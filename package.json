@@ -13,5 +13,8 @@
   "dependencies": {
     "esbuild": "^0.15.5",
     "esbuild-node-externals": "^1.4.1"
-  }
+  },
+"scripts": {
+  "build": "./node_modules/.bin/esbuild ./src/index.js --bundle --minify --platform=node --outfile=./dist/index.js"
+}
 }

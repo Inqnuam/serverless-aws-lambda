@@ -1,2 +1,7 @@
 node_modules
 yarn-error.log
+dist
+# VSCode
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
