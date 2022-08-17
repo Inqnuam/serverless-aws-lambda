@@ -1,5 +1,5 @@
 {
-  "name": "@inqnuam/serverless-alb-offline",
+  "name": "serverless-alb-offline",
   "version": "1.0.0",
   "description": "AWS Application Load Balancer mock for Serverless",
   "main": "index.js",
