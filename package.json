@@ -1,6 +1,6 @@
 {
   "name": "serverless-alb-offline",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "AWS Application Load Balancer mock for Serverless",
   "main": "src/index.js",
   "author": "Inqnuam",

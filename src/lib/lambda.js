@@ -23,19 +23,7 @@ const htmlContent502 = `<html>
 </html>`;
 
 export class LambdaMock extends EventEmitter {
-  constructor({
-    name,
-    path,
-    method,
-    timeout,
-    memorySize,
-    environment,
-    handlerPath,
-    handlerName,
-    esEntryPoint,
-    esOutputPath,
-    entryPoint,
-  }) {
+  constructor({ name, path, method, timeout, memorySize, environment, handlerPath, handlerName, esEntryPoint, esOutputPath, entryPoint }) {
     super();
     this.name = name;
     this.path = path;
@@ -58,7 +46,7 @@ export class LambdaMock extends EventEmitter {
       esOutputPath: this.esOutputPath,
       handlerName: this.handlerName,
     };
-    await new Promise((resolve) => {
+    await new Promise((resolve, reject) => {
       this._worker = new Worker(workerPath, {
         env: this.environment,
         stackSizeMb: this.memorySize,
@@ -74,7 +62,7 @@ export class LambdaMock extends EventEmitter {
         }
       });
       this._worker.on("error", (err) => {
-        log.RED("lambda error");
+        log.RED("Lambda execution fatal error");
         console.error(err);
 
         reject(err);
@@ -92,11 +80,7 @@ export class LambdaMock extends EventEmitter {
       const awsRequestId = randomUUID();
 
       const date = new Date();
-      log.CYAN(
-        `${date.toLocaleDateString()} ${date.toLocaleTimeString()} requestId: ${awsRequestId} | '${
-          this.name
-        }' ${this.method} ${this.path}`
-      );
+      log.CYAN(`${date.toLocaleDateString()} ${date.toLocaleTimeString()} requestId: ${awsRequestId} | '${this.name}' ${this.method} ${this.path}`);
       this._worker.postMessage({
         channel: "exec",
         data: { event },
