@@ -13,4 +13,5 @@ const CYAN = (s) => {
 const BR_BLUE = (s) => {
   console.log(`\x1b[94m${s}\x1b[0m`);
 };
-export { GREEN, YELLOW, CYAN, BR_BLUE, RED };
+const log = { GREEN, YELLOW, CYAN, BR_BLUE, RED };
+module.exports.default = log;

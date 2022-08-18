@@ -1,12 +1,11 @@
-import { Worker } from "worker_threads";
-import { dirname, resolve } from "path";
-import { fileURLToPath } from "url";
-import { randomUUID } from "crypto";
-import { EventEmitter } from "events";
-import * as log from "./colorize.js";
+const { Worker } = require("worker_threads");
+const { resolve } = require("path");
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const { randomUUID } = require("crypto");
+const { EventEmitter } = require("events");
+
+const log = require("./colorize.js");
+
 const workerPath = resolve(__dirname, "./worker.js");
 const htmlContent502 = `<html>
 
@@ -22,7 +21,7 @@ const htmlContent502 = `<html>
 
 </html>`;
 
-export class LambdaMock extends EventEmitter {
+class LambdaMock extends EventEmitter {
   constructor({ name, path, method, timeout, memorySize, environment, handlerPath, handlerName, esEntryPoint, esOutputPath, entryPoint }) {
     super();
     this.name = name;
@@ -123,3 +122,4 @@ export class LambdaMock extends EventEmitter {
     return eventResponse;
   }
 }
+module.exports.LambdaMock = LambdaMock;

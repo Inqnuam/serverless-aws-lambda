@@ -1,8 +1,9 @@
-import esbuild from "esbuild";
-import path from "path";
-import { nodeExternalsPlugin } from "esbuild-node-externals";
-import { ApplicationLoadBalancer } from "./lib/alb.js";
-import * as log from "./lib/colorize.js";
+const path = require("path");
+const { ApplicationLoadBalancer } = require("./lib/alb.js");
+const log = require("./lib/colorize.js");
+
+const esbuild = require("esbuild");
+const { nodeExternalsPlugin } = require("esbuild-node-externals");
 
 const cwd = process.cwd();
 const DEFAULT_LAMBDA_TIMEOUT = 6;
@@ -20,14 +21,9 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     this.serverless = serverless;
     this.options = options;
 
-    this.pluginConfig =
-      this.serverless.service.custom["serverless-alb-offline"];
+    this.pluginConfig = this.serverless.service.custom["serverless-alb-offline"];
 
-    this.PORT =
-      this.options.p ??
-      this.options.port ??
-      this.pluginConfig?.port ??
-      process.env.PORT;
+    this.PORT = this.options.p ?? this.options.port ?? this.pluginConfig?.port ?? process.env.PORT;
 
     this.#setWatchValue();
 
@@ -78,10 +74,6 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       outdir: path.join(cwd, ".alb_offline"),
       bundle: true,
       plugins: [nodeExternalsPlugin()],
-      format: "esm",
-      outExtension: {
-        ".js": ".mjs",
-      },
       watch: false,
     };
 
@@ -150,22 +142,13 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       }
       events.forEach((event) => {
         const alb = event?.alb;
-        if (
-          alb?.conditions &&
-          alb.conditions.path?.length &&
-          alb.conditions.method?.length
-        ) {
+        if (alb?.conditions && alb.conditions.path?.length && alb.conditions.method?.length) {
           const handlerPath = lambda.handler;
           const lastPointIndex = handlerPath.lastIndexOf(".");
           const handlerName = handlerPath.slice(lastPointIndex + 1);
-          const esEntryPoint = path.join(
-            cwd,
-            handlerPath.slice(0, lastPointIndex)
-          );
+          const esEntryPoint = path.join(cwd, handlerPath.slice(0, lastPointIndex));
           const region = {
-            AWS_REGION:
-              this.runtimeConfig.environment.AWS_REGION ??
-              this.runtimeConfig.environment.REGION,
+            AWS_REGION: this.runtimeConfig.environment.AWS_REGION ?? this.runtimeConfig.environment.REGION,
           };
 
           let lambdaDef = {
@@ -175,14 +158,8 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
             esEntryPoint,
             path: alb.conditions.path[0],
             method: alb.conditions.method[0].toUpperCase(),
-            memorySize:
-              lambda.memorySize ??
-              this.runtimeConfig.memorySize ??
-              DEFAULT_LAMBDA_MEMORY_SIZE,
-            timeout:
-              lambda.timeout ??
-              this.runtimeConfig.timeout ??
-              DEFAULT_LAMBDA_TIMEOUT,
+            memorySize: lambda.memorySize ?? this.runtimeConfig.memorySize ?? DEFAULT_LAMBDA_MEMORY_SIZE,
+            timeout: lambda.timeout ?? this.runtimeConfig.timeout ?? DEFAULT_LAMBDA_TIMEOUT,
             environment: {
               ...this.runtimeConfig.environment,
               ...lambda.environment,
@@ -203,14 +180,11 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
 
   #setLambdaEsOutputPaths(outputs) {
     const outputNames = Object.keys(outputs)
-      .filter((x) => !x.endsWith(".map"))
+      .filter((x) => !x.endsWith(".map") && outputs[x].entryPoint)
       .map((x) => {
         const element = outputs[x];
         const lastPointIndex = element.entryPoint.lastIndexOf(".");
-        const entryPoint = path.join(
-          cwd,
-          element.entryPoint.slice(0, lastPointIndex)
-        );
+        const entryPoint = path.join(cwd, element.entryPoint.slice(0, lastPointIndex));
         const esOutputPath = path.join(cwd, x);
 
         return {
@@ -220,9 +194,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       });
 
     this.#lambdas.forEach((x) => {
-      const foundOutput = outputNames.find(
-        (w) => w.entryPoint == x.esEntryPoint
-      );
+      const foundOutput = outputNames.find((w) => w.entryPoint == x.esEntryPoint);
 
       if (foundOutput) {
         x.esOutputPath = foundOutput.esOutputPath;
@@ -231,8 +203,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
   }
 
   #setEnvs() {
-    const { environment, memorySize, timeout } =
-      this.serverless.service.provider;
+    const { environment, memorySize, timeout } = this.serverless.service.provider;
 
     this.runtimeConfig.memorySize = memorySize;
     this.runtimeConfig.timeout = timeout;
@@ -241,4 +212,4 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
   }
 }
 
-export default ServerlessAlbOffline;
+module.exports = ServerlessAlbOffline;

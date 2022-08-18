@@ -1,4 +1,4 @@
-export class AlbRouter {
+class AlbRouter {
   #handlers = {
     GET: [],
     POST: [],
@@ -91,9 +91,7 @@ export class AlbRouter {
   }
 
   #setHandler(method, lambdaController) {
-    const foundIndex = this.#handlers[method].findIndex(
-      (x) => x.path == lambdaController.path
-    );
+    const foundIndex = this.#handlers[method].findIndex((x) => x.path == lambdaController.path);
 
     if (foundIndex == -1) {
       this.#handlers[method].push(lambdaController);
@@ -110,3 +108,5 @@ export class AlbRouter {
     console.log(`\x1b[36m${printingString}\x1b[0m`);
   }
 }
+
+module.exports = AlbRouter;

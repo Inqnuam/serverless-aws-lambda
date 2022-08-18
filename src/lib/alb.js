@@ -1,9 +1,9 @@
-import http from "http";
-import { networkInterfaces } from "os";
-import { AlbRouter } from "./router.js";
-import { LambdaMock } from "./lambda.js";
-import inspector from "inspector";
-import * as log from "./colorize.js";
+const http = require("http");
+const { networkInterfaces } = require("os");
+const AlbRouter = require("./router");
+const { LambdaMock } = require("./lambda.js");
+const inspector = require("inspector");
+const log = require("./colorize.js");
 
 const localIp = Object.values(networkInterfaces())
   .flat()
@@ -15,7 +15,7 @@ const debuggerIsAttached = inspector.url() != undefined;
 if (debuggerIsAttached) {
   console.warn("Lambdas timeout are disabled when a Debugger is attached");
 }
-export class ApplicationLoadBalancer extends AlbRouter {
+class ApplicationLoadBalancer extends AlbRouter {
   #server = null;
   runtimeConfig = {};
   constructor(config = { debug: false }) {
@@ -239,3 +239,5 @@ export class ApplicationLoadBalancer extends AlbRouter {
     }
   }
 }
+
+module.exports.ApplicationLoadBalancer = ApplicationLoadBalancer;

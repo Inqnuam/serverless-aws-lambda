@@ -1,5 +1,5 @@
-import { parentPort, workerData } from "worker_threads";
-import inspector from "inspector";
+const { parentPort, workerData } = require("worker_threads");
+const inspector = require("inspector");
 
 const debuggerIsAttached = inspector.url() != undefined;
 
@@ -9,9 +9,7 @@ parentPort.on("message", async (e) => {
   const { channel, data, awsRequestId } = e;
 
   if (channel == "import") {
-    const handler = await import(
-      `${workerData.esOutputPath}?version=${Date.now()}`
-    );
+    const handler = await import(`${workerData.esOutputPath}?version=${Date.now()}`);
     eventHandler = handler[workerData.handlerName];
     parentPort.postMessage({ channel: "import" });
   } else if (channel == "exec") {
@@ -80,10 +78,7 @@ parentPort.on("message", async (e) => {
       functionName: workerData.name,
       memoryLimitInMB: workerData.memorySize,
       logGroupName: `/aws/lambda/${workerData.name}`,
-      logStreamName: `${new Date().toLocaleDateString()}[$LATEST]${awsRequestId.replace(
-        /-/g,
-        ""
-      )}`,
+      logStreamName: `${new Date().toLocaleDateString()}[$LATEST]${awsRequestId.replace(/-/g, "")}`,
       clientContext: undefined,
       identity: undefined,
       invokedFunctionArn: `arn:aws:lambda:eu-west-1:00000000000:function:${workerData.name}`,
