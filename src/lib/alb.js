@@ -66,7 +66,7 @@ export class ApplicationLoadBalancer extends AlbRouter {
     let body = Buffer.alloc(0);
 
     const contentType = headers["content-type"];
-    let event = this.#convertReqToAlbEvent(req, parsedURL);
+    let event = this.#convertReqToAlbEvent(req);
 
     if (this.debug) {
       log.YELLOW("event:");
@@ -80,12 +80,7 @@ export class ApplicationLoadBalancer extends AlbRouter {
           body += chunk;
         })
         .on("end", async () => {
-          if (
-            contentType &&
-            (contentType.includes("json") ||
-              contentType.includes("xml") ||
-              contentType.startsWith("text/"))
-          ) {
+          if (contentType && (contentType.includes("json") || contentType.includes("xml") || contentType.startsWith("text/"))) {
             event.body = body.toString();
           }
 
@@ -115,11 +110,7 @@ export class ApplicationLoadBalancer extends AlbRouter {
     });
 
     try {
-      const responseData = await this.#getLambdaResponse(
-        event,
-        lambdaController,
-        res
-      );
+      const responseData = await this.#getLambdaResponse(event, lambdaController, res);
       if (!res.writableFinished) {
         this.#setResponseHead(res, responseData);
         this.#writeResponseBody(res, responseData);
@@ -141,13 +132,8 @@ export class ApplicationLoadBalancer extends AlbRouter {
     res.statusCode = responseData.statusCode ?? 200;
     res.statusMessage = responseData.statusMessage ?? "";
 
-    if (
-      typeof responseData.headers == "object" &&
-      !Array.isArray(responseData.headers)
-    ) {
-      const headersKeys = Object.keys(responseData.headers).filter(
-        (key) => key !== "Server" && key !== "Date"
-      );
+    if (typeof responseData.headers == "object" && !Array.isArray(responseData.headers)) {
+      const headersKeys = Object.keys(responseData.headers).filter((key) => key !== "Server" && key !== "Date");
       headersKeys.forEach((key) => {
         res.setHeader(key, responseData.headers[key]);
       });
@@ -159,15 +145,8 @@ export class ApplicationLoadBalancer extends AlbRouter {
   }
 
   #writeResponseBody(res, responseData) {
-    if (
-      typeof responseData.body != "string" &&
-      res.statusCode &&
-      String(res.statusCode).startsWith("2")
-    ) {
-      console.warn(
-        "response 'body' must be a string. Receievd",
-        typeof responseData.body
-      );
+    if (typeof responseData.body != "string" && res.statusCode && String(res.statusCode).startsWith("2")) {
+      console.warn("response 'body' must be a string. Receievd", typeof responseData.body);
       responseData.body = "";
 
       // TODO: if statudCode 404 send html 404 not found as body
@@ -184,8 +163,10 @@ export class ApplicationLoadBalancer extends AlbRouter {
     });
   }
 
-  #convertReqToAlbEvent(req, parsedURL) {
-    const { method, headers } = req;
+  #convertReqToAlbEvent(req) {
+    const { method, headers, url } = req;
+
+    const parsedURL = new URL(url, "http://localhost:3003");
 
     const albDefaultHeaders = {
       "x-forwarded-for": req.socket.remoteAddress,
@@ -197,21 +178,28 @@ export class ApplicationLoadBalancer extends AlbRouter {
       headers: { ...albDefaultHeaders, ...headers },
       httpMethod: method,
       path: parsedURL.pathname,
-      queryStringParameters: this.#paramsToObject(
-        parsedURL.searchParams.entries()
-      ),
+      queryStringParameters: this.#paramsToObject(url),
       isBase64Encoded: false,
     };
 
     return event;
   }
 
-  #paramsToObject(entries) {
-    const result = {};
-    for (const [key, value] of entries) {
-      result[key] = value;
-    }
-    return result;
+  #paramsToObject(reqUrl) {
+    const queryStartIndex = reqUrl.indexOf("?");
+    if (queryStartIndex == -1) return {};
+
+    let queryStringComponents = {};
+    const queryString = reqUrl.slice(queryStartIndex + 1);
+    const queryComponents = queryString.split("&");
+
+    queryComponents.forEach((c) => {
+      const [key, value] = c.split("=");
+
+      queryStringComponents[key] = value;
+    });
+
+    return queryStringComponents;
   }
 
   async load(lambdaDefinitions) {
