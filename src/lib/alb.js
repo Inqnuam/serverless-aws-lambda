@@ -3,7 +3,7 @@ const { networkInterfaces } = require("os");
 const AlbRouter = require("./router");
 const { LambdaMock } = require("./lambda.js");
 const inspector = require("inspector");
-const log = require("./colorize.js");
+const { log } = require("./colorize.js");
 
 const localIp = Object.values(networkInterfaces())
   .flat()
@@ -49,6 +49,7 @@ class ApplicationLoadBalancer extends AlbRouter {
     this.#server.listen(port, () => {
       const { port: listeningPort } = this.#server.address();
       this.PORT = listeningPort;
+      AlbRouter.PORT = listeningPort;
       if (typeof callback == "function") {
         callback(listeningPort);
       } else {

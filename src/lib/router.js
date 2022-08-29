@@ -10,7 +10,7 @@ class AlbRouter {
     COPY: [],
     ANY: null,
   };
-  PORT = 0;
+  static PORT = 0;
   debug = false;
   constructor(config) {
     this.debug = config.debug;

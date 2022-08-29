@@ -10,16 +10,19 @@ parentPort.on("message", async (e) => {
 
   if (channel == "import") {
     const handler = await import(`${workerData.esOutputPath}?version=${Date.now()}`);
-    eventHandler = handler[workerData.handlerName];
+
+    // workaround to ES bug
+    if (workerData.handlerName == "default" && typeof handler.default == "object" && typeof handler.default.default == "function") {
+      eventHandler = handler.default.default;
+    } else {
+      eventHandler = handler[workerData.handlerName];
+    }
+
     parentPort.postMessage({ channel: "import" });
   } else if (channel == "exec") {
     const { event } = data;
 
     let isSent = false;
-    const resIsSent = () => {
-      isSent = true;
-    };
-
     let timeout = workerData.timeout * 1000;
 
     const lambdaTimeoutInterval = setInterval(() => {
@@ -33,6 +36,11 @@ parentPort.on("message", async (e) => {
       }
     }, 250);
 
+    const resIsSent = () => {
+      isSent = true;
+      clearInterval(lambdaTimeoutInterval);
+    };
+
     const getRemainingTimeInMillis = () => {
       return timeout;
     };
@@ -44,7 +52,6 @@ parentPort.on("message", async (e) => {
           return;
         }
         resIsSent();
-        clearInterval(lambdaTimeoutInterval);
 
         parentPort.postMessage({
           channel: "succeed",
@@ -57,7 +64,7 @@ parentPort.on("message", async (e) => {
           return;
         }
         resIsSent();
-        clearInterval(lambdaTimeoutInterval);
+
         parentPort.postMessage({ channel: "fail", data: err, awsRequestId });
       },
       done: (err, lambdaRes) => {
@@ -66,7 +73,6 @@ parentPort.on("message", async (e) => {
         }
         // TODO: check what to do with err
         resIsSent();
-        clearInterval(lambdaTimeoutInterval);
 
         parentPort.postMessage({
           channel: "done",

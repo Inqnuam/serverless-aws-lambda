@@ -4,7 +4,7 @@ const { resolve } = require("path");
 const { randomUUID } = require("crypto");
 const { EventEmitter } = require("events");
 
-const log = require("./colorize.js");
+const { log } = require("./colorize.js");
 
 const workerPath = resolve(__dirname, "./worker.js");
 const htmlContent502 = `<html>

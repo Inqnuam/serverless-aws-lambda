@@ -1,6 +1,6 @@
 const path = require("path");
 const { ApplicationLoadBalancer } = require("./lib/alb.js");
-const log = require("./lib/colorize.js");
+const { log } = require("./lib/colorize.js");
 
 const esbuild = require("esbuild");
 const { nodeExternalsPlugin } = require("esbuild-node-externals");
@@ -70,8 +70,10 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       platform: "node",
       sourcemap: true,
       metafile: true,
+      target: "ES6",
       entryPoints: entryPoints,
       outdir: path.join(cwd, ".alb_offline"),
+      outbase: "src",
       bundle: true,
       plugins: [nodeExternalsPlugin()],
       watch: false,
