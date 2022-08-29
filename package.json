@@ -14,7 +14,9 @@
     "esbuild-node-externals": "^1.4.1"
   },
   "devDependencies": {
-    "@types/node": "^18.7.6"
+    "@types/node": "^18.7.6",
+    "esbuild": "^0.15.5",
+    "esbuild-node-externals": "^1.4.1"
   },
   "scripts": {
     "build": "./node_modules/.bin/esbuild ./src/index.js --bundle --minify --platform=node --outdir=dist --external:./src/lib/worker.js --external:\"./node_modules/*\" && ./node_modules/.bin/esbuild ./src/lib/worker.js --bundle --minify --platform=node --outdir=dist"
