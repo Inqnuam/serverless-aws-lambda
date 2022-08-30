@@ -4,6 +4,7 @@ const { log } = require("./lib/colorize.js");
 
 const esbuild = require("esbuild");
 const { nodeExternalsPlugin } = require("esbuild-node-externals");
+const { handlebars } = require("./lib/handlebars.js");
 
 const cwd = process.cwd();
 const DEFAULT_LAMBDA_TIMEOUT = 6;
@@ -75,7 +76,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       outdir: path.join(cwd, ".alb_offline"),
       outbase: "src",
       bundle: true,
-      plugins: [nodeExternalsPlugin()],
+      plugins: [nodeExternalsPlugin(), handlebars()],
       watch: false,
     };
 
