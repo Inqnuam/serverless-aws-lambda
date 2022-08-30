@@ -1,6 +1,6 @@
 {
   "name": "serverless-alb-offline",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "AWS Application Load Balancer mock for Serverless",
   "main": "dist/index.js",
   "author": "Inqnuam",
@@ -9,14 +9,16 @@
     "type": "git",
     "url": "git+https://github.com/inqnuam/serverless-alb-offline.git"
   },
-  "dependencies": {
+  "devDependencies": {
+    "@types/node": "^18.7.14",
     "esbuild": "^0.15.6",
     "esbuild-node-externals": "^1.5.0"
   },
-  "devDependencies": {
-    "@types/node": "^18.7.14"
+  "peerDependencies": {
+    "esbuild": "^0.15.6",
+    "esbuild-node-externals": "^1.5.0"
   },
   "scripts": {
-    "build": "./node_modules/.bin/esbuild ./src/index.js --bundle --minify --platform=node --outdir=dist --external:./src/lib/worker.js --external:\"./node_modules/*\" && ./node_modules/.bin/esbuild ./src/lib/worker.js --bundle --minify --platform=node --outdir=dist"
+    "build": "node ./build.js"
   }
 }
