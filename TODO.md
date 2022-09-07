@@ -1,1 +1,1 @@
-Add websocket for html pages
+Add websocket for html pages in dev mode
