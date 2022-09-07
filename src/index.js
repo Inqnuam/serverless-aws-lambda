@@ -73,7 +73,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       platform: "node",
       sourcemap: true,
       metafile: true,
-      target: "ES6",
+      target: "ES2018",
       entryPoints: entryPoints,
       outdir: path.join(cwd, ".alb_offline"),
       outbase: "src",
