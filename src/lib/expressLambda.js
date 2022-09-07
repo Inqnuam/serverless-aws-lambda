@@ -1,4 +1,5 @@
 const { LambdaCompiler } = require("../compiler/src/compiler");
+const path = require("path");
 
 const ExpressLambda = ({ dev }) => {
   return {
