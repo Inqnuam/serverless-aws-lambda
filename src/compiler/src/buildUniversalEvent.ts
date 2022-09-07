@@ -1,0 +1,74 @@
+import ts from "typescript";
+
+function _buildUniversalEvent(context: ts.TransformationContext) {
+  return context.factory.createVariableStatement(
+    undefined,
+    context.factory.createVariableDeclarationList(
+      [
+        context.factory.createVariableDeclaration(
+          context.factory.createIdentifier("_buildUniversalEvent"),
+          undefined,
+          undefined,
+          context.factory.createArrowFunction(
+            undefined,
+            undefined,
+            [
+              context.factory.createParameterDeclaration(
+                undefined,
+                undefined,
+                undefined,
+                context.factory.createIdentifier("awsAlbEvent"),
+                undefined,
+                context.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
+                undefined
+              ),
+            ],
+            undefined,
+            context.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+            context.factory.createBlock(
+              [
+                context.factory.createVariableStatement(
+                  undefined,
+                  context.factory.createVariableDeclarationList(
+                    [
+                      context.factory.createVariableDeclaration(
+                        context.factory.createIdentifier("universalEvent"),
+                        undefined,
+                        undefined,
+                        context.factory.createObjectLiteralExpression(
+                          [
+                            context.factory.createSpreadAssignment(
+                              context.factory.createIdentifier("awsAlbEvent")
+                            ),
+                          ],
+                          false
+                        )
+                      ),
+                    ],
+                    ts.NodeFlags.Let
+                  )
+                ),
+                context.factory.createExpressionStatement(
+                  context.factory.createBinaryExpression(
+                    context.factory.createPropertyAccessExpression(
+                      context.factory.createIdentifier("universalEvent"),
+                      context.factory.createIdentifier("query")
+                    ),
+                    context.factory.createToken(ts.SyntaxKind.EqualsToken),
+                    context.factory.createObjectLiteralExpression([], false)
+                  )
+                ),
+                context.factory.createReturnStatement(
+                  context.factory.createIdentifier("universalEvent")
+                ),
+              ],
+              true
+            )
+          )
+        ),
+      ],
+      ts.NodeFlags.Const
+    )
+  );
+}
+export { _buildUniversalEvent };

@@ -5,6 +5,7 @@ const esBuildConfig = {
   bundle: true,
   minify: true,
   platform: "node",
+  target: "es2018",
   plugins: [nodeExternalsPlugin()],
   outdir: "dist",
 };

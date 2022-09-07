@@ -1,0 +1,10 @@
+{
+    "include": ["src/lib/**/*"],
+    "compilerOptions": {
+    "declaration": true,
+    "esModuleInterop": true,
+      "emitDeclarationOnly": true,
+      "declarationDir": "./dist",
+     
+    }
+  }
