@@ -2,6 +2,7 @@
     "include": ["src/lib/**/*"],
     "compilerOptions": {
     "declaration": true,
+    "target": "es2018" ,
     "esModuleInterop": true,
       "emitDeclarationOnly": true,
       "declarationDir": "./dist",
