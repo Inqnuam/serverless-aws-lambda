@@ -390,13 +390,11 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
     context.factory.createMethodDeclaration(
       undefined,
       undefined,
-      undefined,
       context.factory.createIdentifier("redirect"),
       undefined,
       undefined,
       [
         context.factory.createParameterDeclaration(
-          undefined,
           undefined,
           undefined,
           context.factory.createIdentifier("code"),
@@ -405,7 +403,6 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
           undefined
         ),
         context.factory.createParameterDeclaration(
-          undefined,
           undefined,
           undefined,
           context.factory.createIdentifier("path"),
@@ -417,33 +414,45 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
       undefined,
       context.factory.createBlock(
         [
-          context.factory.createExpressionStatement(
-            context.factory.createBinaryExpression(
-              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("isSent")),
-              context.factory.createToken(ts.SyntaxKind.EqualsToken),
-              context.factory.createTrue()
-            )
-          ),
-          context.factory.createExpressionStatement(
-            context.factory.createCallExpression(
-              context.factory.createPropertyAccessExpression(
-                context.factory.createCallExpression(
-                  context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("status")),
-                  undefined,
-                  [context.factory.createIdentifier("code")]
+          context.factory.createIfStatement(
+            context.factory.createPrefixUnaryExpression(
+              ts.SyntaxKind.ExclamationToken,
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("isSent"))
+            ),
+            context.factory.createBlock(
+              [
+                context.factory.createExpressionStatement(
+                  context.factory.createBinaryExpression(
+                    context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("isSent")),
+                    context.factory.createToken(ts.SyntaxKind.EqualsToken),
+                    context.factory.createTrue()
+                  )
                 ),
-                context.factory.createIdentifier("set")
-              ),
-              undefined,
-              [context.factory.createStringLiteral("Location"), context.factory.createIdentifier("path")]
-            )
-          ),
-          context.factory.createExpressionStatement(
-            context.factory.createCallExpression(
-              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#returnReseponse")),
-              undefined,
-              []
-            )
+                context.factory.createExpressionStatement(
+                  context.factory.createCallExpression(
+                    context.factory.createPropertyAccessExpression(
+                      context.factory.createCallExpression(
+                        context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("status")),
+                        undefined,
+                        [context.factory.createIdentifier("code")]
+                      ),
+                      context.factory.createIdentifier("set")
+                    ),
+                    undefined,
+                    [context.factory.createStringLiteral("Location"), context.factory.createIdentifier("path")]
+                  )
+                ),
+                context.factory.createExpressionStatement(
+                  context.factory.createCallExpression(
+                    context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#returnReseponse")),
+                    undefined,
+                    []
+                  )
+                ),
+              ],
+              true
+            ),
+            undefined
           ),
         ],
         true
