@@ -53,9 +53,17 @@ parentPort.on("message", async (e) => {
         }
         resIsSent();
 
+        let data;
+        if (typeof lambdaRes == "object" && lambdaRes.statusCode) {
+          data = JSON.stringify(lambdaRes);
+        } else {
+          const errMsg = `typeof 'succeed' content value must be an object, including at least 'statusCode' key-value.\nReceived: ${typeof lambdaRes}=>\n${lambdaRes} `;
+
+          throw new Error(errMsg);
+        }
         parentPort.postMessage({
           channel: "succeed",
-          data: lambdaRes,
+          data,
           awsRequestId,
         });
       },
@@ -63,9 +71,10 @@ parentPort.on("message", async (e) => {
         if (isSent) {
           return;
         }
+        console.error(err);
         resIsSent();
 
-        parentPort.postMessage({ channel: "fail", data: err, awsRequestId });
+        parentPort.postMessage({ channel: "fail", data: "Request failed", awsRequestId });
       },
       done: (err, lambdaRes) => {
         if (isSent) {
@@ -74,9 +83,18 @@ parentPort.on("message", async (e) => {
         // TODO: check what to do with err
         resIsSent();
 
+        let data;
+        if (typeof lambdaRes == "object" && lambdaRes.statusCode) {
+          data = JSON.stringify(lambdaRes);
+        } else {
+          const errMsg = `typeof 'done' content value must be an object, including at least 'statusCode' key-value.\nReceived: ${typeof lambdaRes}=>\n${lambdaRes} `;
+
+          throw new Error(errMsg);
+        }
+
         parentPort.postMessage({
           channel: "done",
-          data: lambdaRes,
+          data: data,
           awsRequestId,
         });
       },

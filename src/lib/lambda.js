@@ -86,16 +86,24 @@ class LambdaMock extends EventEmitter {
         awsRequestId,
       });
 
-      this.on(awsRequestId, (channel, data) => {
+      this.on(awsRequestId, (channel, rawData) => {
         this.removeAllListeners(awsRequestId);
 
+        const data = JSON.parse(rawData);
         switch (channel) {
           case "return":
             resolve(data);
 
             break;
           case "succeed":
-            res.end(data);
+            res.statusCode = data.statusCode;
+            if (data.headers && typeof data.headers == "object") {
+              for (const [key, value] of Object.entries(data.headers)) {
+                res.setHeader(key, value);
+              }
+            }
+
+            res.end(data.body);
             resolve();
             break;
           case "fail":
@@ -108,7 +116,14 @@ class LambdaMock extends EventEmitter {
             resolve();
             break;
           case "done":
-            res.end(data);
+            res.statusCode = data.statusCode;
+            if (data.headers && typeof data.headers == "object") {
+              for (const [key, value] of Object.entries(data.headers)) {
+                res.setHeader(key, value);
+              }
+            }
+
+            res.end(data.body);
 
             resolve();
             break;

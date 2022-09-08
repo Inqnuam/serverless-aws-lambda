@@ -23,7 +23,7 @@ export interface Request {
   headers: Object;
   isBase64Encoded: boolean;
   query: Object;
-  body: any;
+  body: string | null | undefined;
   method: HttpMethod;
 }
 
