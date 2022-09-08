@@ -1,5 +1,6 @@
 import ts from "typescript";
-const cantFindPath = (method = "GET", path = "/hello") => `<!DOCTYPE html>
+import { ILambdaCompiler } from "./declarations";
+const cantFindPath = (method = "access", path = "/") => `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -10,7 +11,18 @@ const cantFindPath = (method = "GET", path = "/hello") => `<!DOCTYPE html>
 </body>
 </html>`;
 
-export const buildLambdaHandler = (context: ts.TransformationContext, lambdaName: string, middlewares: ts.Expression[]) => {
+const InternalServerError = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>Internal Server Error</pre>
+</body>
+</html>`;
+
+export const buildLambdaHandler = (context: ts.TransformationContext, lambdaName: string, middlewares: ts.Expression[], compiler: ILambdaCompiler) => {
   return [
     // route middlewares
     context.factory.createVariableStatement(
@@ -167,51 +179,115 @@ export const buildLambdaHandler = (context: ts.TransformationContext, lambdaName
                                                 context.factory.createBlock(
                                                   [
                                                     context.factory.createIfStatement(
-                                                      context.factory.createBinaryExpression(
-                                                        context.factory.createIdentifier("err"),
-                                                        context.factory.createToken(ts.SyntaxKind.AmpersandAmpersandToken),
-                                                        context.factory.createIdentifier(`_${lambdaName}errorCallback`)
-                                                      ),
+                                                      context.factory.createIdentifier("err"),
                                                       context.factory.createBlock(
                                                         [
-                                                          context.factory.createTryStatement(
+                                                          context.factory.createIfStatement(
+                                                            context.factory.createBinaryExpression(
+                                                              context.factory.createTypeOfExpression(context.factory.createIdentifier(`_${lambdaName}errorCallback`)),
+                                                              context.factory.createToken(ts.SyntaxKind.ExclamationEqualsToken),
+                                                              context.factory.createStringLiteral("undefined")
+                                                            ),
                                                             context.factory.createBlock(
                                                               [
-                                                                context.factory.createExpressionStatement(
-                                                                  context.factory.createAwaitExpression(
-                                                                    context.factory.createCallExpression(
-                                                                      context.factory.createIdentifier(`_${lambdaName}errorCallback`),
+                                                                context.factory.createTryStatement(
+                                                                  context.factory.createBlock(
+                                                                    [
+                                                                      context.factory.createExpressionStatement(
+                                                                        context.factory.createAwaitExpression(
+                                                                          context.factory.createCallExpression(
+                                                                            context.factory.createIdentifier(`_${lambdaName}errorCallback`),
+                                                                            undefined,
+                                                                            [
+                                                                              context.factory.createIdentifier("err"),
+                                                                              context.factory.createIdentifier("req"),
+                                                                              context.factory.createIdentifier("res"),
+                                                                            ]
+                                                                          )
+                                                                        )
+                                                                      ),
+                                                                    ],
+                                                                    true
+                                                                  ),
+                                                                  context.factory.createCatchClause(
+                                                                    context.factory.createVariableDeclaration(
+                                                                      context.factory.createIdentifier("error"),
                                                                       undefined,
+                                                                      undefined,
+                                                                      undefined
+                                                                    ),
+                                                                    context.factory.createBlock(
                                                                       [
-                                                                        context.factory.createIdentifier("err"),
-                                                                        context.factory.createIdentifier("req"),
-                                                                        context.factory.createIdentifier("res"),
-                                                                      ]
+                                                                        context.factory.createExpressionStatement(
+                                                                          context.factory.createCallExpression(
+                                                                            context.factory.createPropertyAccessExpression(
+                                                                              context.factory.createCallExpression(
+                                                                                context.factory.createPropertyAccessExpression(
+                                                                                  context.factory.createCallExpression(
+                                                                                    context.factory.createPropertyAccessExpression(
+                                                                                      context.factory.createIdentifier("res"),
+                                                                                      context.factory.createIdentifier("status")
+                                                                                    ),
+                                                                                    undefined,
+                                                                                    [context.factory.createNumericLiteral("500")]
+                                                                                  ),
+                                                                                  context.factory.createIdentifier("type")
+                                                                                ),
+                                                                                undefined,
+                                                                                [context.factory.createStringLiteral("text/html; charset=utf-8")]
+                                                                              ),
+                                                                              context.factory.createIdentifier("send")
+                                                                            ),
+                                                                            undefined,
+                                                                            [
+                                                                              compiler.isDev
+                                                                                ? context.factory.createIdentifier("error.message")
+                                                                                : context.factory.createStringLiteral(InternalServerError),
+                                                                            ]
+                                                                          )
+                                                                        ),
+                                                                      ],
+                                                                      true
                                                                     )
-                                                                  )
+                                                                  ),
+                                                                  undefined
                                                                 ),
                                                               ],
                                                               true
                                                             ),
-                                                            context.factory.createCatchClause(
-                                                              context.factory.createVariableDeclaration(context.factory.createIdentifier("error"), undefined, undefined, undefined),
-                                                              context.factory.createBlock(
-                                                                [
-                                                                  context.factory.createExpressionStatement(
-                                                                    context.factory.createCallExpression(
-                                                                      context.factory.createPropertyAccessExpression(
-                                                                        context.factory.createIdentifier("console"),
-                                                                        context.factory.createIdentifier("log")
+                                                            context.factory.createBlock(
+                                                              [
+                                                                context.factory.createExpressionStatement(
+                                                                  context.factory.createCallExpression(
+                                                                    context.factory.createPropertyAccessExpression(
+                                                                      context.factory.createCallExpression(
+                                                                        context.factory.createPropertyAccessExpression(
+                                                                          context.factory.createCallExpression(
+                                                                            context.factory.createPropertyAccessExpression(
+                                                                              context.factory.createIdentifier("res"),
+                                                                              context.factory.createIdentifier("status")
+                                                                            ),
+                                                                            undefined,
+                                                                            [context.factory.createNumericLiteral("500")]
+                                                                          ),
+                                                                          context.factory.createIdentifier("type")
+                                                                        ),
+                                                                        undefined,
+                                                                        [context.factory.createStringLiteral("text/html; charset=utf-8")]
                                                                       ),
-                                                                      undefined,
-                                                                      [context.factory.createIdentifier("error")]
-                                                                    )
-                                                                  ),
-                                                                ],
-                                                                true
-                                                              )
-                                                            ),
-                                                            undefined
+                                                                      context.factory.createIdentifier("send")
+                                                                    ),
+                                                                    undefined,
+                                                                    [
+                                                                      compiler.isDev
+                                                                        ? context.factory.createIdentifier("err.message")
+                                                                        : context.factory.createStringLiteral(InternalServerError),
+                                                                    ]
+                                                                  )
+                                                                ),
+                                                              ],
+                                                              true
+                                                            )
                                                           ),
                                                         ],
                                                         true
@@ -249,33 +325,98 @@ export const buildLambdaHandler = (context: ts.TransformationContext, lambdaName
                                     context.factory.createVariableDeclaration(context.factory.createIdentifier("error"), undefined, undefined, undefined),
                                     context.factory.createBlock(
                                       [
-                                        context.factory.createExpressionStatement(
-                                          context.factory.createCallExpression(
-                                            context.factory.createPropertyAccessExpression(
-                                              context.factory.createCallExpression(
-                                                context.factory.createPropertyAccessExpression(
-                                                  context.factory.createCallExpression(
-                                                    context.factory.createPropertyAccessExpression(
-                                                      context.factory.createIdentifier("res"),
-                                                      context.factory.createIdentifier("status")
-                                                    ),
-                                                    undefined,
-                                                    [context.factory.createNumericLiteral("500")]
-                                                  ),
-                                                  context.factory.createIdentifier("type")
-                                                ),
-                                                undefined,
-                                                [context.factory.createStringLiteral("text/html; charset=utf-8")]
-                                              ),
-                                              context.factory.createIdentifier("send")
-                                            ),
-                                            undefined,
+                                        context.factory.createIfStatement(
+                                          context.factory.createBinaryExpression(
+                                            context.factory.createTypeOfExpression(context.factory.createIdentifier(`_${lambdaName}errorCallback`)),
+                                            context.factory.createToken(ts.SyntaxKind.ExclamationEqualsToken),
+                                            context.factory.createStringLiteral("undefined")
+                                          ),
+                                          context.factory.createBlock(
                                             [
-                                              context.factory.createIdentifier(
-                                                // TODO: send error only in dev mode, else default 500 error
-                                                "error"
+                                              context.factory.createTryStatement(
+                                                context.factory.createBlock(
+                                                  [
+                                                    context.factory.createExpressionStatement(
+                                                      context.factory.createAwaitExpression(
+                                                        context.factory.createCallExpression(context.factory.createIdentifier(`_${lambdaName}errorCallback`), undefined, [
+                                                          context.factory.createIdentifier("error"),
+                                                          context.factory.createIdentifier("req"),
+                                                          context.factory.createIdentifier("res"),
+                                                        ])
+                                                      )
+                                                    ),
+                                                  ],
+                                                  true
+                                                ),
+                                                context.factory.createCatchClause(
+                                                  context.factory.createVariableDeclaration(context.factory.createIdentifier("error"), undefined, undefined, undefined),
+                                                  context.factory.createBlock(
+                                                    [
+                                                      context.factory.createExpressionStatement(
+                                                        context.factory.createCallExpression(
+                                                          context.factory.createPropertyAccessExpression(
+                                                            context.factory.createCallExpression(
+                                                              context.factory.createPropertyAccessExpression(
+                                                                context.factory.createCallExpression(
+                                                                  context.factory.createPropertyAccessExpression(
+                                                                    context.factory.createIdentifier("res"),
+                                                                    context.factory.createIdentifier("status")
+                                                                  ),
+                                                                  undefined,
+                                                                  [context.factory.createNumericLiteral("500")]
+                                                                ),
+                                                                context.factory.createIdentifier("type")
+                                                              ),
+                                                              undefined,
+                                                              [context.factory.createStringLiteral("text/html; charset=utf-8")]
+                                                            ),
+                                                            context.factory.createIdentifier("send")
+                                                          ),
+                                                          undefined,
+                                                          [
+                                                            compiler.isDev
+                                                              ? context.factory.createIdentifier("error.message")
+                                                              : context.factory.createStringLiteral(InternalServerError),
+                                                          ]
+                                                        )
+                                                      ),
+                                                    ],
+                                                    true
+                                                  )
+                                                ),
+                                                undefined
                                               ),
-                                            ]
+                                            ],
+                                            true
+                                          ),
+                                          context.factory.createBlock(
+                                            [
+                                              context.factory.createExpressionStatement(
+                                                context.factory.createCallExpression(
+                                                  context.factory.createPropertyAccessExpression(
+                                                    context.factory.createCallExpression(
+                                                      context.factory.createPropertyAccessExpression(
+                                                        context.factory.createCallExpression(
+                                                          context.factory.createPropertyAccessExpression(
+                                                            context.factory.createIdentifier("res"),
+                                                            context.factory.createIdentifier("status")
+                                                          ),
+                                                          undefined,
+                                                          [context.factory.createNumericLiteral("500")]
+                                                        ),
+                                                        context.factory.createIdentifier("type")
+                                                      ),
+                                                      undefined,
+                                                      [context.factory.createStringLiteral("text/html; charset=utf-8")]
+                                                    ),
+                                                    context.factory.createIdentifier("send")
+                                                  ),
+                                                  undefined,
+                                                  [compiler.isDev ? context.factory.createIdentifier("error.message") : context.factory.createStringLiteral(InternalServerError)]
+                                                )
+                                              ),
+                                            ],
+                                            true
                                           )
                                         ),
                                       ],
@@ -347,7 +488,7 @@ export const buildLambdaHandler = (context: ts.TransformationContext, lambdaName
                                 context.factory.createIdentifier("send")
                               ),
                               undefined,
-                              [context.factory.createStringLiteral(cantFindPath())]
+                              [context.factory.createStringLiteral(cantFindPath("access", lambdaName))]
                             )
                           ),
                         ],

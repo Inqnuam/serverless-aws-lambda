@@ -212,7 +212,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
 
     this.runtimeConfig.memorySize = memorySize;
     this.runtimeConfig.timeout = timeout;
-    this.runtimeConfig.environment = environment;
+    this.runtimeConfig.environment = environment ?? {};
     this.runtimeConfig.environment.AWS_PROFILE = process.env.AWS_PROFILE;
   }
 }

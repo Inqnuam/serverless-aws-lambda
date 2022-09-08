@@ -9,9 +9,11 @@ export function getLambdaImportDeclaration(this: ILambdaCompiler, context: ts.Tr
     // @ts-ignore
     if (node.moduleSpecifier?.text == pkgPath) {
       // @ts-ignore
-      const importElement = node.importClause?.namedBindings?.elements?.[0];
-      if (importElement) {
-        if (importElement.name.escapedText == "Lambda" || importElement.propertyName?.escapedText == "Lambda") {
+      const importElements = node.importClause?.namedBindings?.elements;
+
+      if (importElements) {
+        const importElement = importElements.find((x) => x.name.escapedText == "Lambda" || x.propertyName?.escapedText == "Lambda");
+        if ((importElement && importElement.name.escapedText == "Lambda") || importElement.propertyName?.escapedText == "Lambda") {
           const lambdaClassImportedName = importElement.name.escapedText;
           this.importClauses.add(lambdaClassImportedName);
 

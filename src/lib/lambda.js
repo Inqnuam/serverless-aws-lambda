@@ -89,7 +89,7 @@ class LambdaMock extends EventEmitter {
       this.on(awsRequestId, (channel, rawData) => {
         this.removeAllListeners(awsRequestId);
 
-        const data = JSON.parse(rawData);
+        const data = channel == "return" ? rawData : JSON.parse(rawData);
         switch (channel) {
           case "return":
             resolve(data);
@@ -97,6 +97,8 @@ class LambdaMock extends EventEmitter {
             break;
           case "succeed":
             res.statusCode = data.statusCode;
+            res.setHeader("Server", "awselb/2.0");
+            res.setHeader("Date", new Date().toUTCString());
             if (data.headers && typeof data.headers == "object") {
               for (const [key, value] of Object.entries(data.headers)) {
                 res.setHeader(key, value);
@@ -111,12 +113,16 @@ class LambdaMock extends EventEmitter {
 
             res.statusCode = 502;
             res.setHeader("Content-Type", "text/html");
+            res.setHeader("Server", "awselb/2.0");
+            res.setHeader("Date", new Date().toUTCString());
             res.end(htmlContent502);
 
             resolve();
             break;
           case "done":
             res.statusCode = data.statusCode;
+            res.setHeader("Server", "awselb/2.0");
+            res.setHeader("Date", new Date().toUTCString());
             if (data.headers && typeof data.headers == "object") {
               for (const [key, value] of Object.entries(data.headers)) {
                 res.setHeader(key, value);

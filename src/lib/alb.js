@@ -70,7 +70,7 @@ class ApplicationLoadBalancer extends AlbRouter {
     let event = this.#convertReqToAlbEvent(req);
 
     if (this.debug) {
-      log.YELLOW("event:");
+      log.YELLOW("ALB event:");
       console.log(event);
     }
     const lambdaController = this.getHandler(method, parsedURL.pathname);
@@ -141,12 +141,13 @@ class ApplicationLoadBalancer extends AlbRouter {
     }
 
     if (!responseData.statusCode) {
-      console.warn("Invalid 'statudCode'. default 200 is sent to client");
+      console.warn("Invalid 'statusCode'. default 200 is sent to client");
     }
   }
 
   #writeResponseBody(res, responseData) {
-    if (typeof responseData.body != "string" && res.statusCode && String(res.statusCode).startsWith("2")) {
+    // && res.statusCode && String(res.statusCode).startsWith("2")
+    if (responseData.body && typeof responseData.body != "string") {
       console.warn("response 'body' must be a string. Receievd", typeof responseData.body);
       responseData.body = "";
 
@@ -182,6 +183,10 @@ class ApplicationLoadBalancer extends AlbRouter {
       queryStringParameters: this.#paramsToObject(url),
       isBase64Encoded: false,
     };
+
+    if (headers["content-type"]?.includes("multipart/form-data")) {
+      event.isBase64Encoded = true;
+    }
 
     return event;
   }

@@ -1,10 +1,6 @@
 import ts from "typescript";
 
-import {
-  possibleExpressions,
-  declarationList,
-  ILambdaCompiler,
-} from "./declarations";
+import { possibleExpressions, declarationList, ILambdaCompiler } from "./declarations";
 
 import { buildLambdaHandler } from "./buildLambdaHandler";
 import { buildErrorHandler } from "./buildErrorHandler";
@@ -15,11 +11,7 @@ const printer = ts.createPrinter({
   newLine: ts.NewLineKind.LineFeed,
 });
 
-function getHandlerExpressions(
-  this: LambdaCompiler,
-  context: ts.TransformationContext,
-  node: ts.Node
-) {
+function getHandlerExpressions(this: LambdaCompiler, context: ts.TransformationContext, node: ts.Node) {
   if (ts.isExpressionStatement(node)) {
     // @ts-ignore
     const initializerName = node.expression?.expression?.expression?.text;
@@ -28,10 +20,7 @@ function getHandlerExpressions(
       // @ts-ignore
       const callerName = node.expression?.expression.name?.text;
 
-      if (
-        callerName == "handler" &&
-        this.varDeclarationsList[initializerName][callerName]
-      ) {
+      if (callerName == "handler" && this.varDeclarationsList[initializerName][callerName]) {
         this.varDeclarationsList[initializerName].handler.push(
           // @ts-ignore
           ...node.expression.arguments
@@ -41,23 +30,17 @@ function getHandlerExpressions(
           context,
           initializerName,
           // @ts-ignore
-          node.expression.arguments
+          node.expression.arguments,
+          this
         );
 
-        return context.factory.updateSourceFile(
-          node as unknown as ts.SourceFile,
-          declarations
-        );
+        return context.factory.updateSourceFile(node as unknown as ts.SourceFile, declarations);
       }
     }
   }
 }
 
-function getErrorHandlerExpressions(
-  this: LambdaCompiler,
-  context: ts.TransformationContext,
-  node: ts.Node
-) {
+function getErrorHandlerExpressions(this: LambdaCompiler, context: ts.TransformationContext, node: ts.Node) {
   if (ts.isExpressionStatement(node)) {
     // @ts-ignore
     const initializerName = node.expression?.expression?.expression?.text;
@@ -66,10 +49,7 @@ function getErrorHandlerExpressions(
       // @ts-ignore
       const callerName = node.expression?.expression.name?.text;
 
-      if (
-        callerName == "onError" &&
-        this.varDeclarationsList[initializerName][callerName]
-      ) {
+      if (callerName == "onError" && this.varDeclarationsList[initializerName][callerName]) {
         this.varDeclarationsList[initializerName].onError.push(
           // @ts-ignore
           ...node.expression.arguments
@@ -92,11 +72,7 @@ function transformFac(this: LambdaCompiler, context: ts.TransformationContext) {
 
   return (rootNode: ts.Node) => {
     function visit(node: ts.Node): ts.Node {
-      const foundImport = getLambdaImportDeclaration.call(
-        container,
-        context,
-        node
-      );
+      const foundImport = getLambdaImportDeclaration.call(container, context, node);
 
       if (typeof foundImport === "object") {
         return foundImport;
@@ -108,21 +84,13 @@ function transformFac(this: LambdaCompiler, context: ts.TransformationContext) {
         return undefined;
       }
 
-      const foundHandlerExpr = getHandlerExpressions.call(
-        container,
-        context,
-        node
-      );
+      const foundHandlerExpr = getHandlerExpressions.call(container, context, node);
 
       if (foundHandlerExpr) {
         return foundHandlerExpr;
       }
 
-      const foundErrorHandlerExpr = getErrorHandlerExpressions.call(
-        container,
-        context,
-        node
-      );
+      const foundErrorHandlerExpr = getErrorHandlerExpressions.call(container, context, node);
 
       if (foundErrorHandlerExpr) {
         return foundErrorHandlerExpr;
@@ -150,19 +118,11 @@ export class LambdaCompiler implements ILambdaCompiler {
     const program = ts.createProgram([filePath], {});
     this.sourceFile = program.getSourceFile(filePath)!;
 
-    const transformationResult = ts.transform(
-      this.sourceFile,
-      [transformFac.bind(this)],
-      { removeComments: true }
-    );
+    const transformationResult = ts.transform(this.sourceFile, [transformFac.bind(this)], { removeComments: true });
 
     const transformedSourceFile = transformationResult.transformed[0];
 
-    const code = printer.printNode(
-      ts.EmitHint.Unspecified,
-      transformedSourceFile,
-      this.sourceFile
-    );
+    const code = printer.printNode(ts.EmitHint.Unspecified, transformedSourceFile, this.sourceFile);
 
     this.output = code;
 

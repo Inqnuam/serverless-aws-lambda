@@ -1,36 +1,6 @@
 const fs = require("fs/promises");
 const handlebars = require("handlebars");
 
-async function esbuildResolve(name, dirs, esbuild) {
-  let result = null;
-  for (const dir of dirs) {
-    try {
-      await esbuild.build({
-        stdin: {
-          contents: `import ${JSON.stringify(name)}`,
-          resolveDir: dir,
-        },
-        write: false,
-        bundle: true,
-        plugins: [
-          {
-            name: "resolve",
-            setup({ onLoad }) {
-              onLoad({ filter: /.*/ }, (args) => {
-                result = args.path;
-                return { contents: "" };
-              });
-            },
-          },
-        ],
-      });
-    } catch (error) {}
-    if (result) {
-      return result;
-    }
-  }
-  return null;
-}
 let foundHelpers;
 class ESBuildHandlebarsJSCompiler extends handlebars.JavaScriptCompiler {
   nameLookup(parent, name, type) {

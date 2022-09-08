@@ -15,4 +15,5 @@ export interface ILambdaCompiler {
   sourceFile: ts.SourceFile;
   importClauses: Set<any>;
   importAllNames: Set<any>;
+  isDev: boolean;
 }
