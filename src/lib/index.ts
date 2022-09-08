@@ -13,13 +13,13 @@ type Object = {
 };
 
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
-interface Request {
+export interface Request {
   query: Object;
   body: any;
   method: HttpMethod;
 }
 
-interface Response {
+export interface Response {
   locals: Object;
   set: (key: string, value: string) => Response;
   status: (code: number) => Response;
@@ -27,6 +27,17 @@ interface Response {
   json: (value: { [key: string]: any }) => void;
   send: (content: any) => void;
   redirect: (code: number, path: string) => void;
+  callbackWaitsForEmptyEventLoop: boolean;
+  functionVersion: string;
+  functionName: string;
+  memoryLimitInMB: string;
+  logGroupName: string;
+  logStreamName: string;
+  clientContext: any;
+  identity: any;
+  invokedFunctionArn: string;
+  awsRequestId: string;
+  getRemainingTimeInMillis: () => number;
 }
 
 export type errorCallback = (error: any, req: Request, res: Response) => void;
