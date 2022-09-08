@@ -82,6 +82,66 @@ function _buildUniversalEvent(context: ts.TransformationContext) {
                     true
                   )
                 ),
+                context.factory.createIfStatement(
+                  context.factory.createBinaryExpression(
+                    context.factory.createPrefixUnaryExpression(
+                      ts.SyntaxKind.ExclamationToken,
+                      context.factory.createPropertyAccessExpression(context.factory.createIdentifier("awsAlbEvent"), context.factory.createIdentifier("isBase64Encoded"))
+                    ),
+                    context.factory.createToken(ts.SyntaxKind.AmpersandAmpersandToken),
+                    context.factory.createBinaryExpression(
+                      context.factory.createElementAccessExpression(
+                        context.factory.createPropertyAccessExpression(context.factory.createIdentifier("awsAlbEvent"), context.factory.createIdentifier("headers")),
+                        context.factory.createStringLiteral("content-type")
+                      ),
+                      context.factory.createToken(ts.SyntaxKind.EqualsEqualsToken),
+                      context.factory.createStringLiteral("application/json")
+                    )
+                  ),
+                  context.factory.createBlock(
+                    [
+                      context.factory.createTryStatement(
+                        context.factory.createBlock(
+                          [
+                            context.factory.createVariableStatement(
+                              undefined,
+                              context.factory.createVariableDeclarationList(
+                                [
+                                  context.factory.createVariableDeclaration(
+                                    context.factory.createIdentifier("body"),
+                                    undefined,
+                                    undefined,
+                                    context.factory.createCallExpression(
+                                      context.factory.createPropertyAccessExpression(context.factory.createIdentifier("JSON"), context.factory.createIdentifier("parse")),
+                                      undefined,
+                                      [context.factory.createPropertyAccessExpression(context.factory.createIdentifier("awsAlbEvent"), context.factory.createIdentifier("body"))]
+                                    )
+                                  ),
+                                ],
+                                ts.NodeFlags.Const
+                              )
+                            ),
+                            context.factory.createExpressionStatement(
+                              context.factory.createBinaryExpression(
+                                context.factory.createPropertyAccessExpression(context.factory.createIdentifier("universalEvent"), context.factory.createIdentifier("body")),
+                                context.factory.createToken(ts.SyntaxKind.EqualsToken),
+                                context.factory.createIdentifier("body")
+                              )
+                            ),
+                          ],
+                          true
+                        ),
+                        context.factory.createCatchClause(
+                          context.factory.createVariableDeclaration(context.factory.createIdentifier("err"), undefined, undefined, undefined),
+                          context.factory.createBlock([], false)
+                        ),
+                        undefined
+                      ),
+                    ],
+                    true
+                  ),
+                  undefined
+                ),
                 context.factory.createReturnStatement(context.factory.createIdentifier("universalEvent")),
               ],
               true
