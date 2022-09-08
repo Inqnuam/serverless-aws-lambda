@@ -6,7 +6,7 @@ const esbuild = require("esbuild");
 const { nodeExternalsPlugin } = require("esbuild-node-externals");
 const { handlebars } = require("./lib/handlebars.js");
 const { ExpressLambda } = require("./lib/expressLambda.js");
-const { Lambda, Request, Response } = require("./lib/index");
+const { Lambda } = require("./lib/index");
 
 const cwd = process.cwd();
 const DEFAULT_LAMBDA_TIMEOUT = 6;
@@ -219,5 +219,3 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
 
 module.exports = ServerlessAlbOffline;
 module.exports.Lambda = Lambda;
-module.exports.Request = Request;
-module.exports.Response = Response;
