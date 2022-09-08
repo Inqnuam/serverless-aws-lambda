@@ -13,7 +13,7 @@ type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTION
 interface RawResponseContent {
   statusCode: number;
   headers: Object;
-  body: any;
+  body: string | null | undefined;
 }
 
 export interface Request {
