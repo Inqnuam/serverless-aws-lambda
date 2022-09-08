@@ -8,12 +8,20 @@ export interface LambdaConfig {
   reservedConcurrency?: number;
 }
 
-type Object = {
-  [key: string]: any;
-};
-
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
+
+interface RawResponseContent {
+  statusCode: number;
+  headers: Object;
+  body: any;
+}
+
 export interface Request {
+  requestContext: Object;
+  httpMethod: HttpMethod;
+  queryStringParameters: Object;
+  headers: Object;
+  isBase64Encoded: boolean;
   query: Object;
   body: any;
   method: HttpMethod;
@@ -38,15 +46,18 @@ export interface Response {
   invokedFunctionArn: string;
   awsRequestId: string;
   getRemainingTimeInMillis: () => number;
+  succeed: (responseContent: RawResponseContent & Object) => void;
+  done: (error: any, responseContent: RawResponseContent & Object) => void;
+  fail: (error: any) => void;
 }
 
 export type errorCallback = (error: any, req: Request, res: Response) => void;
 export type NextFunction = (error?: any) => void;
-export type routeMiddlewares = (req: Request, res: Response, next: NextFunction) => Promise<void> | void;
+export type RouteController = (req: Request, res: Response, next: NextFunction) => Promise<void> | void;
 
 export class Lambda {
   constructor() {}
 
-  handler(...middlewares: routeMiddlewares[]) {}
+  handler(...middlewares: RouteController[]) {}
   onError(callback: errorCallback) {}
 }

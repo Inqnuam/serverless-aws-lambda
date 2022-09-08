@@ -1,10 +1,160 @@
 import ts from "typescript";
 
 const _ResponseHandlerAST = (context: ts.TransformationContext) => {
-  return context.factory.createClassDeclaration(undefined, undefined, context.factory.createIdentifier("_ResponseHandler"), undefined, undefined, [
-    context.factory.createPropertyDeclaration(undefined, undefined, context.factory.createIdentifier("isSent"), undefined, undefined, context.factory.createFalse()),
+  return context.factory.createClassDeclaration(undefined, context.factory.createIdentifier("_ResponseHandler"), undefined, undefined, [
     context.factory.createPropertyDeclaration(
       undefined,
+      context.factory.createIdentifier("callbackWaitsForEmptyEventLoop"),
+      undefined,
+      context.factory.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword),
+      undefined
+    ),
+    context.factory.createPropertyDeclaration(
+      undefined,
+      context.factory.createIdentifier("functionVersion"),
+      undefined,
+      context.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+      undefined
+    ),
+    context.factory.createPropertyDeclaration(
+      undefined,
+      context.factory.createIdentifier("functionName"),
+      undefined,
+      context.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+      undefined
+    ),
+    context.factory.createPropertyDeclaration(
+      undefined,
+      context.factory.createIdentifier("memoryLimitInMB"),
+      undefined,
+      context.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+      undefined
+    ),
+    context.factory.createPropertyDeclaration(
+      undefined,
+      context.factory.createIdentifier("logGroupName"),
+      undefined,
+      context.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+      undefined
+    ),
+    context.factory.createPropertyDeclaration(
+      undefined,
+      context.factory.createIdentifier("logStreamName"),
+      undefined,
+      context.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+      undefined
+    ),
+    context.factory.createPropertyDeclaration(
+      undefined,
+      context.factory.createIdentifier("clientContext"),
+      undefined,
+      context.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
+      undefined
+    ),
+    context.factory.createPropertyDeclaration(
+      undefined,
+      context.factory.createIdentifier("identity"),
+      undefined,
+      context.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
+      undefined
+    ),
+    context.factory.createPropertyDeclaration(
+      undefined,
+      context.factory.createIdentifier("invokedFunctionArn"),
+      undefined,
+      context.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+      undefined
+    ),
+    context.factory.createPropertyDeclaration(
+      undefined,
+      context.factory.createIdentifier("awsRequestId"),
+      undefined,
+      context.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+      undefined
+    ),
+    context.factory.createPropertyDeclaration(
+      undefined,
+      context.factory.createIdentifier("getRemainingTimeInMillis"),
+      undefined,
+      context.factory.createFunctionTypeNode(undefined, [], context.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)),
+      undefined
+    ),
+    context.factory.createPropertyDeclaration(
+      undefined,
+      context.factory.createIdentifier("succeed"),
+      undefined,
+      context.factory.createFunctionTypeNode(
+        undefined,
+        [
+          context.factory.createParameterDeclaration(
+            undefined,
+            undefined,
+            context.factory.createIdentifier("responseContent"),
+            undefined,
+            context.factory.createIntersectionTypeNode([
+              context.factory.createTypeReferenceNode(context.factory.createIdentifier("RawResponseContent"), undefined),
+              context.factory.createTypeReferenceNode(context.factory.createIdentifier("Object"), undefined),
+            ]),
+            undefined
+          ),
+        ],
+        context.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword)
+      ),
+      undefined
+    ),
+    context.factory.createPropertyDeclaration(
+      undefined,
+      context.factory.createIdentifier("done"),
+      undefined,
+      context.factory.createFunctionTypeNode(
+        undefined,
+        [
+          context.factory.createParameterDeclaration(
+            undefined,
+            undefined,
+            context.factory.createIdentifier("error"),
+            undefined,
+            context.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
+            undefined
+          ),
+          context.factory.createParameterDeclaration(
+            undefined,
+            undefined,
+            context.factory.createIdentifier("responseContent"),
+            undefined,
+            context.factory.createIntersectionTypeNode([
+              context.factory.createTypeReferenceNode(context.factory.createIdentifier("RawResponseContent"), undefined),
+              context.factory.createTypeReferenceNode(context.factory.createIdentifier("Object"), undefined),
+            ]),
+            undefined
+          ),
+        ],
+        context.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword)
+      ),
+      undefined
+    ),
+    context.factory.createPropertyDeclaration(
+      undefined,
+      context.factory.createIdentifier("fail"),
+      undefined,
+      context.factory.createFunctionTypeNode(
+        undefined,
+        [
+          context.factory.createParameterDeclaration(
+            undefined,
+            undefined,
+            context.factory.createIdentifier("error"),
+            undefined,
+            context.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
+            undefined
+          ),
+        ],
+        context.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword)
+      ),
+      undefined
+    ),
+    context.factory.createPropertyDeclaration(undefined, context.factory.createIdentifier("isSent"), undefined, undefined, context.factory.createFalse()),
+    context.factory.createPropertyDeclaration(
       undefined,
       context.factory.createIdentifier("locals"),
       undefined,
@@ -13,7 +163,6 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
     ),
     context.factory.createPropertyDeclaration(
       undefined,
-      undefined,
       context.factory.createPrivateIdentifier("#responseObject"),
       undefined,
       context.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
@@ -21,23 +170,20 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
     ),
     context.factory.createPropertyDeclaration(
       undefined,
-      undefined,
       context.factory.createPrivateIdentifier("#resolve"),
       undefined,
-      context.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
+      context.factory.createTypeReferenceNode(context.factory.createIdentifier("Function"), undefined),
       undefined
     ),
     context.factory.createConstructorDeclaration(
-      undefined,
       undefined,
       [
         context.factory.createParameterDeclaration(
           undefined,
           undefined,
+          context.factory.createIdentifier("param"),
           undefined,
-          context.factory.createIdentifier("resolve"),
-          undefined,
-          context.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
+          context.factory.createTypeReferenceNode(context.factory.createIdentifier("param"), undefined),
           undefined
         ),
       ],
@@ -60,7 +206,91 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
             context.factory.createBinaryExpression(
               context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#resolve")),
               context.factory.createToken(ts.SyntaxKind.EqualsToken),
-              context.factory.createIdentifier("resolve")
+              context.factory.createPropertyAccessExpression(context.factory.createIdentifier("param"), context.factory.createIdentifier("resolve"))
+            )
+          ),
+          context.factory.createExpressionStatement(
+            context.factory.createBinaryExpression(
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("callbackWaitsForEmptyEventLoop")),
+              context.factory.createToken(ts.SyntaxKind.EqualsToken),
+              context.factory.createPropertyAccessExpression(context.factory.createIdentifier("param"), context.factory.createIdentifier("callbackWaitsForEmptyEventLoop"))
+            )
+          ),
+          context.factory.createExpressionStatement(
+            context.factory.createBinaryExpression(
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("functionVersion")),
+              context.factory.createToken(ts.SyntaxKind.EqualsToken),
+              context.factory.createPropertyAccessExpression(context.factory.createIdentifier("param"), context.factory.createIdentifier("functionVersion"))
+            )
+          ),
+          context.factory.createExpressionStatement(
+            context.factory.createBinaryExpression(
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("functionName")),
+              context.factory.createToken(ts.SyntaxKind.EqualsToken),
+              context.factory.createPropertyAccessExpression(context.factory.createIdentifier("param"), context.factory.createIdentifier("functionName"))
+            )
+          ),
+          context.factory.createExpressionStatement(
+            context.factory.createBinaryExpression(
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("memoryLimitInMB")),
+              context.factory.createToken(ts.SyntaxKind.EqualsToken),
+              context.factory.createPropertyAccessExpression(context.factory.createIdentifier("param"), context.factory.createIdentifier("memoryLimitInMB"))
+            )
+          ),
+          context.factory.createExpressionStatement(
+            context.factory.createBinaryExpression(
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("clientContext")),
+              context.factory.createToken(ts.SyntaxKind.EqualsToken),
+              context.factory.createPropertyAccessExpression(context.factory.createIdentifier("param"), context.factory.createIdentifier("clientContext"))
+            )
+          ),
+          context.factory.createExpressionStatement(
+            context.factory.createBinaryExpression(
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("identity")),
+              context.factory.createToken(ts.SyntaxKind.EqualsToken),
+              context.factory.createPropertyAccessExpression(context.factory.createIdentifier("param"), context.factory.createIdentifier("identity"))
+            )
+          ),
+          context.factory.createExpressionStatement(
+            context.factory.createBinaryExpression(
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("invokedFunctionArn")),
+              context.factory.createToken(ts.SyntaxKind.EqualsToken),
+              context.factory.createPropertyAccessExpression(context.factory.createIdentifier("param"), context.factory.createIdentifier("invokedFunctionArn"))
+            )
+          ),
+          context.factory.createExpressionStatement(
+            context.factory.createBinaryExpression(
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("awsRequestId")),
+              context.factory.createToken(ts.SyntaxKind.EqualsToken),
+              context.factory.createPropertyAccessExpression(context.factory.createIdentifier("param"), context.factory.createIdentifier("awsRequestId"))
+            )
+          ),
+          context.factory.createExpressionStatement(
+            context.factory.createBinaryExpression(
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("getRemainingTimeInMillis")),
+              context.factory.createToken(ts.SyntaxKind.EqualsToken),
+              context.factory.createPropertyAccessExpression(context.factory.createIdentifier("param"), context.factory.createIdentifier("getRemainingTimeInMillis"))
+            )
+          ),
+          context.factory.createExpressionStatement(
+            context.factory.createBinaryExpression(
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("succeed")),
+              context.factory.createToken(ts.SyntaxKind.EqualsToken),
+              context.factory.createPropertyAccessExpression(context.factory.createIdentifier("param"), context.factory.createIdentifier("succeed"))
+            )
+          ),
+          context.factory.createExpressionStatement(
+            context.factory.createBinaryExpression(
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("done")),
+              context.factory.createToken(ts.SyntaxKind.EqualsToken),
+              context.factory.createPropertyAccessExpression(context.factory.createIdentifier("param"), context.factory.createIdentifier("done"))
+            )
+          ),
+          context.factory.createExpressionStatement(
+            context.factory.createBinaryExpression(
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("fail")),
+              context.factory.createToken(ts.SyntaxKind.EqualsToken),
+              context.factory.createPropertyAccessExpression(context.factory.createIdentifier("param"), context.factory.createIdentifier("fail"))
             )
           ),
         ],
@@ -70,7 +300,6 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
     context.factory.createMethodDeclaration(
       undefined,
       undefined,
-      undefined,
       context.factory.createPrivateIdentifier("#returnReseponse"),
       undefined,
       undefined,
@@ -78,6 +307,13 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
       undefined,
       context.factory.createBlock(
         [
+          context.factory.createExpressionStatement(
+            context.factory.createBinaryExpression(
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("isSent")),
+              context.factory.createToken(ts.SyntaxKind.EqualsToken),
+              context.factory.createTrue()
+            )
+          ),
           context.factory.createExpressionStatement(
             context.factory.createCallExpression(
               context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#resolve")),
@@ -92,13 +328,11 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
     context.factory.createMethodDeclaration(
       undefined,
       undefined,
-      undefined,
       context.factory.createIdentifier("status"),
       undefined,
       undefined,
       [
         context.factory.createParameterDeclaration(
-          undefined,
           undefined,
           undefined,
           context.factory.createIdentifier("code"),
@@ -128,13 +362,11 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
     context.factory.createMethodDeclaration(
       undefined,
       undefined,
-      undefined,
       context.factory.createIdentifier("set"),
       undefined,
       undefined,
       [
         context.factory.createParameterDeclaration(
-          undefined,
           undefined,
           undefined,
           context.factory.createIdentifier("key"),
@@ -143,7 +375,6 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
           undefined
         ),
         context.factory.createParameterDeclaration(
-          undefined,
           undefined,
           undefined,
           context.factory.createIdentifier("value"),
@@ -176,13 +407,11 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
     context.factory.createMethodDeclaration(
       undefined,
       undefined,
-      undefined,
       context.factory.createIdentifier("type"),
       undefined,
       undefined,
       [
         context.factory.createParameterDeclaration(
-          undefined,
           undefined,
           undefined,
           context.factory.createIdentifier("contentType"),
@@ -215,13 +444,11 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
     context.factory.createMethodDeclaration(
       undefined,
       undefined,
-      undefined,
       context.factory.createIdentifier("cookie"),
       undefined,
       undefined,
       [
         context.factory.createParameterDeclaration(
-          undefined,
           undefined,
           undefined,
           context.factory.createIdentifier("name"),
@@ -234,7 +461,6 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
       context.factory.createBlock([context.factory.createReturnStatement(context.factory.createThis())], true)
     ),
     context.factory.createMethodDeclaration(
-      undefined,
       undefined,
       undefined,
       context.factory.createIdentifier("clearCookie"),
@@ -244,7 +470,6 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
         context.factory.createParameterDeclaration(
           undefined,
           undefined,
-          undefined,
           context.factory.createIdentifier("name"),
           undefined,
           context.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
@@ -257,13 +482,11 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
     context.factory.createMethodDeclaration(
       undefined,
       undefined,
-      undefined,
       context.factory.createIdentifier("json"),
       undefined,
       undefined,
       [
         context.factory.createParameterDeclaration(
-          undefined,
           undefined,
           undefined,
           context.factory.createIdentifier("body"),
@@ -282,13 +505,6 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
             ),
             context.factory.createBlock(
               [
-                context.factory.createExpressionStatement(
-                  context.factory.createBinaryExpression(
-                    context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("isSent")),
-                    context.factory.createToken(ts.SyntaxKind.EqualsToken),
-                    context.factory.createTrue()
-                  )
-                ),
                 context.factory.createExpressionStatement(
                   context.factory.createCallExpression(
                     context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("type")),
@@ -329,13 +545,11 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
     context.factory.createMethodDeclaration(
       undefined,
       undefined,
-      undefined,
       context.factory.createIdentifier("send"),
       undefined,
       undefined,
       [
         context.factory.createParameterDeclaration(
-          undefined,
           undefined,
           undefined,
           context.factory.createIdentifier("content"),
@@ -354,13 +568,6 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
             ),
             context.factory.createBlock(
               [
-                context.factory.createExpressionStatement(
-                  context.factory.createBinaryExpression(
-                    context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("isSent")),
-                    context.factory.createToken(ts.SyntaxKind.EqualsToken),
-                    context.factory.createTrue()
-                  )
-                ),
                 context.factory.createExpressionStatement(
                   context.factory.createBinaryExpression(
                     context.factory.createPropertyAccessExpression(
@@ -421,13 +628,6 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
             ),
             context.factory.createBlock(
               [
-                context.factory.createExpressionStatement(
-                  context.factory.createBinaryExpression(
-                    context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("isSent")),
-                    context.factory.createToken(ts.SyntaxKind.EqualsToken),
-                    context.factory.createTrue()
-                  )
-                ),
                 context.factory.createExpressionStatement(
                   context.factory.createCallExpression(
                     context.factory.createPropertyAccessExpression(
