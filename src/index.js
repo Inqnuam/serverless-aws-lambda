@@ -1,6 +1,7 @@
 const path = require("path");
 const { ApplicationLoadBalancer } = require("./lib/alb.js");
 const { log } = require("./lib/colorize.js");
+const { zip } = require("./lib/zip.js");
 
 const esbuild = require("esbuild");
 const { nodeExternalsPlugin } = require("esbuild-node-externals");
@@ -24,7 +25,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     this.serverless = serverless;
     this.options = options;
 
-    this.pluginConfig = this.serverless.service.custom["serverless-alb-offline"];
+    this.pluginConfig = this.serverless.service.custom["serverless-alb-lambda"];
 
     this.PORT = this.options.p ?? this.options.port ?? this.pluginConfig?.port ?? process.env.PORT;
 
@@ -34,8 +35,9 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       this.tsconfig = this.pluginConfig.tsconfig;
     }
 
+    //  this.serverless.service.getFunction(funcName);
     this.commands = {
-      "alb-offline": {
+      "alb-lambda": {
         usage: "Mock AWS ALB-Lambda",
         lifecycleEvents: ["run"],
         options: {
@@ -56,36 +58,50 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     };
 
     this.hooks = {
-      "alb-offline:run": this.init.bind(this),
+      "alb-lambda:run": this.init.bind(this),
+      "before:package:createDeploymentArtifacts": this.init.bind(this, true),
+      "before:deploy:deploy": this.init.bind(this, true),
+      "before:invoke:local:invoke": this.invokeLocal.bind(this),
     };
   }
 
-  async init() {
-    this.#setEnvs();
-    this.#lambdas = this.#getAlbLambdas();
-    this.#setEsBuildConfig();
-    this.buildAndWatch();
+  async invokeLocal() {
+    await this.init(false, this.options.function);
   }
-  #setEsBuildConfig() {
+  async init(isPackaging, invokeName) {
+    this.#setEnvs();
+    this.#lambdas = this.#getAlbLambdas(invokeName);
+    this.#setEsBuildConfig(isPackaging, invokeName);
+    await this.buildAndWatch(isPackaging, invokeName);
+  }
+  #setEsBuildConfig(isPackaging, invokeName) {
     const entryPoints = this.#lambdas.map((x) => x.esEntryPoint);
+
+    const plugins = [handlebars(), ExpressLambda({ dev: !isPackaging })];
 
     let esBuildConfig = {
       platform: "node",
-      sourcemap: true,
+      sourcemap: !isPackaging,
+      minify: isPackaging,
       metafile: true,
       target: "ES2018",
       entryPoints: entryPoints,
       outdir: path.join(cwd, ".alb_offline"),
       outbase: "src",
       bundle: true,
-      plugins: [nodeExternalsPlugin(), handlebars(), ExpressLambda({ dev: true })],
+      external: ["aws-sdk"],
+      plugins,
       watch: false,
     };
 
-    if (this.watch) {
-      esBuildConfig.watch = {
-        onRebuild: this.#onRebuild.bind(this),
-      };
+    if (!isPackaging) {
+      plugins.unshift(nodeExternalsPlugin());
+
+      if (!invokeName && this.watch) {
+        esBuildConfig.watch = {
+          onRebuild: this.#onRebuild.bind(this),
+        };
+      }
     }
 
     if (this.tsconfig) {
@@ -111,12 +127,32 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
         }
       });
   }
-  async buildAndWatch() {
+  async buildAndWatch(isPackaging, invokeName) {
     const result = await esbuild.build(this.esBuildConfig);
     const { outputs } = result.metafile;
     this.#setLambdaEsOutputPaths(outputs);
-    await this.load(this.#lambdas);
-    this.listen(this.PORT);
+
+    if (!isPackaging && !invokeName) {
+      await this.load(this.#lambdas);
+      this.listen(this.PORT);
+    } else if (invokeName) {
+      const slsDeclaration = this.serverless.service.getFunction(invokeName);
+      const foundLambda = this.#lambdas.find((x) => x.name == invokeName);
+
+      if (foundLambda) {
+        slsDeclaration.handler = foundLambda.esOutputPath.replace(`${cwd}/`, "").replace(".js", `.${foundLambda.handlerName}`);
+      }
+    } else {
+      // TODO: convert to promise all
+      for (const l of this.#lambdas) {
+        const slsDeclaration = this.serverless.service.getFunction(l.name);
+
+        const path = l.esOutputPath;
+        await zip(path.slice(0, -3));
+
+        slsDeclaration.package = { ...slsDeclaration.package, disable: true, artifact: path.replace(".js", ".zip") };
+      }
+    }
   }
 
   async #onRebuild(error, result) {
@@ -130,10 +166,13 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       log.GREEN("🔄✅ Rebuild ");
     }
   }
-  #getAlbLambdas() {
+  #getAlbLambdas(invokeName) {
     const funcs = this.serverless.service.functions;
-    const functionsNames = Object.keys(funcs);
+    let functionsNames = Object.keys(funcs);
 
+    if (invokeName) {
+      functionsNames = functionsNames.filter((x) => x == invokeName);
+    }
     const albs = functionsNames.reduce((accum, funcName) => {
       const lambda = funcs[funcName];
       const events = lambda.events?.filter((x) =>

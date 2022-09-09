@@ -3,9 +3,9 @@
 # Installation
 
 ```bash
-yarn add -D serverless-alb-offline
+yarn add -D serverless-alb-lambda
 # or
-npm install -D serverless-alb-offline
+npm install -D serverless-alb-lambda
 ```
 
 inside your `serverless.yml`
@@ -17,18 +17,18 @@ frameworkVersion: "3"
 configValidationMode: error
 
 plugins:
-  - serverless-alb-offline
+  - serverless-alb-lambda
 
 custom:
-  serverless-alb-offline:
+  serverless-alb-lambda:
     port: 3000
     watch: true
 ```
 
-to trigger the plugin passe `alb-offline` into your serverless CLI commande:
+to trigger the plugin passe `alb-lambda` into your serverless CLI commande:
 
 ```bash
-sls alb-offline -s dev
+sls alb-lambda -s dev
 ```
 
 It is also possible to passe port and watch options from the CLI with `--port` or `-p` and `--watch` or `-w`.
