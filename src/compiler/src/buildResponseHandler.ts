@@ -104,6 +104,29 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
     ),
     context.factory.createPropertyDeclaration(
       undefined,
+      context.factory.createPrivateIdentifier("#succeed"),
+      undefined,
+      context.factory.createFunctionTypeNode(
+        undefined,
+        [
+          context.factory.createParameterDeclaration(
+            undefined,
+            undefined,
+            context.factory.createIdentifier("responseContent"),
+            undefined,
+            context.factory.createIntersectionTypeNode([
+              context.factory.createTypeReferenceNode(context.factory.createIdentifier("RawResponseContent"), undefined),
+              context.factory.createTypeReferenceNode(context.factory.createIdentifier("Object"), undefined),
+            ]),
+            undefined
+          ),
+        ],
+        context.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword)
+      ),
+      undefined
+    ),
+    context.factory.createPropertyDeclaration(
+      undefined,
       context.factory.createIdentifier("done"),
       undefined,
       context.factory.createFunctionTypeNode(
@@ -135,7 +158,58 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
     ),
     context.factory.createPropertyDeclaration(
       undefined,
+      context.factory.createPrivateIdentifier("#done"),
+      undefined,
+      context.factory.createFunctionTypeNode(
+        undefined,
+        [
+          context.factory.createParameterDeclaration(
+            undefined,
+            undefined,
+            context.factory.createIdentifier("error"),
+            undefined,
+            context.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
+            undefined
+          ),
+          context.factory.createParameterDeclaration(
+            undefined,
+            undefined,
+            context.factory.createIdentifier("responseContent"),
+            undefined,
+            context.factory.createIntersectionTypeNode([
+              context.factory.createTypeReferenceNode(context.factory.createIdentifier("RawResponseContent"), undefined),
+              context.factory.createTypeReferenceNode(context.factory.createIdentifier("Object"), undefined),
+            ]),
+            undefined
+          ),
+        ],
+        context.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword)
+      ),
+      undefined
+    ),
+    context.factory.createPropertyDeclaration(
+      undefined,
       context.factory.createIdentifier("fail"),
+      undefined,
+      context.factory.createFunctionTypeNode(
+        undefined,
+        [
+          context.factory.createParameterDeclaration(
+            undefined,
+            undefined,
+            context.factory.createIdentifier("error"),
+            undefined,
+            context.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
+            undefined
+          ),
+        ],
+        context.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword)
+      ),
+      undefined
+    ),
+    context.factory.createPropertyDeclaration(
+      undefined,
+      context.factory.createPrivateIdentifier("#fail"),
       undefined,
       context.factory.createFunctionTypeNode(
         undefined,
@@ -206,7 +280,7 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
             context.factory.createBinaryExpression(
               context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#resolve")),
               context.factory.createToken(ts.SyntaxKind.EqualsToken),
-              context.factory.createPropertyAccessExpression(context.factory.createIdentifier("param"), context.factory.createIdentifier("resolve"))
+              context.factory.createPropertyAccessExpression(context.factory.createIdentifier("param"), context.factory.createIdentifier("resolve2"))
             )
           ),
           context.factory.createExpressionStatement(
@@ -274,23 +348,139 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
           ),
           context.factory.createExpressionStatement(
             context.factory.createBinaryExpression(
-              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("succeed")),
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#succeed")),
               context.factory.createToken(ts.SyntaxKind.EqualsToken),
               context.factory.createPropertyAccessExpression(context.factory.createIdentifier("param"), context.factory.createIdentifier("succeed"))
             )
           ),
           context.factory.createExpressionStatement(
             context.factory.createBinaryExpression(
-              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("done")),
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#done")),
               context.factory.createToken(ts.SyntaxKind.EqualsToken),
               context.factory.createPropertyAccessExpression(context.factory.createIdentifier("param"), context.factory.createIdentifier("done"))
             )
           ),
           context.factory.createExpressionStatement(
             context.factory.createBinaryExpression(
-              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("fail")),
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#fail")),
               context.factory.createToken(ts.SyntaxKind.EqualsToken),
               context.factory.createPropertyAccessExpression(context.factory.createIdentifier("param"), context.factory.createIdentifier("fail"))
+            )
+          ),
+          context.factory.createExpressionStatement(
+            context.factory.createBinaryExpression(
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("succeed")),
+              context.factory.createToken(ts.SyntaxKind.EqualsToken),
+              context.factory.createArrowFunction(
+                undefined,
+                undefined,
+                [
+                  context.factory.createParameterDeclaration(
+                    undefined,
+                    undefined,
+                    context.factory.createIdentifier("responseContent"),
+                    undefined,
+                    context.factory.createIntersectionTypeNode([
+                      context.factory.createTypeReferenceNode(context.factory.createIdentifier("RawResponseContent"), undefined),
+                      context.factory.createTypeReferenceNode(context.factory.createIdentifier("Object"), undefined),
+                    ]),
+                    undefined
+                  ),
+                ],
+                context.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword),
+                context.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                context.factory.createBlock(
+                  [
+                    context.factory.createExpressionStatement(
+                      context.factory.createCallExpression(
+                        context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#succeed")),
+                        undefined,
+                        [context.factory.createIdentifier("responseContent")]
+                      )
+                    ),
+                  ],
+                  true
+                )
+              )
+            )
+          ),
+          context.factory.createExpressionStatement(
+            context.factory.createBinaryExpression(
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("done")),
+              context.factory.createToken(ts.SyntaxKind.EqualsToken),
+              context.factory.createArrowFunction(
+                undefined,
+                undefined,
+                [
+                  context.factory.createParameterDeclaration(
+                    undefined,
+                    undefined,
+                    context.factory.createIdentifier("error"),
+                    undefined,
+                    context.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
+                    undefined
+                  ),
+                  context.factory.createParameterDeclaration(
+                    undefined,
+                    undefined,
+                    context.factory.createIdentifier("responseContent"),
+                    undefined,
+                    context.factory.createIntersectionTypeNode([
+                      context.factory.createTypeReferenceNode(context.factory.createIdentifier("RawResponseContent"), undefined),
+                      context.factory.createTypeReferenceNode(context.factory.createIdentifier("Object"), undefined),
+                    ]),
+                    undefined
+                  ),
+                ],
+                undefined,
+                context.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                context.factory.createBlock(
+                  [
+                    context.factory.createExpressionStatement(
+                      context.factory.createCallExpression(
+                        context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#done")),
+                        undefined,
+                        [context.factory.createIdentifier("error"), context.factory.createIdentifier("responseContent")]
+                      )
+                    ),
+                  ],
+                  true
+                )
+              )
+            )
+          ),
+          context.factory.createExpressionStatement(
+            context.factory.createBinaryExpression(
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("fail")),
+              context.factory.createToken(ts.SyntaxKind.EqualsToken),
+              context.factory.createArrowFunction(
+                undefined,
+                undefined,
+                [
+                  context.factory.createParameterDeclaration(
+                    undefined,
+                    undefined,
+                    context.factory.createIdentifier("error"),
+                    undefined,
+                    context.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
+                    undefined
+                  ),
+                ],
+                context.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword),
+                context.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                context.factory.createBlock(
+                  [
+                    context.factory.createExpressionStatement(
+                      context.factory.createCallExpression(
+                        context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#fail")),
+                        undefined,
+                        [context.factory.createIdentifier("error")]
+                      )
+                    ),
+                  ],
+                  true
+                )
+              )
             )
           ),
         ],
@@ -498,45 +688,33 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
       undefined,
       context.factory.createBlock(
         [
-          context.factory.createIfStatement(
-            context.factory.createPrefixUnaryExpression(
-              ts.SyntaxKind.ExclamationToken,
-              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("isSent"))
-            ),
-            context.factory.createBlock(
-              [
-                context.factory.createExpressionStatement(
-                  context.factory.createCallExpression(
-                    context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("type")),
-                    undefined,
-                    [context.factory.createStringLiteral("application/json")]
-                  )
-                ),
-                context.factory.createExpressionStatement(
-                  context.factory.createBinaryExpression(
-                    context.factory.createPropertyAccessExpression(
-                      context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#responseObject")),
-                      context.factory.createIdentifier("body")
-                    ),
-                    context.factory.createToken(ts.SyntaxKind.EqualsToken),
-                    context.factory.createCallExpression(
-                      context.factory.createPropertyAccessExpression(context.factory.createIdentifier("JSON"), context.factory.createIdentifier("stringify")),
-                      undefined,
-                      [context.factory.createIdentifier("body")]
-                    )
-                  )
-                ),
-                context.factory.createExpressionStatement(
-                  context.factory.createCallExpression(
-                    context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#returnReseponse")),
-                    undefined,
-                    []
-                  )
-                ),
-              ],
-              true
-            ),
-            undefined
+          context.factory.createExpressionStatement(
+            context.factory.createCallExpression(
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("type")),
+              undefined,
+              [context.factory.createStringLiteral("application/json")]
+            )
+          ),
+          context.factory.createExpressionStatement(
+            context.factory.createBinaryExpression(
+              context.factory.createPropertyAccessExpression(
+                context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#responseObject")),
+                context.factory.createIdentifier("body")
+              ),
+              context.factory.createToken(ts.SyntaxKind.EqualsToken),
+              context.factory.createCallExpression(
+                context.factory.createPropertyAccessExpression(context.factory.createIdentifier("JSON"), context.factory.createIdentifier("stringify")),
+                undefined,
+                [context.factory.createIdentifier("body")]
+              )
+            )
+          ),
+          context.factory.createExpressionStatement(
+            context.factory.createCallExpression(
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#returnReseponse")),
+              undefined,
+              []
+            )
           ),
         ],
         true
@@ -561,34 +739,22 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
       undefined,
       context.factory.createBlock(
         [
-          context.factory.createIfStatement(
-            context.factory.createPrefixUnaryExpression(
-              ts.SyntaxKind.ExclamationToken,
-              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("isSent"))
-            ),
-            context.factory.createBlock(
-              [
-                context.factory.createExpressionStatement(
-                  context.factory.createBinaryExpression(
-                    context.factory.createPropertyAccessExpression(
-                      context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#responseObject")),
-                      context.factory.createIdentifier("body")
-                    ),
-                    context.factory.createToken(ts.SyntaxKind.EqualsToken),
-                    context.factory.createIdentifier("content")
-                  )
-                ),
-                context.factory.createExpressionStatement(
-                  context.factory.createCallExpression(
-                    context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#returnReseponse")),
-                    undefined,
-                    []
-                  )
-                ),
-              ],
-              true
-            ),
-            undefined
+          context.factory.createExpressionStatement(
+            context.factory.createBinaryExpression(
+              context.factory.createPropertyAccessExpression(
+                context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#responseObject")),
+                context.factory.createIdentifier("body")
+              ),
+              context.factory.createToken(ts.SyntaxKind.EqualsToken),
+              context.factory.createIdentifier("content")
+            )
+          ),
+          context.factory.createExpressionStatement(
+            context.factory.createCallExpression(
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#returnReseponse")),
+              undefined,
+              []
+            )
           ),
         ],
         true
@@ -621,38 +787,26 @@ const _ResponseHandlerAST = (context: ts.TransformationContext) => {
       undefined,
       context.factory.createBlock(
         [
-          context.factory.createIfStatement(
-            context.factory.createPrefixUnaryExpression(
-              ts.SyntaxKind.ExclamationToken,
-              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("isSent"))
-            ),
-            context.factory.createBlock(
-              [
-                context.factory.createExpressionStatement(
-                  context.factory.createCallExpression(
-                    context.factory.createPropertyAccessExpression(
-                      context.factory.createCallExpression(
-                        context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("status")),
-                        undefined,
-                        [context.factory.createIdentifier("code")]
-                      ),
-                      context.factory.createIdentifier("set")
-                    ),
-                    undefined,
-                    [context.factory.createStringLiteral("Location"), context.factory.createIdentifier("path")]
-                  )
+          context.factory.createExpressionStatement(
+            context.factory.createCallExpression(
+              context.factory.createPropertyAccessExpression(
+                context.factory.createCallExpression(
+                  context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createIdentifier("status")),
+                  undefined,
+                  [context.factory.createIdentifier("code")]
                 ),
-                context.factory.createExpressionStatement(
-                  context.factory.createCallExpression(
-                    context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#returnReseponse")),
-                    undefined,
-                    []
-                  )
-                ),
-              ],
-              true
-            ),
-            undefined
+                context.factory.createIdentifier("set")
+              ),
+              undefined,
+              [context.factory.createStringLiteral("Location"), context.factory.createIdentifier("path")]
+            )
+          ),
+          context.factory.createExpressionStatement(
+            context.factory.createCallExpression(
+              context.factory.createPropertyAccessExpression(context.factory.createThis(), context.factory.createPrivateIdentifier("#returnReseponse")),
+              undefined,
+              []
+            )
           ),
         ],
         true
