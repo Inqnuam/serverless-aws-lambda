@@ -3,7 +3,7 @@ const { nodeExternalsPlugin } = require("esbuild-node-externals");
 
 const esBuildConfig = {
   bundle: true,
-  // minify: true,
+  minify: true,
   platform: "node",
   target: "es2018",
   plugins: [nodeExternalsPlugin()],

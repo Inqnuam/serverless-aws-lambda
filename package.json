@@ -1,7 +1,7 @@
 {
   "name": "serverless-alb-lambda",
-  "version": "1.2.2",
-  "description": "AWS Application Load Balancer mock for Serverless",
+  "version": "1.2.3",
+  "description": "AWS Application Load Balancer - Lambda dev tool for Serverless. Allows Express synthax in handlers. Supports packaging and local invoking and offline real alb lambda server mocking",
   "main": "dist/index.js",
   "author": "Inqnuam",
   "license": "MIT",
