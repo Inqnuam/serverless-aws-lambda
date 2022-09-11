@@ -7,7 +7,6 @@ class AlbRouter {
     DELETE: [],
     OPTIONS: [],
     HEAD: [],
-    COPY: [],
     ANY: null,
   };
   static PORT = 0;
@@ -62,12 +61,6 @@ class AlbRouter {
     this.#setHandler(method, lambdaController);
   }
   HEAD = this.head;
-
-  copy(lambdaController) {
-    const method = "COPY";
-    this.#setHandler(method, lambdaController);
-  }
-  COPY = this.COPY;
 
   any(handler) {
     this.#handlers.ANY = handler;

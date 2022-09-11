@@ -214,29 +214,8 @@ class ApplicationLoadBalancer extends AlbRouter {
         const lambdaController = new LambdaMock(lambda);
         // await lambdaController.importEventHandler();
 
-        switch (lambda.method) {
-          case "POST":
-            this.post(lambdaController);
-            break;
-
-          case "GET":
-            this.get(lambdaController);
-            break;
-
-          case "PATCH":
-            this.patch(lambdaController);
-            break;
-
-          case "PUT":
-            this.put(lambdaController);
-            break;
-
-          case "DELETE":
-            this.delete(lambdaController);
-            break;
-
-          default:
-            break;
+        if (typeof this[lambda.method] == "function") {
+          this[lambda.method](lambdaController);
         }
       }
     } catch (error) {

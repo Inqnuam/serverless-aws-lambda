@@ -71,7 +71,7 @@ class LambdaMock extends EventEmitter {
   }
   async invoke(event, res) {
     if (!this._worker) {
-      log.BR_BLUE(`❄️ Cold start ${this.name}`);
+      log.BR_BLUE(`❄️ Cold start '${this.name}'`);
       await this.importEventHandler();
     }
 
@@ -89,7 +89,12 @@ class LambdaMock extends EventEmitter {
       this.on(awsRequestId, (channel, rawData) => {
         this.removeAllListeners(awsRequestId);
 
-        const data = channel == "return" ? rawData : JSON.parse(rawData);
+        let data;
+        try {
+          data = channel == "return" ? rawData : JSON.parse(rawData);
+        } catch (error) {
+          data = rawData;
+        }
         switch (channel) {
           case "return":
             resolve(data);
@@ -109,7 +114,7 @@ class LambdaMock extends EventEmitter {
             resolve();
             break;
           case "fail":
-            console.error(data);
+            log.RED(data);
 
             res.statusCode = 502;
             res.setHeader("Content-Type", "text/html");

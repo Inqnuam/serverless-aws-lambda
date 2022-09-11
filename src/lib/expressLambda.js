@@ -6,10 +6,9 @@ const ExpressLambda = ({ dev }) => {
     name: "Express Lambda",
     setup(build) {
       const entryPoints = build.initialOptions.entryPoints
-        // .filter((e) => e.endsWith(".ts"))
         .map((e) => {
-          const himar = e.replace(path.basename(e), `${path.basename(e)}.ts`);
-          return himar.replace(/\//g, "\\/");
+          const asTsFile = e.replace(path.basename(e), `${path.basename(e)}.ts`);
+          return asTsFile.replace(/\//g, "\\/");
         })
         .join("|");
 

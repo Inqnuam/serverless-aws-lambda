@@ -31,7 +31,7 @@ parentPort.on("message", async (e) => {
       if (timeout <= 0) {
         clearInterval(lambdaTimeoutInterval);
         if (!debuggerIsAttached) {
-          parentPort.postMessage({ channel: "fail", data: "timeout" });
+          parentPort.postMessage({ channel: "fail", data: "_timeout_", awsRequestId });
         }
       }
     }, 250);

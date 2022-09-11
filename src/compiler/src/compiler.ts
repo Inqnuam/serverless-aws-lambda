@@ -1,6 +1,6 @@
 import ts from "typescript";
 
-import { possibleExpressions, declarationList, ILambdaCompiler } from "./declarations";
+import { declarationList, ILambdaCompiler } from "./declarations";
 
 import { buildLambdaHandler } from "./buildLambdaHandler";
 import { buildErrorHandler } from "./buildErrorHandler";
@@ -112,21 +112,17 @@ export class LambdaCompiler implements ILambdaCompiler {
   importAllNames = new Set();
   isDev: boolean;
   output: string = "";
-  // TODO: passes isDev to builders
+
   constructor(filePath: string, isDev: boolean) {
     this.isDev = isDev;
+
     const program = ts.createProgram([filePath], {});
     this.sourceFile = program.getSourceFile(filePath)!;
 
     const transformationResult = ts.transform(this.sourceFile, [transformFac.bind(this)], { removeComments: true });
-
     const transformedSourceFile = transformationResult.transformed[0];
 
-    const code = printer.printNode(ts.EmitHint.Unspecified, transformedSourceFile, this.sourceFile);
-
-    this.output = code;
-
-    // console.log(this.varDeclarationsList);
+    this.output = printer.printNode(ts.EmitHint.Unspecified, transformedSourceFile, this.sourceFile);
   }
 }
 //

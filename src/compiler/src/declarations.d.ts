@@ -1,6 +1,5 @@
 import ts, { Set } from "typescript";
 
-export type possibleExpressions = ts.Expression | ts.VariableStatement | ts.ImportDeclaration;
 export type declarationList = {
   [key: string]: {
     onError: ts.Expression[] | ts.VariableStatement[];

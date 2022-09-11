@@ -6,7 +6,7 @@ const { zip } = require("./lib/zip.js");
 const esbuild = require("esbuild");
 const { nodeExternalsPlugin } = require("esbuild-node-externals");
 const { handlebars } = require("./lib/handlebars.js");
-const { ExpressLambda } = require("./lib/expressLambda.js");
+//const { ExpressLambda } = require("./lib/expressLambda.js");
 const { Lambda } = require("./lib/index");
 
 const cwd = process.cwd();
@@ -77,7 +77,11 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
   #setEsBuildConfig(isPackaging, invokeName) {
     const entryPoints = this.#lambdas.map((x) => x.esEntryPoint);
 
-    const plugins = [handlebars(), ExpressLambda({ dev: !isPackaging })];
+    const plugins = [
+      handlebars(),
+
+      // ExpressLambda({ dev: !isPackaging })
+    ];
 
     let esBuildConfig = {
       platform: "node",
@@ -86,7 +90,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       metafile: true,
       target: "ES2018",
       entryPoints: entryPoints,
-      outdir: path.join(cwd, ".alb_offline"),
+      outdir: path.join(cwd, ".alb_lambda"),
       outbase: "src",
       bundle: true,
       external: ["aws-sdk"],
