@@ -1,7 +1,7 @@
 {
   "name": "serverless-alb-lambda",
-  "version": "1.2.5",
-  "description": "AWS Application Load Balancer - Lambda dev tool for Serverless. Allows Express synthax in handlers. Supports packaging and local invoking and offline real alb lambda server mocking",
+  "version": "1.2.6",
+  "description": "AWS Application Load Balancer and API Gateway - Lambda dev tool for Serverless. Allows Express synthax in handlers. Supports packaging, local invoking and offline real ALB and APG lambda server mocking",
   "main": "dist/index.js",
   "author": "Inqnuam",
   "license": "MIT",
@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "archiver": "^5.3.1",
-    "esbuild": "^0.15.7",
+    "esbuild": "^0.15.8",
     "esbuild-node-externals": "^1.5.0",
     "handlebars": ">= 4 < 5",
     "typescript": "^4.8.3"

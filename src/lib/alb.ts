@@ -83,17 +83,19 @@ export class ApplicationLoadBalancer extends AlbRouter {
   #requestListener(req: IncomingMessage, res: ServerResponse) {
     const { url, method, headers } = req;
 
+    const mockType = (headers["x-mock-type"] ?? "alb") as string;
     const parsedURL = new URL(url as string, "http://localhost:3003");
     let body = Buffer.alloc(0);
 
     const contentType = headers["content-type"];
-    let event = this.#convertReqToAlbEvent(req);
+    let event = mockType == "alb" ? this.#convertReqToAlbEvent(req) : this.#convertReqToApgEvent(req);
 
     if (this.debug) {
-      log.YELLOW("ALB event:");
+      log.YELLOW(`${mockType.toUpperCase()} event`);
       console.log(event);
     }
-    const lambdaController = this.getHandler(method as HttpMethod, parsedURL.pathname);
+
+    const lambdaController = this.getHandler(method as HttpMethod, parsedURL.pathname, mockType);
 
     if (lambdaController) {
       req
@@ -105,7 +107,7 @@ export class ApplicationLoadBalancer extends AlbRouter {
             event.body = body.toString();
           }
 
-          this.#responseHandler(res, event, lambdaController);
+          this.#responseHandler(res, event, lambdaController, method as HttpMethod, parsedURL.pathname);
         })
         .on("error", (err) => {
           console.error(err.stack);
@@ -116,7 +118,7 @@ export class ApplicationLoadBalancer extends AlbRouter {
     }
   }
 
-  async #responseHandler(res: ServerResponse, event: any, lambdaController: ILambdaMock) {
+  async #responseHandler(res: ServerResponse, event: any, lambdaController: ILambdaMock, method: HttpMethod, path: string) {
     const hrTimeStart = process.hrtime();
 
     res.on("finish", () => {
@@ -131,7 +133,7 @@ export class ApplicationLoadBalancer extends AlbRouter {
     });
 
     try {
-      const responseData = await this.#getLambdaResponse(event, lambdaController, res);
+      const responseData = await this.#getLambdaResponse(event, lambdaController, res, method, path);
       if (!res.writableFinished) {
         this.#setResponseHead(res, responseData);
         this.#writeResponseBody(res, responseData);
@@ -160,6 +162,10 @@ export class ApplicationLoadBalancer extends AlbRouter {
       });
     }
 
+    if (responseData.cookies.length) {
+      res.setHeader("Set-Cookie", responseData.cookies);
+    }
+
     if (!responseData.statusCode) {
       console.warn("Invalid 'statusCode'. default 200 is sent to client");
     }
@@ -177,9 +183,9 @@ export class ApplicationLoadBalancer extends AlbRouter {
     res.end(responseData.body);
   }
 
-  async #getLambdaResponse(event: any, lambdaController: ILambdaMock, res: ServerResponse) {
+  async #getLambdaResponse(event: any, lambdaController: ILambdaMock, res: ServerResponse, method: HttpMethod, path: string) {
     return await new Promise(async (resolve, reject) => {
-      const responseData = await lambdaController.invoke(event, res);
+      const responseData = await lambdaController.invoke(event, res, method, path);
 
       resolve(responseData);
     });
@@ -204,6 +210,37 @@ export class ApplicationLoadBalancer extends AlbRouter {
       isBase64Encoded: false,
     };
 
+    if (event.headers["x-mock-type"]) {
+      delete event.headers["x-mock-type"];
+    }
+    if (headers["content-type"]?.includes("multipart/form-data")) {
+      event.isBase64Encoded = true;
+    }
+
+    return event;
+  }
+
+  #convertReqToApgEvent(req: IncomingMessage) {
+    const { method, headers, url } = req;
+
+    const parsedURL = new URL(url as string, "http://localhost:3003");
+
+    const albDefaultHeaders = {
+      "x-forwarded-for": req.socket.remoteAddress,
+      "x-forwarded-proto": "http",
+      "x-forwarded-port": this.port,
+    };
+
+    let event: AlbEvent = {
+      headers: { ...albDefaultHeaders, ...headers },
+      httpMethod: method as string,
+      path: parsedURL.pathname,
+      queryStringParameters: this.#paramsToObject(url as string),
+      isBase64Encoded: false,
+    };
+    if (event.headers["x-mock-type"]) {
+      delete event.headers["x-mock-type"];
+    }
     if (headers["content-type"]?.includes("multipart/form-data")) {
       event.isBase64Encoded = true;
     }
@@ -229,12 +266,14 @@ export class ApplicationLoadBalancer extends AlbRouter {
   }
 
   async load(lambdaDefinitions: ILambdaMock[]) {
-    for (const lambda of lambdaDefinitions.filter((x) => x.kind == "ALB")) {
+    for (const lambda of lambdaDefinitions) {
       const lambdaController = new LambdaMock(lambda);
 
-      if (typeof this[lambda.method] == "function") {
-        this[lambda.method](lambdaController);
-      }
+      this.addHandler(lambdaController);
+
+      // if (typeof this[lambda.method] == "function") {
+      //   this[lambda.method](lambdaController);
+      // }
     }
   }
 }

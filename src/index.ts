@@ -7,6 +7,8 @@ import { build, BuildOptions } from "esbuild";
 import { nodeExternalsPlugin } from "esbuild-node-externals";
 import { hbs } from "./lib/handlebars";
 import { Lambda } from "./lib/index";
+import { LambdaEndpoint } from "./lib/lambda";
+import { HttpMethod } from "./lib/router";
 //const { ExpressLambda } = require("./lib/expressLambda.js");
 
 const cwd = process.cwd();
@@ -188,11 +190,6 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     }
     const albs = functionsNames.reduce((accum: any[], funcName: string) => {
       const lambda = funcs[funcName];
-      const events = lambda.events?.filter((x) =>
-        Object.keys(x)
-          .map((x) => x.toLowerCase())
-          .includes("alb")
-      );
 
       const handlerPath = lambda.handler;
       const lastPointIndex = handlerPath.lastIndexOf(".");
@@ -209,6 +206,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
         esEntryPoint,
         memorySize: lambda.memorySize ?? this.runtimeConfig.memorySize ?? DEFAULT_LAMBDA_MEMORY_SIZE,
         timeout: lambda.timeout ?? this.runtimeConfig.timeout ?? DEFAULT_LAMBDA_TIMEOUT,
+        endpoints: [],
         environment: {
           ...this.runtimeConfig.environment,
           ...lambda.environment,
@@ -217,29 +215,102 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
         },
       };
 
-      if (!events.length) {
-        accum.push(lambdaDef);
-        return accum;
-      }
-      events.forEach((event) => {
-        const alb = event?.alb;
-        if (alb?.conditions && alb.conditions.path?.length && alb.conditions.method?.length) {
-          // @ts-ignore
-          lambdaDef.path = alb.conditions.path[0];
-          // @ts-ignore
-          lambdaDef.method = alb.conditions.method[0].toUpperCase();
-          // @ts-ignore
-          lambdaDef.kind = "ALB";
-          accum.push(lambdaDef);
-        }
-      });
+      // const events = lambda.events;
 
+      //   ?.filter((x) =>
+      //   Object.keys(x)
+      //     .map((x) => x.toLowerCase())
+      //     .includes("alb")
+      // );
+      if (lambda.events.length) {
+        lambdaDef.endpoints = lambda.events.map(this.#parseSlsEventDefinition).filter((x) => x);
+      }
+      accum.push(lambdaDef);
       return accum;
+
+      // events.forEach((event) => {
+      //   const alb = event.alb;
+
+      //   // NOTE: httpApi = APG v2 (HTTP)
+      //   // http = APG v1 (REST)
+      //   // both are:
+      //   // objects with path (string) and optionnal method (string)
+      //   // OR both are string including method - path
+
+      //   // alb application load balancer
+
+      //   // alb.method (array) is not required, default is "any"
+
+      //   if (alb?.conditions && alb.conditions.path?.length && alb.conditions.method?.length) {
+      //     // @ts-ignore
+      //     lambdaDef.path = alb.conditions.path[0];
+      //     // @ts-ignore
+      //     lambdaDef.method = alb.conditions.method[0].toUpperCase();
+      //     // @ts-ignore
+      //     lambdaDef.kind = "ALB";
+      //     accum.push(lambdaDef);
+      //   }
+      // });
+
+      // return accum;
     }, []);
 
     return albs;
   }
 
+  #parseSlsEventDefinition(event): LambdaEndpoint | null {
+    const supportedEvents = ["http", "httpApi", "alb"];
+
+    const keys = Object.keys(event);
+
+    if (!keys.length || !supportedEvents.includes(keys[0])) {
+      return null;
+    }
+
+    let parsendEvent: LambdaEndpoint = {
+      kind: "alb",
+      paths: [],
+      methods: ["ANY"],
+    };
+
+    if (event.alb) {
+      if (!event.alb.conditions || !event.alb.conditions.path?.length) {
+        return null;
+      }
+
+      parsendEvent.kind = "alb";
+      parsendEvent.paths = event.alb.conditions.path;
+
+      if (event.alb.conditions.method?.length) {
+        parsendEvent.methods = event.alb.conditions.method.map((x: string) => x.toUpperCase());
+      }
+    } else if (event.http || event.httpApi) {
+      parsendEvent.kind = "apg";
+      const httpEvent = event.http ?? event.httpApi;
+
+      if (typeof httpEvent == "string") {
+        // 'PUT /users/update'
+        const declarationComponents = httpEvent.split(" ");
+
+        if (declarationComponents.length != 2) {
+          return null;
+        }
+
+        parsendEvent.methods = [declarationComponents[0] as HttpMethod];
+        parsendEvent.paths = [declarationComponents[1]];
+      } else if (typeof httpEvent == "object" && httpEvent.path) {
+        parsendEvent.paths = [httpEvent.path];
+
+        if (httpEvent.method) {
+          parsendEvent.methods = [httpEvent.method.toUpperCase()];
+        }
+      } else {
+        return null;
+      }
+    }
+
+    return parsendEvent;
+  }
   #setLambdaEsOutputPaths(outputs) {
     const outputNames = Object.keys(outputs)
       .filter((x) => !x.endsWith(".map") && outputs[x].entryPoint)

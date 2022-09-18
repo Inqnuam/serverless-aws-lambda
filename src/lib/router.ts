@@ -1,6 +1,6 @@
 import { ILambdaMock } from "./lambda";
 
-export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
+export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "ANY";
 
 export class AlbRouter {
   #handlers: {
@@ -13,6 +13,7 @@ export class AlbRouter {
     HEAD: ILambdaMock[];
     ANY: ILambdaMock[];
   };
+  handlers: ILambdaMock[] = [];
   static PORT = 0;
   debug = false;
   constructor(config: any) {
@@ -76,37 +77,61 @@ export class AlbRouter {
   }
   ANY = this.any;
 
-  getHandler(method: HttpMethod, path: string) {
-    const foundHandler = this.#handlers[method]?.find((x: any) => x.path == path);
+  getHandler(method: HttpMethod, path: string, kind?: string) {
+    const foundHandler = this.handlers.find((x) =>
+      x.endpoints
+        .filter((e) => (kind ? e.kind == kind : e))
+        .find((w) => {
+          return w.paths.includes(path) && (w.methods.includes("ANY") || w.methods.includes(method));
+        })
+    );
+
+    // const foundHandler = this.#handlers[method]?.find((x: any) => x.path == path);
     if (foundHandler) {
       return foundHandler;
     } else {
       // Use Regex to find lambda controller
+      return this.handlers.find((x) =>
+        x.endpoints
+          .filter((e) => (kind ? e.kind == kind : e))
+          .find((w) => {
+            const hasPath = w.paths.find((p) => {
+              const rawPattern = p.replace(/\*/g, ".*").replace(/\//g, "\\/");
+              const pattern = new RegExp(`^${rawPattern}$`, "g");
 
-      return this.#handlers[method]?.find((x) => {
-        const rawPattern = x.path.replace(/\*/g, ".*").replace(/\//g, "\\/");
-        const pattern = new RegExp(`^${rawPattern}$`, "g");
+              return pattern.test(path);
+            });
+            return hasPath && (w.methods.includes("ANY") || w.methods.includes(method));
+          })
+      );
+    }
+  }
 
-        return pattern.test(path);
+  addHandler(lambdaController: ILambdaMock) {
+    this.handlers.push(lambdaController);
+
+    if (this.debug) {
+      lambdaController.endpoints.forEach((x) => {
+        x.paths.forEach((p) => {
+          this.#printPath(x.methods.join(" "), p);
+        });
       });
     }
   }
-
   #setHandler(method: HttpMethod, lambdaController: ILambdaMock) {
-    const foundIndex = this.#handlers[method].findIndex((x) => x.path == lambdaController.path);
-
-    if (foundIndex == -1) {
-      this.#handlers[method].push(lambdaController);
-      if (this.debug) {
-        this.#printPath(method, lambdaController);
-      }
-    } else {
-      this.#handlers[method][foundIndex] = lambdaController;
-    }
+    // const foundIndex = this.#handlers[method].findIndex((x) => x.path == lambdaController.path);
+    // if (foundIndex == -1) {
+    //   this.#handlers[method].push(lambdaController);
+    //   if (this.debug) {
+    //     this.#printPath(method, lambdaController);
+    //   }
+    // } else {
+    //   this.#handlers[method][foundIndex] = lambdaController;
+    // }
   }
 
-  #printPath(method: HttpMethod, lambdaController: ILambdaMock) {
-    const printingString = `${method}\thttp://localhost:${AlbRouter.PORT}${lambdaController.path}`;
+  #printPath(method: string, path: string) {
+    const printingString = `${method}\thttp://localhost:${AlbRouter.PORT}${path}`;
     console.log(`\x1b[36m${printingString}\x1b[0m`);
   }
 }

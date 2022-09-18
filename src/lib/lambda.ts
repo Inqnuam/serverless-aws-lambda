@@ -25,8 +25,7 @@ type GateWayKind = "ALB" | "HTTP";
 
 export interface ILambdaMock {
   name: string;
-  path: string;
-  method: HttpMethod;
+  endpoints: LambdaEndpoint[];
   timeout: number;
   memorySize: number;
   environment: { [key: string]: any };
@@ -36,14 +35,19 @@ export interface ILambdaMock {
   esOutputPath: string;
   entryPoint: string;
   _worker?: Worker;
-  kind: GateWayKind;
-  invoke: (event: any, res: ServerResponse) => Promise<any>;
+  invoke: (event: any, res: ServerResponse, method: string, path: string) => Promise<any>;
 }
 
+export interface LambdaEndpoint {
+  kind: "alb" | "apg";
+  paths: string[];
+  methods: HttpMethod[];
+}
 export class LambdaMock extends EventEmitter implements ILambdaMock {
   name: string;
-  path: string;
-  method: HttpMethod;
+
+  endpoints: LambdaEndpoint[];
+
   timeout: number;
   memorySize: number;
   environment: { [key: string]: any };
@@ -53,12 +57,10 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   esOutputPath: string;
   entryPoint: string;
   _worker?: Worker;
-  kind: GateWayKind;
-  constructor({ name, path, method, timeout, memorySize, environment, handlerPath, handlerName, esEntryPoint, esOutputPath, entryPoint, kind }: ILambdaMock) {
+  constructor({ name, endpoints, timeout, memorySize, environment, handlerPath, handlerName, esEntryPoint, esOutputPath, entryPoint }: ILambdaMock) {
     super();
     this.name = name;
-    this.path = path;
-    this.method = method;
+    this.endpoints = endpoints;
     this.timeout = timeout;
     this.memorySize = memorySize;
     this.environment = environment;
@@ -67,7 +69,6 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     this.esEntryPoint = esEntryPoint;
     this.esOutputPath = esOutputPath;
     this.entryPoint = entryPoint;
-    this.kind = kind;
   }
 
   async importEventHandler() {
@@ -102,7 +103,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
       this._worker.postMessage({ channel: "import" });
     });
   }
-  async invoke(event: any, res: any) {
+  async invoke(event: any, res: any, method: string, path: string) {
     if (!this._worker) {
       log.BR_BLUE(`❄️ Cold start '${this.name}'`);
       await this.importEventHandler();
@@ -112,7 +113,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
       const awsRequestId = randomUUID();
 
       const date = new Date();
-      log.CYAN(`${date.toLocaleDateString()} ${date.toLocaleTimeString()} requestId: ${awsRequestId} | '${this.name}' ${this.method} ${this.path}`);
+      log.CYAN(`${date.toLocaleDateString()} ${date.toLocaleTimeString()} requestId: ${awsRequestId} | '${this.name}' ${method} ${path}`);
       this._worker?.postMessage({
         channel: "exec",
         data: { event },

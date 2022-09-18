@@ -2,29 +2,217 @@ import EventEmitter from "events";
 import { HttpMethod } from "./router";
 
 export type NextFunction = (error?: any) => void;
-export type errorCallback = (error: any, req: IRequest, res: IResponse) => Promise<void> | void;
 export type RouteMiddleware = (error: any, req: IRequest, res: IResponse, next: NextFunction) => Promise<void> | void;
 export type RouteController = (req: IRequest, res: IResponse, next: NextFunction) => Promise<void> | void;
 
+interface SetCookieOptions {
+  domain: string;
+  encode: Function;
+  expires: Date | number;
+  httpOnly: boolean;
+  maxAge: number;
+  path: string;
+  priority: string;
+  secure: boolean;
+  signed: boolean;
+  sameSite: boolean | string;
+}
+
+var fieldContentRegExp = /^[\u0009\u0020-\u007e\u0080-\u00ff]+$/;
+const encode = function encode(val: string) {
+  return encodeURIComponent(val);
+};
+function tryDecode(str: string, decode: Function) {
+  try {
+    return decode(str);
+  } catch (e) {
+    return str;
+  }
+}
+function decode(str: string) {
+  return str.indexOf("%") !== -1 ? decodeURIComponent(str) : str;
+}
+
+function isDate(val: any) {
+  return Object.prototype.toString.call(val) === "[object Date]" || val instanceof Date;
+}
+
+const cookie = {
+  serialize: (name: string, val: string, options?: any) => {
+    var opt = options || {};
+    var enc = opt.encode || encode;
+
+    if (typeof enc !== "function") {
+      throw new TypeError("option encode is invalid");
+    }
+
+    if (!fieldContentRegExp.test(name)) {
+      throw new TypeError("argument name is invalid");
+    }
+
+    var value = enc(val);
+
+    if (value && !fieldContentRegExp.test(value)) {
+      throw new TypeError("argument val is invalid");
+    }
+
+    var str = name + "=" + value;
+
+    if (null != opt.maxAge) {
+      var maxAge = opt.maxAge - 0;
+
+      if (isNaN(maxAge) || !isFinite(maxAge)) {
+        throw new TypeError("option maxAge is invalid");
+      }
+
+      str += "; Max-Age=" + Math.floor(maxAge);
+    }
+
+    if (opt.domain) {
+      if (!fieldContentRegExp.test(opt.domain)) {
+        throw new TypeError("option domain is invalid");
+      }
+
+      str += "; Domain=" + opt.domain;
+    }
+
+    if (opt.path) {
+      if (!fieldContentRegExp.test(opt.path)) {
+        throw new TypeError("option path is invalid");
+      }
+
+      str += "; Path=" + opt.path;
+    }
+
+    if (opt.expires) {
+      var expires = opt.expires;
+
+      if (!isDate(expires) || isNaN(expires.valueOf())) {
+        throw new TypeError("option expires is invalid");
+      }
+
+      str += "; Expires=" + expires.toUTCString();
+    }
+
+    if (opt.httpOnly) {
+      str += "; HttpOnly";
+    }
+
+    if (opt.secure) {
+      str += "; Secure";
+    }
+
+    if (opt.priority) {
+      var priority = typeof opt.priority === "string" ? opt.priority.toLowerCase() : opt.priority;
+
+      switch (priority) {
+        case "low":
+          str += "; Priority=Low";
+          break;
+        case "medium":
+          str += "; Priority=Medium";
+          break;
+        case "high":
+          str += "; Priority=High";
+          break;
+        default:
+          throw new TypeError("option priority is invalid");
+      }
+    }
+
+    if (opt.sameSite) {
+      var sameSite = typeof opt.sameSite === "string" ? opt.sameSite.toLowerCase() : opt.sameSite;
+
+      switch (sameSite) {
+        case true:
+          str += "; SameSite=Strict";
+          break;
+        case "lax":
+          str += "; SameSite=Lax";
+          break;
+        case "strict":
+          str += "; SameSite=Strict";
+          break;
+        case "none":
+          str += "; SameSite=None";
+          break;
+        default:
+          throw new TypeError("option sameSite is invalid");
+      }
+    }
+
+    return str;
+  },
+  parse: (str: string, options?: any) => {
+    if (typeof str !== "string") {
+      throw new TypeError("argument str must be a string");
+    }
+
+    var obj: any = {};
+    var opt = options || {};
+    var dec = opt.decode || decode;
+
+    var index = 0;
+    while (index < str.length) {
+      var eqIdx = str.indexOf("=", index);
+
+      // no more cookie pairs
+      if (eqIdx === -1) {
+        break;
+      }
+
+      var endIdx = str.indexOf(";", index);
+
+      if (endIdx === -1) {
+        endIdx = str.length;
+      } else if (endIdx < eqIdx) {
+        // backtrack on prior semicolon
+        index = str.lastIndexOf(";", eqIdx - 1) + 1;
+        continue;
+      }
+
+      var key = str.slice(index, eqIdx).trim();
+
+      // only assign once
+      if (undefined === obj[key]) {
+        var val = str.slice(eqIdx + 1, endIdx).trim();
+
+        // quoted values
+        if (val.charCodeAt(0) === 0x22) {
+          val = val.slice(1, -1);
+        }
+
+        obj[key] = tryDecode(val, dec);
+      }
+
+      index = endIdx + 1;
+    }
+
+    return obj;
+  },
+};
+
 export interface RawResponseContent {
+  cookies: string[];
+  isBase64Encoded: boolean;
   statusCode: number;
   headers: { [key: string]: any };
   body: string | null | undefined;
 }
 
-export type on = {
-  // end: (finalController: RouteController) => Lambda;
-  error: (errorHandler: errorCallback) => Lambda;
-};
 export interface IRequest {
   requestContext: { [key: string]: any };
   httpMethod: HttpMethod;
   queryStringParameters: { [key: string]: string };
+  path: string;
   headers: { [key: string]: any };
   isBase64Encoded: boolean;
   query: { [key: string]: string };
   body: string | null | undefined;
   method: HttpMethod;
+  cookies: { [key: string]: any };
+  get: (headerField: string) => { [key: string]: any } | undefined;
+  params: string[];
 }
 
 export type RedirectOptions = [code: number, path: string];
@@ -50,6 +238,7 @@ export interface IResponse {
   json: (content: [] | { [key: string]: any }) => void;
   set: (headerKey: string, headerValue: string) => IResponse;
   redirect: (...redirectOptions: RedirectOptions) => void;
+  cookie: (name: string, value: string, options?: SetCookieOptions) => IResponse;
 }
 
 class _Response implements IResponse {
@@ -70,6 +259,8 @@ class _Response implements IResponse {
   getRemainingTimeInMillis: () => number;
 
   responseObject: RawResponseContent = {
+    cookies: [],
+    isBase64Encoded: false,
     statusCode: 200,
     headers: {},
     body: "",
@@ -111,7 +302,7 @@ class _Response implements IResponse {
     this.#fail(error);
   }
   #sendResponse() {
-    if (!this.responseObject.headers["content-type"]) {
+    if (!this.responseObject.headers["Content-Type"]) {
       this.type("text/html");
     }
     this.#resolve(this.responseObject);
@@ -120,12 +311,17 @@ class _Response implements IResponse {
     this.responseObject.body = content;
     return this;
   }
+  cookie(name: string, value: string, options?: SetCookieOptions | undefined) {
+    this.responseObject.cookies.push(cookie.serialize(name, value, options));
+
+    return this;
+  }
   status(code: number) {
     this.responseObject.statusCode = code;
     return this;
   }
   type(contentType: string) {
-    this.responseObject.headers["content-type"] = contentType;
+    this.responseObject.headers["Content-Type"] = contentType;
     return this;
   }
   set(headerKey: string, headerValue: string) {
@@ -161,7 +357,20 @@ const _buildUniversalEvent = (awsAlbEvent: any) => {
       const body = JSON.parse(awsAlbEvent.body);
       universalEvent.body = body;
     }
+    universalEvent.cookies = typeof awsAlbEvent.headers.cookie == "string" ? cookie.parse(awsAlbEvent.headers.cookie) : {};
+    universalEvent.get = (headerField: string) => {
+      return awsAlbEvent.headers[headerField.toLowerCase()];
+    };
+    let reqPath = decodeURIComponent(universalEvent.path);
+
+    // const queryStartPos = reqPath.lastIndexOf("?");
+    // if (queryStartPos != -1) {
+    //   reqPath = reqPath.slice(0, queryStartPos);
+    // }
+
+    universalEvent.params = reqPath.split("/").filter((x) => x);
   } catch (err) {}
+
   return universalEvent;
 };
 
@@ -208,7 +417,7 @@ export class Lambda extends Function {
         return;
       }
       response = obj;
-      resEmitter.emit("finished");
+      resEmitter.emit("end");
     };
 
     let res = new _Response(context, resolve, {});
@@ -270,7 +479,7 @@ export class Lambda extends Function {
     };
 
     await new Promise(async (resolve) => {
-      resEmitter.once("finished", resolve);
+      resEmitter.once("end", resolve);
       await next();
     });
 
