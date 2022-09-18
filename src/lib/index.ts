@@ -1,18 +1,22 @@
+import EventEmitter from "events";
+import { HttpMethod } from "./router";
+
 export type NextFunction = (error?: any) => void;
-export type errorCallback = (error: any, req: _Request, res: IResponse) => Promise<void> | void;
-export type RouteController = (req: _Request, res: IResponse, next: NextFunction) => Promise<void> | void;
+export type errorCallback = (error: any, req: IRequest, res: IResponse) => Promise<void> | void;
+export type RouteMiddleware = (error: any, req: IRequest, res: IResponse, next: NextFunction) => Promise<void> | void;
+export type RouteController = (req: IRequest, res: IResponse, next: NextFunction) => Promise<void> | void;
 
 export interface RawResponseContent {
   statusCode: number;
   headers: { [key: string]: any };
   body: string | null | undefined;
 }
-export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
+
 export type on = {
   // end: (finalController: RouteController) => Lambda;
   error: (errorHandler: errorCallback) => Lambda;
 };
-export interface _Request {
+export interface IRequest {
   requestContext: { [key: string]: any };
   httpMethod: HttpMethod;
   queryStringParameters: { [key: string]: string };
@@ -107,9 +111,12 @@ class _Response implements IResponse {
     this.#fail(error);
   }
   #sendResponse() {
+    if (!this.responseObject.headers["content-type"]) {
+      this.type("text/html");
+    }
     this.#resolve(this.responseObject);
   }
-  #setBody(content: string) {
+  #setBody(content?: string) {
     this.responseObject.body = content;
     return this;
   }
@@ -129,7 +136,7 @@ class _Response implements IResponse {
     this.type("application/json").#setBody(JSON.stringify(content)).#sendResponse();
   }
 
-  send(content: string) {
+  send(content?: string) {
     this.#setBody(content).#sendResponse();
   }
 
@@ -141,11 +148,12 @@ class _Response implements IResponse {
   }
 }
 
-const _buildUniversalEvent = (awsAlbEvent) => {
+const _buildUniversalEvent = (awsAlbEvent: any) => {
   let universalEvent = { ...awsAlbEvent };
   try {
-    universalEvent.query = {};
     universalEvent.method = awsAlbEvent.httpMethod;
+    universalEvent.query = {};
+
     for (const [key, value] of Object.entries(awsAlbEvent.queryStringParameters)) {
       universalEvent.query[key] = decodeURIComponent(value as string);
     }
@@ -157,98 +165,125 @@ const _buildUniversalEvent = (awsAlbEvent) => {
   return universalEvent;
 };
 
-function* genControllers(controllers: RouteController[]) {
-  for (const func of controllers) {
+function* genControllers(controllers: (RouteController | RouteMiddleware)[]) {
+  for (const func in controllers) {
     yield func;
   }
 }
 
+const getMiddlewareAfter = (currentPosition: number, controllers: (RouteController | RouteMiddleware)[], controllersStack: Generator<string, void, unknown>) => {
+  let func: Function | null = null;
+  const foundIndex = controllers.findIndex((x, index) => {
+    return index > currentPosition && x.length == 4;
+  });
+
+  if (foundIndex != -1) {
+    for (let i = currentPosition; i < foundIndex; i++) {
+      func = controllers[controllersStack.next().value as unknown as number];
+    }
+  }
+
+  return func;
+};
 export class Lambda extends Function {
-  controllers: RouteController[] = [];
-  errorHandler: errorCallback;
-  finalHandler: RouteController | null;
-  on: on;
+  controllers: (RouteController | RouteMiddleware)[] = [];
 
   constructor() {
     super();
-    this.on = {
-      error: (errorHandler: errorCallback) => {
-        this.errorHandler = errorHandler;
-        return this;
-      },
-      // end: (finalHandler: RouteController) => {
-      //   this.finalHandler = finalHandler;
-      //   return this
-      // },
-    };
     return new Proxy(this, {
       apply: (target, thisArg, args) => target._call(...args),
     });
   }
 
-  async _call(...args) {
+  async _call(...args: any[]) {
     const req = _buildUniversalEvent(args[0]);
     const context = args[1];
     let response: RawResponseContent | null = null;
 
     const controllersStack = genControllers(this.controllers);
+    const resEmitter = new EventEmitter();
+
     const resolve = (obj: RawResponseContent) => {
       if (response) {
         return;
       }
       response = obj;
+      resEmitter.emit("finished");
     };
 
     let res = new _Response(context, resolve, {});
+    let currentIndex = 0;
     const next = async (err?: any) => {
       const locals = { ...res.locals };
       const previousResponse = { ...res.responseObject };
       res = new _Response(context, resolve, locals, previousResponse);
 
       if (err) {
-        if (this.errorHandler) {
+        const foundErrorHandler = getMiddlewareAfter(currentIndex, this.controllers, controllersStack);
+
+        if (foundErrorHandler) {
           try {
-            await this.errorHandler(err, req, res);
+            await foundErrorHandler(err, req, res, next);
+            if (!response) {
+              res.status(204).send();
+            }
           } catch (error) {
-            res.status(500).type("text/html").send("Unhandled Error");
+            res.status(500).send("Unhandled Error");
           }
         } else {
-          res.status(500).type("text/html").send("Unhandled Error");
+          res.status(500).send("Unhandled Error");
         }
 
         controllersStack.return();
       }
-      const func = controllersStack.next().value;
-      if (func) {
+      const i = controllersStack.next().value;
+
+      if (i) {
+        currentIndex = Number(i);
+        const func = this.controllers[i as unknown as number];
         try {
-          await func(req, res, next);
+          if (func.length == 3) {
+            const controller = func as RouteController;
+            await controller(req, res, next);
+          } else if (func.length == 4) {
+            const controller = func as RouteMiddleware;
+            await controller(null, req, res, next);
+          }
         } catch (error) {
-          if (this.errorHandler) {
+          const foundErrorHandler = getMiddlewareAfter(currentIndex, this.controllers, controllersStack);
+
+          if (foundErrorHandler) {
             try {
-              await this.errorHandler(error, req, res);
+              await foundErrorHandler(error, req, res, next);
+              if (!response) {
+                res.status(204).send();
+              }
             } catch (error) {
-              res.status(500).type("text/html").send("Unhandled Error");
+              res.status(500).send("Unhandled Error");
             }
           } else {
-            res.status(500).type("text/html").send("Unhandled Error");
+            res.status(500).send("Unhandled Error");
           }
           controllersStack.return();
         }
       }
     };
 
-    await next();
-    if (response) {
-      return response;
-    } else {
-      return {
-        statusCode: 204,
-      };
-    }
+    await new Promise(async (resolve) => {
+      resEmitter.once("finished", resolve);
+      await next();
+    });
+
+    return response ?? { statusCode: 204 };
   }
 
-  handler(...controllers: RouteController[]) {
-    this.controllers = controllers;
+  handle(...controllers: RouteController[]) {
+    this.controllers.push(...controllers);
+    return this;
+  }
+
+  use(...middlewares: RouteMiddleware[]) {
+    this.controllers.push(...middlewares);
     return this;
   }
 }

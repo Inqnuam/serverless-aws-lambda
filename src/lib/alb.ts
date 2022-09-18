@@ -1,29 +1,46 @@
-const http = require("http");
-const { networkInterfaces } = require("os");
-const AlbRouter = require("./router");
-const { LambdaMock } = require("./lambda.js");
-const inspector = require("inspector");
-const { log } = require("./colorize.js");
+import http, { Server, IncomingMessage, ServerResponse } from "http";
+import { AddressInfo } from "net";
+import { networkInterfaces } from "os";
+import { AlbRouter, HttpMethod } from "./router";
+import { ILambdaMock, LambdaMock } from "./lambda";
+import { log } from "./colorize";
+import inspector from "inspector";
 
-const localIp = Object.values(networkInterfaces())
-  .flat()
-  .filter((item) => !item.internal && item.family === "IPv4")
-  .find(Boolean).address;
+let localIp: string;
+
+if (networkInterfaces) {
+  // @ts-ignore
+  localIp = Object.values(networkInterfaces())
+    ?.flat()
+    // @ts-ignore
+    .filter((item) => !item.internal && item.family === "IPv4")
+    .find(Boolean).address;
+}
 
 const debuggerIsAttached = inspector.url() != undefined;
 
 if (debuggerIsAttached) {
   console.warn("Lambdas timeout are disabled when a Debugger is attached");
 }
-class ApplicationLoadBalancer extends AlbRouter {
-  #server = null;
+
+interface AlbEvent {
+  headers: { [key: string]: any };
+  httpMethod: string;
+  path: string;
+  queryStringParameters: { [key: string]: string };
+  isBase64Encoded: boolean;
+  body?: string;
+}
+
+export class ApplicationLoadBalancer extends AlbRouter {
+  #server: Server;
   runtimeConfig = {};
   constructor(config = { debug: false }) {
     super(config);
     this.#server = http.createServer(this.#requestListener.bind(this));
   }
   get port() {
-    return this.PORT;
+    return AlbRouter.PORT;
   }
   get #get502HtmlContent() {
     const htmlContent502 = `<html>
@@ -42,28 +59,31 @@ class ApplicationLoadBalancer extends AlbRouter {
 
     return htmlContent502;
   }
-  listen(port = 0, callback) {
-    if (typeof Number(port) !== "number") {
+  listen(port = 0, callback?: Function) {
+    if (isNaN(port)) {
       throw Error("port should be a number");
     }
     this.#server.listen(port, () => {
-      const { port: listeningPort } = this.#server.address();
-      this.PORT = listeningPort;
+      const { port: listeningPort } = this.#server.address() as AddressInfo;
       AlbRouter.PORT = listeningPort;
       if (typeof callback == "function") {
         callback(listeningPort);
       } else {
-        const output = `✅ Application Load Balancer is listening on http://localhost:${listeningPort} | http://${localIp}:${listeningPort}`;
+        let output = `✅ Application Load Balancer is listening on http://localhost:${listeningPort}`;
+
+        if (localIp) {
+          output += ` | http://${localIp}:${listeningPort}`;
+        }
 
         log.GREEN(output);
       }
     });
   }
 
-  #requestListener(req, res) {
+  #requestListener(req: IncomingMessage, res: ServerResponse) {
     const { url, method, headers } = req;
 
-    const parsedURL = new URL(url, "http://localhost:3003");
+    const parsedURL = new URL(url as string, "http://localhost:3003");
     let body = Buffer.alloc(0);
 
     const contentType = headers["content-type"];
@@ -73,7 +93,7 @@ class ApplicationLoadBalancer extends AlbRouter {
       log.YELLOW("ALB event:");
       console.log(event);
     }
-    const lambdaController = this.getHandler(method, parsedURL.pathname);
+    const lambdaController = this.getHandler(method as HttpMethod, parsedURL.pathname);
 
     if (lambdaController) {
       req
@@ -96,7 +116,7 @@ class ApplicationLoadBalancer extends AlbRouter {
     }
   }
 
-  async #responseHandler(res, event, lambdaController) {
+  async #responseHandler(res: ServerResponse, event: any, lambdaController: ILambdaMock) {
     const hrTimeStart = process.hrtime();
 
     res.on("finish", () => {
@@ -126,7 +146,7 @@ class ApplicationLoadBalancer extends AlbRouter {
     }
   }
 
-  #setResponseHead(res, responseData) {
+  #setResponseHead(res: ServerResponse, responseData: any) {
     res.setHeader("Server", "awselb/2.0");
     res.setHeader("Date", new Date().toUTCString());
 
@@ -145,7 +165,7 @@ class ApplicationLoadBalancer extends AlbRouter {
     }
   }
 
-  #writeResponseBody(res, responseData) {
+  #writeResponseBody(res: ServerResponse, responseData: any) {
     // && res.statusCode && String(res.statusCode).startsWith("2")
     if (responseData.body && typeof responseData.body != "string") {
       console.warn("response 'body' must be a string. Receievd", typeof responseData.body);
@@ -157,7 +177,7 @@ class ApplicationLoadBalancer extends AlbRouter {
     res.end(responseData.body);
   }
 
-  async #getLambdaResponse(event, lambdaController, res) {
+  async #getLambdaResponse(event: any, lambdaController: ILambdaMock, res: ServerResponse) {
     return await new Promise(async (resolve, reject) => {
       const responseData = await lambdaController.invoke(event, res);
 
@@ -165,10 +185,10 @@ class ApplicationLoadBalancer extends AlbRouter {
     });
   }
 
-  #convertReqToAlbEvent(req) {
+  #convertReqToAlbEvent(req: IncomingMessage) {
     const { method, headers, url } = req;
 
-    const parsedURL = new URL(url, "http://localhost:3003");
+    const parsedURL = new URL(url as string, "http://localhost:3003");
 
     const albDefaultHeaders = {
       "x-forwarded-for": req.socket.remoteAddress,
@@ -176,11 +196,11 @@ class ApplicationLoadBalancer extends AlbRouter {
       "x-forwarded-port": this.port,
     };
 
-    let event = {
+    let event: AlbEvent = {
       headers: { ...albDefaultHeaders, ...headers },
-      httpMethod: method,
+      httpMethod: method as string,
       path: parsedURL.pathname,
-      queryStringParameters: this.#paramsToObject(url),
+      queryStringParameters: this.#paramsToObject(url as string),
       isBase64Encoded: false,
     };
 
@@ -191,11 +211,11 @@ class ApplicationLoadBalancer extends AlbRouter {
     return event;
   }
 
-  #paramsToObject(reqUrl) {
+  #paramsToObject(reqUrl: string) {
     const queryStartIndex = reqUrl.indexOf("?");
     if (queryStartIndex == -1) return {};
 
-    let queryStringComponents = {};
+    let queryStringComponents: any = {};
     const queryString = reqUrl.slice(queryStartIndex + 1);
     const queryComponents = queryString.split("&");
 
@@ -208,21 +228,13 @@ class ApplicationLoadBalancer extends AlbRouter {
     return queryStringComponents;
   }
 
-  async load(lambdaDefinitions) {
-    try {
-      for (const lambda of lambdaDefinitions) {
-        const lambdaController = new LambdaMock(lambda);
-        // await lambdaController.importEventHandler();
+  async load(lambdaDefinitions: ILambdaMock[]) {
+    for (const lambda of lambdaDefinitions.filter((x) => x.kind == "ALB")) {
+      const lambdaController = new LambdaMock(lambda);
 
-        if (typeof this[lambda.method] == "function") {
-          this[lambda.method](lambdaController);
-        }
+      if (typeof this[lambda.method] == "function") {
+        this[lambda.method](lambdaController);
       }
-    } catch (error) {
-      log.RED("JSON PARSER ERROR");
-      console.error(error);
     }
   }
 }
-
-module.exports.ApplicationLoadBalancer = ApplicationLoadBalancer;

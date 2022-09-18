@@ -1,24 +1,34 @@
-const fs = require("fs/promises");
-const handlebars = require("handlebars");
+//const handlebars = require("handlebars");
 
-let foundHelpers;
+import handlebars from "handlebars";
+import { PluginBuild, OnLoadOptions } from "esbuild";
+import { stat, readFile } from "fs/promises";
+
+let foundHelpers: string[] = [];
+// @ts-ignore
 class ESBuildHandlebarsJSCompiler extends handlebars.JavaScriptCompiler {
-  nameLookup(parent, name, type) {
+  // @ts-ignore
+  nameLookup(parent, name: string, type) {
     if (type === "helper" && !foundHelpers.includes(name)) {
       foundHelpers.push(name);
     }
     return super.nameLookup(parent, name, type);
   }
 }
-function hbs(options = {}) {
-  const { filter = /\.(hbs|handlebars)$/i, additionalHelpers = {}, precompileOptions = {} } = options;
+function hbs(options: { additionalHelpers: any; precompileOptions: any } = { additionalHelpers: {}, precompileOptions: {} }) {
+  const onloadOpt: OnLoadOptions = {
+    filter: /\.(hbs|handlebars)$/i,
+  };
+
+  const { additionalHelpers = {}, precompileOptions = {} } = options;
   return {
     name: "handlebars",
-    setup(build) {
+    setup(build: PluginBuild) {
       const fileCache = new Map();
       const hb = handlebars.create();
+      // @ts-ignore
       hb.JavaScriptCompiler = ESBuildHandlebarsJSCompiler;
-      build.onLoad({ filter }, async ({ path: filename }) => {
+      build.onLoad(onloadOpt, async ({ path: filename }) => {
         if (fileCache.has(filename)) {
           const cachedFile = fileCache.get(filename) || {
             data: null,
@@ -27,7 +37,7 @@ function hbs(options = {}) {
           let cacheValid = true;
           try {
             // Check that mtime isn't more recent than when we cached the result
-            if ((await fs.stat(filename)).mtime > cachedFile.modified) {
+            if ((await stat(filename)).mtime > cachedFile.modified) {
               cacheValid = false;
             }
           } catch {
@@ -40,9 +50,9 @@ function hbs(options = {}) {
             fileCache.delete(filename);
           }
         }
-        const source = await fs.readFile(filename, "utf-8");
+        const source = await readFile(filename, "utf-8");
         //const foundHelpers: string[] = [];
-        const knownHelpers = Object.keys(additionalHelpers).reduce((prev, helper) => {
+        const knownHelpers = Object.keys(additionalHelpers).reduce((prev: any, helper: string) => {
           prev[helper] = true;
           return prev;
         }, {});
@@ -63,13 +73,12 @@ function hbs(options = {}) {
             `export default Handlebars.template(${template});`,
           ].join("\n");
           return { contents };
-        } catch (err) {
-          const exception = err;
-          const esBuildError = { text: exception.message };
+        } catch (err: any) {
+          const esBuildError = { text: err.message };
           return { errors: [esBuildError] };
         }
       });
     },
   };
 }
-exports.handlebars = hbs;
+export { hbs };

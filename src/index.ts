@@ -1,13 +1,13 @@
-const path = require("path");
-const { ApplicationLoadBalancer } = require("./lib/alb.js");
-const { log } = require("./lib/colorize.js");
-const { zip } = require("./lib/zip.js");
-
-const esbuild = require("esbuild");
-const { nodeExternalsPlugin } = require("esbuild-node-externals");
-const { handlebars } = require("./lib/handlebars.js");
+import path from "path";
+import { ApplicationLoadBalancer } from "./lib/alb";
+import { ILambdaMock } from "./lib/lambda";
+import { log } from "./lib/colorize";
+import { zip } from "./lib/zip";
+import { build, BuildOptions } from "esbuild";
+import { nodeExternalsPlugin } from "esbuild-node-externals";
+import { hbs } from "./lib/handlebars";
+import { Lambda } from "./lib/index";
 //const { ExpressLambda } = require("./lib/expressLambda.js");
-const { Lambda } = require("./lib/index");
 
 const cwd = process.cwd();
 const DEFAULT_LAMBDA_TIMEOUT = 6;
@@ -18,16 +18,25 @@ const isLocalEnv = {
 };
 
 class ServerlessAlbOffline extends ApplicationLoadBalancer {
-  #lambdas = [];
+  #lambdas: ILambdaMock[];
   watch = true;
+  serverless: any;
+  options: any;
+  pluginConfig: any;
+  tsconfig: any;
+  commands: any;
+  hooks: any;
+  esBuildConfig: any;
+  runtimeConfig: any;
   constructor(serverless, options) {
     super({ debug: process.env.SLS_DEBUG == "*" });
+    this.#lambdas = [];
     this.serverless = serverless;
     this.options = options;
 
     this.pluginConfig = this.serverless.service.custom["serverless-alb-lambda"];
 
-    this.PORT = this.options.p ?? this.options.port ?? this.pluginConfig?.port ?? process.env.PORT;
+    ServerlessAlbOffline.PORT = this.options.p ?? this.options.port ?? this.pluginConfig?.port ?? process.env.PORT;
 
     this.#setWatchValue();
 
@@ -68,22 +77,22 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
   async invokeLocal() {
     await this.init(false, this.options.function);
   }
-  async init(isPackaging, invokeName) {
-    this.#setEnvs();
+  async init(isPackaging: boolean, invokeName: string) {
+    this.#setRuntimeEnvs();
     this.#lambdas = this.#getAlbLambdas(invokeName);
     this.#setEsBuildConfig(isPackaging, invokeName);
     await this.buildAndWatch(isPackaging, invokeName);
   }
-  #setEsBuildConfig(isPackaging, invokeName) {
+  #setEsBuildConfig(isPackaging: boolean, invokeName: string) {
     const entryPoints = this.#lambdas.map((x) => x.esEntryPoint);
 
     const plugins = [
-      handlebars(),
+      hbs(),
 
       // ExpressLambda({ dev: !isPackaging })
     ];
 
-    let esBuildConfig = {
+    let esBuildConfig: BuildOptions = {
       platform: "node",
       sourcemap: !isPackaging,
       minify: isPackaging,
@@ -131,14 +140,14 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
         }
       });
   }
-  async buildAndWatch(isPackaging, invokeName) {
-    const result = await esbuild.build(this.esBuildConfig);
-    const { outputs } = result.metafile;
+  async buildAndWatch(isPackaging: boolean, invokeName: string) {
+    const result = await build(this.esBuildConfig);
+    const { outputs } = result.metafile!;
     this.#setLambdaEsOutputPaths(outputs);
 
     if (!isPackaging && !invokeName) {
       await this.load(this.#lambdas);
-      this.listen(this.PORT);
+      this.listen(ServerlessAlbOffline.PORT);
     } else if (invokeName) {
       const slsDeclaration = this.serverless.service.getFunction(invokeName);
       const foundLambda = this.#lambdas.find((x) => x.name == invokeName);
@@ -170,14 +179,14 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       log.GREEN("🔄✅ Rebuild ");
     }
   }
-  #getAlbLambdas(invokeName) {
+  #getAlbLambdas(invokeName: string) {
     const funcs = this.serverless.service.functions;
     let functionsNames = Object.keys(funcs);
 
     if (invokeName) {
       functionsNames = functionsNames.filter((x) => x == invokeName);
     }
-    const albs = functionsNames.reduce((accum, funcName) => {
+    const albs = functionsNames.reduce((accum: any[], funcName: string) => {
       const lambda = funcs[funcName];
       const events = lambda.events?.filter((x) =>
         Object.keys(x)
@@ -185,37 +194,42 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
           .includes("alb")
       );
 
+      const handlerPath = lambda.handler;
+      const lastPointIndex = handlerPath.lastIndexOf(".");
+      const handlerName = handlerPath.slice(lastPointIndex + 1);
+      const esEntryPoint = path.join(cwd, handlerPath.slice(0, lastPointIndex));
+      const region = {
+        AWS_REGION: this.runtimeConfig.environment.AWS_REGION ?? this.runtimeConfig.environment.REGION,
+      };
+
+      let lambdaDef = {
+        name: funcName,
+        handlerPath,
+        handlerName,
+        esEntryPoint,
+        memorySize: lambda.memorySize ?? this.runtimeConfig.memorySize ?? DEFAULT_LAMBDA_MEMORY_SIZE,
+        timeout: lambda.timeout ?? this.runtimeConfig.timeout ?? DEFAULT_LAMBDA_TIMEOUT,
+        environment: {
+          ...this.runtimeConfig.environment,
+          ...lambda.environment,
+          ...region,
+          ...isLocalEnv,
+        },
+      };
+
       if (!events.length) {
+        accum.push(lambdaDef);
         return accum;
       }
       events.forEach((event) => {
         const alb = event?.alb;
         if (alb?.conditions && alb.conditions.path?.length && alb.conditions.method?.length) {
-          const handlerPath = lambda.handler;
-          const lastPointIndex = handlerPath.lastIndexOf(".");
-          const handlerName = handlerPath.slice(lastPointIndex + 1);
-          const esEntryPoint = path.join(cwd, handlerPath.slice(0, lastPointIndex));
-          const region = {
-            AWS_REGION: this.runtimeConfig.environment.AWS_REGION ?? this.runtimeConfig.environment.REGION,
-          };
-
-          let lambdaDef = {
-            name: funcName,
-            handlerPath,
-            handlerName,
-            esEntryPoint,
-            path: alb.conditions.path[0],
-            method: alb.conditions.method[0].toUpperCase(),
-            memorySize: lambda.memorySize ?? this.runtimeConfig.memorySize ?? DEFAULT_LAMBDA_MEMORY_SIZE,
-            timeout: lambda.timeout ?? this.runtimeConfig.timeout ?? DEFAULT_LAMBDA_TIMEOUT,
-            environment: {
-              ...this.runtimeConfig.environment,
-              ...lambda.environment,
-              ...region,
-              ...isLocalEnv,
-            },
-          };
-
+          // @ts-ignore
+          lambdaDef.path = alb.conditions.path[0];
+          // @ts-ignore
+          lambdaDef.method = alb.conditions.method[0].toUpperCase();
+          // @ts-ignore
+          lambdaDef.kind = "ALB";
           accum.push(lambdaDef);
         }
       });
@@ -250,7 +264,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     });
   }
 
-  #setEnvs() {
+  #setRuntimeEnvs() {
     const { environment, memorySize, timeout } = this.serverless.service.provider;
 
     this.runtimeConfig.memorySize = memorySize;

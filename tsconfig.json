@@ -1,12 +1,14 @@
 {
-    "include": ["src/lib/**/*"],
-    "compilerOptions": {
+  "include": ["src/lib/**/*"],
+  "compilerOptions": {
     "declaration": true,
-    "target": "es2018" ,
+    "target": "es2018",
+    "module": "CommonJS",
+    "resolveJsonModule": true,
     "esModuleInterop": true,
-      "emitDeclarationOnly": true,
-      "declarationDir": "./dist",
-      "moduleResolution": "Node"
-     
-    }
+    "emitDeclarationOnly": true,
+    "declarationDir": "./dist",
+    "moduleResolution": "Node",
+    "strict": true /* Enable all strict type-checking options. */
   }
+}

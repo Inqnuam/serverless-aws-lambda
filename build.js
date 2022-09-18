@@ -11,7 +11,7 @@ const esBuildConfig = {
 };
 
 const run = async () => {
-  const buildIndex = esbuild.build({ ...esBuildConfig, external: ["./src/lib/worker.js"], entryPoints: ["./src/index.js"] });
+  const buildIndex = esbuild.build({ ...esBuildConfig, external: ["./src/lib/worker.js"], entryPoints: ["./src/index.ts"] });
 
   const buildWorker = esbuild.build({ ...esBuildConfig, entryPoints: ["./src/lib/worker.js"] });
 

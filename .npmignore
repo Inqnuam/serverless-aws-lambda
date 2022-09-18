@@ -9,3 +9,4 @@ yarn.lock
 src
 build.js
 TODO.md
+tsconfig.json
