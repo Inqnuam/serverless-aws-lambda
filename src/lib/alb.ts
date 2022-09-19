@@ -67,7 +67,7 @@ export class ApplicationLoadBalancer extends AlbRouter {
       const { port: listeningPort } = this.#server.address() as AddressInfo;
       AlbRouter.PORT = listeningPort;
       if (typeof callback == "function") {
-        callback(listeningPort);
+        callback(listeningPort, localIp);
       } else {
         let output = `✅ Application Load Balancer is listening on http://localhost:${listeningPort}`;
 
@@ -270,10 +270,6 @@ export class ApplicationLoadBalancer extends AlbRouter {
       const lambdaController = new LambdaMock(lambda);
 
       this.addHandler(lambdaController);
-
-      // if (typeof this[lambda.method] == "function") {
-      //   this[lambda.method](lambdaController);
-      // }
     }
   }
 }

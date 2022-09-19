@@ -8,7 +8,7 @@ import { nodeExternalsPlugin } from "esbuild-node-externals";
 import { hbs } from "./lib/handlebars";
 import { Lambda } from "./lib/index";
 import { LambdaEndpoint } from "./lib/lambda";
-import { HttpMethod } from "./lib/router";
+import { AlbRouter, HttpMethod } from "./lib/router";
 //const { ExpressLambda } = require("./lib/expressLambda.js");
 
 const cwd = process.cwd();
@@ -148,8 +148,18 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     this.#setLambdaEsOutputPaths(outputs);
 
     if (!isPackaging && !invokeName) {
-      await this.load(this.#lambdas);
-      this.listen(ServerlessAlbOffline.PORT);
+      this.listen(ServerlessAlbOffline.PORT, async (port, localIp) => {
+        AlbRouter.PORT = port;
+        await this.load(this.#lambdas);
+
+        let output = `✅ Application Load Balancer is listening on http://localhost:${port}`;
+
+        if (localIp) {
+          output += ` | http://${localIp}:${port}`;
+        }
+
+        log.GREEN(output);
+      });
     } else if (invokeName) {
       const slsDeclaration = this.serverless.service.getFunction(invokeName);
       const foundLambda = this.#lambdas.find((x) => x.name == invokeName);
@@ -289,14 +299,14 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       const httpEvent = event.http ?? event.httpApi;
 
       if (typeof httpEvent == "string") {
-        // 'PUT /users/update'
+        // ex: 'PUT /users/update'
         const declarationComponents = httpEvent.split(" ");
 
         if (declarationComponents.length != 2) {
           return null;
         }
 
-        parsendEvent.methods = [declarationComponents[0] as HttpMethod];
+        parsendEvent.methods = [declarationComponents[0].toUpperCase() as HttpMethod];
         parsendEvent.paths = [declarationComponents[1]];
       } else if (typeof httpEvent == "object" && httpEvent.path) {
         parsendEvent.paths = [httpEvent.path];
