@@ -3,9 +3,9 @@
 # Installation
 
 ```bash
-yarn add -D serverless-alb-lambda
+yarn add -D serverless-aws-lambda
 # or
-npm install -D serverless-alb-lambda
+npm install -D serverless-aws-lambda
 ```
 
 inside your `serverless.yml`
@@ -17,19 +17,19 @@ frameworkVersion: "3"
 configValidationMode: error
 
 plugins:
-  - serverless-alb-lambda
+  - serverless-aws-lambda
 
 custom:
-  serverless-alb-lambda:
+  serverless-aws-lambda:
     port: 3000
     watch: true
     static: ./public
 ```
 
-to trigger the plugin passe `alb-lambda` into your serverless CLI commande:
+to trigger the plugin passe `aws-lambda` into your serverless CLI commande:
 
 ```bash
-sls alb-lambda -s dev
+sls aws-lambda -s dev
 ```
 
 It is also possible to passe port and watch options from the CLI with `--port` or `-p` and `--watch` or `-w`.

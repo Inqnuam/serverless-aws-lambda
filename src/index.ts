@@ -36,7 +36,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     this.serverless = serverless;
     this.options = options;
 
-    this.pluginConfig = this.serverless.service.custom["serverless-alb-lambda"];
+    this.pluginConfig = this.serverless.service.custom["serverless-aws-lambda"];
 
     ServerlessAlbOffline.PORT = this.options.p ?? this.options.port ?? this.pluginConfig?.port ?? process.env.PORT;
 
@@ -52,8 +52,8 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
 
     //  this.serverless.service.getFunction(funcName);
     this.commands = {
-      "alb-lambda": {
-        usage: "Mock AWS ALB-Lambda",
+      "aws-lambda": {
+        usage: "Mock AWS AWS-Lambda",
         lifecycleEvents: ["run"],
         options: {
           port: {
@@ -74,7 +74,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
 
     this.hooks = {
       // TODO: check signle function deploy
-      "alb-lambda:run": this.init.bind(this),
+      "aws-lambda:run": this.init.bind(this),
       "before:package:createDeploymentArtifacts": this.init.bind(this, true),
       "before:deploy:deploy": this.init.bind(this, true),
       "before:invoke:local:invoke": this.invokeLocal.bind(this),
@@ -106,7 +106,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       metafile: true,
       target: "ES2018",
       entryPoints: entryPoints,
-      outdir: path.join(cwd, ".alb_lambda"),
+      outdir: path.join(cwd, ".aws_lambda"),
       outbase: "src",
       bundle: true,
       external: ["aws-sdk"],

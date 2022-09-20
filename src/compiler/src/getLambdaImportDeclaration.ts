@@ -3,7 +3,7 @@ import { ILambdaCompiler } from "./declarations";
 import { _buildUniversalEvent } from "./buildUniversalEvent";
 import { _ResponseHandlerAST } from "./buildResponseHandler";
 
-const pkgPath = "serverless-alb-lambda";
+const pkgPath = "serverless-aws-lambda";
 export function getLambdaImportDeclaration(this: ILambdaCompiler, context: ts.TransformationContext, node: ts.Node) {
   if (ts.isImportDeclaration(node)) {
     // @ts-ignore
