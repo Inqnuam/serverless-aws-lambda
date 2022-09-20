@@ -46,7 +46,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       this.tsconfig = this.pluginConfig.tsconfig;
     }
 
-    if (this.pluginConfig.static) {
+    if (this.pluginConfig?.static) {
       this.serve = this.pluginConfig.static as string;
     }
 
