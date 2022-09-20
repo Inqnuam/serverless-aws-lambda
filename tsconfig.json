@@ -7,7 +7,7 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "emitDeclarationOnly": true,
-    "outFile": "./dist/index.d.ts",
+    "declarationDir": "./dist",
     "moduleResolution": "Node",
     "removeComments": true,
     "strict": true,
