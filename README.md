@@ -23,6 +23,7 @@ custom:
   serverless-alb-lambda:
     port: 3000
     watch: true
+    static: ./public
 ```
 
 to trigger the plugin passe `alb-lambda` into your serverless CLI commande:

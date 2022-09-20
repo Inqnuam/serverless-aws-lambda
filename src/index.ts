@@ -46,6 +46,10 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       this.tsconfig = this.pluginConfig.tsconfig;
     }
 
+    if (this.pluginConfig.static) {
+      this.serve = this.pluginConfig.static as string;
+    }
+
     //  this.serverless.service.getFunction(funcName);
     this.commands = {
       "alb-lambda": {
@@ -69,6 +73,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     };
 
     this.hooks = {
+      // TODO: check signle function deploy
       "alb-lambda:run": this.init.bind(this),
       "before:package:createDeploymentArtifacts": this.init.bind(this, true),
       "before:deploy:deploy": this.init.bind(this, true),

@@ -5,6 +5,8 @@ import { AlbRouter, HttpMethod } from "./router";
 import { ILambdaMock, LambdaMock } from "./lambda";
 import { log } from "./colorize";
 import inspector from "inspector";
+import { html404, html500 } from "./htmlStatusMsg";
+import serveStatic from "serve-static";
 
 let localIp: string;
 
@@ -35,6 +37,7 @@ interface AlbEvent {
 export class ApplicationLoadBalancer extends AlbRouter {
   #server: Server;
   runtimeConfig = {};
+  #serve: any;
   constructor(config = { debug: false }) {
     super(config);
     this.#server = http.createServer(this.#requestListener.bind(this));
@@ -42,22 +45,9 @@ export class ApplicationLoadBalancer extends AlbRouter {
   get port() {
     return AlbRouter.PORT;
   }
-  get #get502HtmlContent() {
-    const htmlContent502 = `<html>
 
-<head>
-	<title>502 Bad Gateway</title>
-</head>
-
-<body>
-	<center>
-		<h1>502 Bad Gateway</h1>
-	</center>
-</body>
-
-</html>`;
-
-    return htmlContent502;
+  set serve(root: string) {
+    this.#serve = serveStatic(root);
   }
   listen(port = 0, callback?: Function) {
     if (isNaN(port)) {
@@ -90,14 +80,13 @@ export class ApplicationLoadBalancer extends AlbRouter {
     const contentType = headers["content-type"];
     let event = mockType == "alb" ? this.#convertReqToAlbEvent(req) : this.#convertReqToApgEvent(req);
 
-    if (this.debug) {
-      log.YELLOW(`${mockType.toUpperCase()} event`);
-      console.log(event);
-    }
-
     const lambdaController = this.getHandler(method as HttpMethod, parsedURL.pathname, mockType);
 
     if (lambdaController) {
+      if (this.debug) {
+        log.YELLOW(`${mockType.toUpperCase()} event`);
+        console.log(event);
+      }
       req
         .on("data", (chunk) => {
           body += chunk;
@@ -112,9 +101,14 @@ export class ApplicationLoadBalancer extends AlbRouter {
         .on("error", (err) => {
           console.error(err.stack);
         });
+    } else if (this.#serve) {
+      this.#serve(req, res, () => {
+        res.statusCode = 404;
+        res.end(html404);
+      });
     } else {
       res.statusCode = 404;
-      res.end(this.#get502HtmlContent);
+      res.end(html404);
     }
   }
 
@@ -141,7 +135,7 @@ export class ApplicationLoadBalancer extends AlbRouter {
     } catch (error) {
       if (!res.writableFinished) {
         res.statusCode = 500;
-        res.end(this.#get502HtmlContent);
+        res.end(html500);
       }
 
       console.error(error);
@@ -206,7 +200,7 @@ export class ApplicationLoadBalancer extends AlbRouter {
       headers: { ...albDefaultHeaders, ...headers },
       httpMethod: method as string,
       path: parsedURL.pathname,
-      queryStringParameters: this.#paramsToObject(url as string),
+      queryStringParameters: this.#paramsToAlbObject(url as string),
       isBase64Encoded: false,
     };
 
@@ -235,7 +229,7 @@ export class ApplicationLoadBalancer extends AlbRouter {
       headers: { ...albDefaultHeaders, ...headers },
       httpMethod: method as string,
       path: parsedURL.pathname,
-      queryStringParameters: this.#paramsToObject(url as string),
+      queryStringParameters: this.#paramsToAlbObject(url as string),
       isBase64Encoded: false,
     };
     if (event.headers["x-mock-type"]) {
@@ -248,7 +242,7 @@ export class ApplicationLoadBalancer extends AlbRouter {
     return event;
   }
 
-  #paramsToObject(reqUrl: string) {
+  #paramsToAlbObject(reqUrl: string) {
     const queryStartIndex = reqUrl.indexOf("?");
     if (queryStartIndex == -1) return {};
 

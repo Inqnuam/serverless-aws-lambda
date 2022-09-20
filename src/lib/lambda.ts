@@ -6,23 +6,12 @@ import { EventEmitter } from "events";
 
 import { log } from "./colorize";
 import { IncomingMessage, ServerResponse } from "http";
+import { html500 } from "./htmlStatusMsg";
 const workerPath = pathResolve(__dirname, "./worker.js");
-const htmlContent502 = `<html>
 
-<head>
-	<title>502 Bad Gateway</title>
-</head>
-
-<body>
-	<center>
-		<h1>502 Bad Gateway</h1>
-	</center>
-</body>
-
-</html>`;
-
-type GateWayKind = "ALB" | "HTTP";
-
+/**
+ * @internal
+ */
 export interface ILambdaMock {
   name: string;
   endpoints: LambdaEndpoint[];
@@ -37,12 +26,17 @@ export interface ILambdaMock {
   _worker?: Worker;
   invoke: (event: any, res: ServerResponse, method: string, path: string) => Promise<any>;
 }
-
+/**
+ * @internal
+ */
 export interface LambdaEndpoint {
   kind: "alb" | "apg";
   paths: string[];
   methods: HttpMethod[];
 }
+/**
+ * @internal
+ */
 export class LambdaMock extends EventEmitter implements ILambdaMock {
   name: string;
 
@@ -154,7 +148,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
             res.setHeader("Content-Type", "text/html");
             res.setHeader("Server", "awselb/2.0");
             res.setHeader("Date", new Date().toUTCString());
-            res.end(htmlContent502);
+            res.end(html500);
 
             resolve(undefined);
             break;

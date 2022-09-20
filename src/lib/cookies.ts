@@ -1,16 +1,15 @@
-export interface SetCookieOptions {
-    domain: string;
-    encode: Function;
-    expires: Date | number;
-    httpOnly: boolean;
-    maxAge: number;
-    path: string;
-    priority: string;
-    secure: boolean;
-    signed: boolean;
-    sameSite: boolean | string;
-  }
-
+export interface CookieOptions {
+  domain?: string;
+  encode?: (val: string) => string;
+  expires?: Date;
+  httpOnly?: boolean;
+  maxAge?: number;
+  path?: string;
+  priority?: string;
+  secure?: boolean;
+  signed?: boolean;
+  sameSite?: boolean | "lax" | "strict" | "none" | undefined;
+}
 
 const fieldContentRegExp = /^[\u0009\u0020-\u007e\u0080-\u00ff]+$/;
 const encode = function encode(val: string) {
@@ -33,8 +32,8 @@ function isDate(val: any) {
 
 export const cookie = {
   serialize: (name: string, val: string, options?: any) => {
-    var opt = options || {};
-    var enc = opt.encode || encode;
+    let opt = options || {};
+    let enc = opt.encode || encode;
 
     if (typeof enc !== "function") {
       throw new TypeError("option encode is invalid");
@@ -44,16 +43,16 @@ export const cookie = {
       throw new TypeError("argument name is invalid");
     }
 
-    var value = enc(val);
+    let value = enc(val);
 
     if (value && !fieldContentRegExp.test(value)) {
       throw new TypeError("argument val is invalid");
     }
 
-    var str = name + "=" + value;
+    let str = name + "=" + value;
 
     if (null != opt.maxAge) {
-      var maxAge = opt.maxAge - 0;
+      let maxAge = opt.maxAge - 0;
 
       if (isNaN(maxAge) || !isFinite(maxAge)) {
         throw new TypeError("option maxAge is invalid");
@@ -79,7 +78,7 @@ export const cookie = {
     }
 
     if (opt.expires) {
-      var expires = opt.expires;
+      let expires = opt.expires;
 
       if (!isDate(expires) || isNaN(expires.valueOf())) {
         throw new TypeError("option expires is invalid");
@@ -97,7 +96,7 @@ export const cookie = {
     }
 
     if (opt.priority) {
-      var priority = typeof opt.priority === "string" ? opt.priority.toLowerCase() : opt.priority;
+      let priority = typeof opt.priority === "string" ? opt.priority.toLowerCase() : opt.priority;
 
       switch (priority) {
         case "low":
@@ -115,7 +114,7 @@ export const cookie = {
     }
 
     if (opt.sameSite) {
-      var sameSite = typeof opt.sameSite === "string" ? opt.sameSite.toLowerCase() : opt.sameSite;
+      let sameSite = typeof opt.sameSite === "string" ? opt.sameSite.toLowerCase() : opt.sameSite;
 
       switch (sameSite) {
         case true:
@@ -142,20 +141,20 @@ export const cookie = {
       throw new TypeError("argument str must be a string");
     }
 
-    var obj: any = {};
-    var opt = options || {};
-    var dec = opt.decode || decode;
+    let obj: any = {};
+    let opt = options || {};
+    let dec = opt.decode || decode;
 
-    var index = 0;
+    let index = 0;
     while (index < str.length) {
-      var eqIdx = str.indexOf("=", index);
+      let eqIdx = str.indexOf("=", index);
 
       // no more cookie pairs
       if (eqIdx === -1) {
         break;
       }
 
-      var endIdx = str.indexOf(";", index);
+      let endIdx = str.indexOf(";", index);
 
       if (endIdx === -1) {
         endIdx = str.length;
@@ -165,11 +164,11 @@ export const cookie = {
         continue;
       }
 
-      var key = str.slice(index, eqIdx).trim();
+      let key = str.slice(index, eqIdx).trim();
 
       // only assign once
       if (undefined === obj[key]) {
-        var val = str.slice(eqIdx + 1, endIdx).trim();
+        let val = str.slice(eqIdx + 1, endIdx).trim();
 
         // quoted values
         if (val.charCodeAt(0) === 0x22) {
