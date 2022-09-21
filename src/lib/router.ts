@@ -1,4 +1,4 @@
-import { ILambdaMock } from "./lambda";
+import { ILambdaMock } from "./lambdaMock";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "ANY";
 

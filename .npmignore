@@ -10,3 +10,4 @@ src
 build.js
 TODO.md
 tsconfig.json
+/dist/lambda

@@ -26,7 +26,7 @@ const getMiddlewareAfter = (currentPosition: number, controllers: (RouteControll
 
   return func;
 };
-export class Lambda extends Function {
+export class Route extends Function {
   controllers: (RouteController | RouteMiddleware)[] = [];
 
   constructor() {

@@ -2,7 +2,7 @@ import http, { Server, IncomingMessage, ServerResponse } from "http";
 import { AddressInfo } from "net";
 import { networkInterfaces } from "os";
 import { AlbRouter, HttpMethod } from "./router";
-import { ILambdaMock, LambdaMock } from "./lambda";
+import { ILambdaMock, LambdaMock } from "./lambdaMock";
 import { log } from "./colorize";
 import inspector from "inspector";
 import { html404, html500 } from "./htmlStatusMsg";

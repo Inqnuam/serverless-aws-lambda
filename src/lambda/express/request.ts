@@ -1,5 +1,5 @@
-import { cookie, CookieOptions } from "../cookies";
-import { HttpMethod } from "../router";
+import { cookie, CookieOptions } from "./cookies";
+type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "ANY";
 
 export interface RawResponseContent {
   cookies: string[];

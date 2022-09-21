@@ -1,5 +1,5 @@
 import { RawResponseContent } from "./request";
-import { cookie, CookieOptions } from "../cookies";
+import { cookie, CookieOptions } from "./cookies";
 
 export type RedirectOptions = [code: number, path: string];
 

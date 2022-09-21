@@ -1,5 +1,5 @@
 {
-  "include": ["src/lib/**/*"],
+// "include": ["./**/*"],
   "compilerOptions": {
     "declaration": true,
     "target": "es2018",
@@ -7,7 +7,7 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "emitDeclarationOnly": true,
-    "declarationDir": "./dist",
+    "declarationDir": "../../dist/lambda/",
     "moduleResolution": "Node",
     "removeComments": true,
     "strict": true,

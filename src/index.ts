@@ -1,13 +1,12 @@
 import path from "path";
 import { ApplicationLoadBalancer } from "./lib/alb";
-import { ILambdaMock } from "./lib/lambda";
+import { ILambdaMock } from "./lib/lambdaMock";
 import { log } from "./lib/colorize";
 import { zip } from "./lib/zip";
 import { build, BuildOptions } from "esbuild";
 import { nodeExternalsPlugin } from "esbuild-node-externals";
 import { hbs } from "./lib/handlebars";
-import { Lambda } from "./lib/index";
-import { LambdaEndpoint } from "./lib/lambda";
+import { LambdaEndpoint } from "./lib/lambdaMock";
 import { AlbRouter, HttpMethod } from "./lib/router";
 //const { ExpressLambda } = require("./lib/expressLambda.js");
 
@@ -109,7 +108,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       outdir: path.join(cwd, ".aws_lambda"),
       outbase: "src",
       bundle: true,
-      external: ["aws-sdk"],
+      external: ["aws-sdk", "esbuild", "pg-hstore"], // workaround for bundles including sequelize
       plugins,
       watch: false,
     };
@@ -361,4 +360,3 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
 }
 
 module.exports = ServerlessAlbOffline;
-module.exports.Lambda = Lambda;
