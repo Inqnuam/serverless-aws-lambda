@@ -146,35 +146,44 @@ export class ApplicationLoadBalancer extends AlbRouter {
     res.setHeader("Server", "awselb/2.0");
     res.setHeader("Date", new Date().toUTCString());
 
-    res.statusCode = responseData.statusCode ?? 200;
-    res.statusMessage = responseData.statusMessage ?? "";
+    if (responseData) {
+      res.statusCode = responseData.statusCode ?? 200;
+      res.statusMessage = responseData.statusMessage ?? "";
 
-    if (typeof responseData.headers == "object" && !Array.isArray(responseData.headers)) {
-      const headersKeys = Object.keys(responseData.headers).filter((key) => key !== "Server" && key !== "Date");
-      headersKeys.forEach((key) => {
-        res.setHeader(key, responseData.headers[key]);
-      });
-    }
+      if (typeof responseData.headers == "object" && !Array.isArray(responseData.headers)) {
+        const headersKeys = Object.keys(responseData.headers).filter((key) => key !== "Server" && key !== "Date");
+        headersKeys.forEach((key) => {
+          res.setHeader(key, responseData.headers[key]);
+        });
+      }
 
-    if (responseData.cookies.length) {
-      res.setHeader("Set-Cookie", responseData.cookies);
-    }
+      if (responseData) {
+        if (responseData.cookies?.length) {
+          res.setHeader("Set-Cookie", responseData.cookies);
+        }
 
-    if (!responseData.statusCode) {
-      console.warn("Invalid 'statusCode'. default 200 is sent to client");
+        if (!responseData.statusCode) {
+          console.warn("Invalid 'statusCode'. default 200 is sent to client");
+        }
+      }
+    } else {
+      res.statusCode = 200;
     }
   }
 
   #writeResponseBody(res: ServerResponse, responseData: any) {
-    // && res.statusCode && String(res.statusCode).startsWith("2")
-    if (responseData.body && typeof responseData.body != "string") {
-      console.warn("response 'body' must be a string. Receievd", typeof responseData.body);
-      responseData.body = "";
+    if (responseData) {
+      if (responseData.body && typeof responseData.body != "string") {
+        console.warn("response 'body' must be a string. Receievd", typeof responseData.body);
+        responseData.body = "";
 
-      // TODO: if statudCode 404 send html 404 not found as body
+        // TODO: if statudCode 404 send html 404 not found as body
+      }
+
+      res.end(responseData.body);
+    } else {
+      res.end("");
     }
-
-    res.end(responseData.body);
   }
 
   async #getLambdaResponse(event: any, lambdaController: ILambdaMock, res: ServerResponse, method: HttpMethod, path: string) {
