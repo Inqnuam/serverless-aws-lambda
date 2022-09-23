@@ -95,8 +95,6 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
   #setEsBuildConfig(isPackaging: boolean, invokeName: string) {
     const entryPoints = this.#lambdas.map((x) => x.esEntryPoint);
 
-    const plugins: any[] = [];
-
     let esBuildConfig: BuildOptions = {
       platform: "node",
       sourcemap: !isPackaging,
@@ -107,12 +105,13 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       outdir: path.join(cwd, ".aws_lambda"),
       outbase: "src",
       bundle: true,
+      plugins: [],
       external: ["aws-sdk", "esbuild"],
       watch: false,
     };
 
     if (!isPackaging) {
-      plugins.unshift(nodeExternalsPlugin());
+      esBuildConfig.plugins!.unshift(nodeExternalsPlugin());
 
       if (!invokeName && this.watch) {
         esBuildConfig.watch = {
