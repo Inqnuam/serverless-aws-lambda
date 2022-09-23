@@ -24,6 +24,7 @@ custom:
     port: 3000
     watch: true
     static: ./public
+    esBuildConfig: ./path/to/esbuild/configFile.default
 ```
 
 to trigger the plugin passe `aws-lambda` into your serverless CLI commande:
