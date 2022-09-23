@@ -10,3 +10,4 @@ dist
 **/.DS_Store
 /express
 /route.d.ts
+/route.js
