@@ -1,17 +1,19 @@
 import archiver from "archiver";
 import { createReadStream, createWriteStream } from "fs";
-import { basename } from "path";
+import { basename, dirname } from "path";
 
-export const zip = (filePath: string) => {
+export const zip = (filePath: string, zipName: string) => {
   return new Promise((resolve) => {
     const archive = archiver("zip", {
       zlib: { level: 9 },
     });
 
-    archive.on("finish", resolve);
+    const zipOutputPath = `${dirname(filePath)}/${zipName}.zip`;
+    const output = createWriteStream(zipOutputPath);
 
-    const output = createWriteStream(`${filePath}.zip`);
-
+    archive.on("finish", () => {
+      resolve(zipOutputPath);
+    });
     archive.pipe(output);
 
     const fileName = basename(filePath) + ".js";

@@ -177,9 +177,9 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
         const slsDeclaration = this.serverless.service.getFunction(l.name);
 
         const path = l.esOutputPath;
-        await zip(path.slice(0, -3));
+        const zipOutputPath = await zip(path.slice(0, -3), slsDeclaration.name);
 
-        slsDeclaration.package = { ...slsDeclaration.package, disable: true, artifact: path.replace(".js", ".zip") };
+        slsDeclaration.package = { ...slsDeclaration.package, disable: true, artifact: zipOutputPath };
       }
     }
   }
