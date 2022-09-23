@@ -107,8 +107,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       outdir: path.join(cwd, ".aws_lambda"),
       outbase: "src",
       bundle: true,
-      external: ["aws-sdk", "esbuild", "pg-hstore"], // workaround for bundles including sequelize
-      plugins,
+      external: ["aws-sdk", "esbuild"],
       watch: false,
     };
 
