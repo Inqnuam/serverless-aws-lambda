@@ -29,7 +29,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
   esBuildConfig: any;
   customEsBuildConfig: any;
   runtimeConfig: any;
-  constructor(serverless, options) {
+  constructor(serverless: any, options: any) {
     super({ debug: process.env.SLS_DEBUG == "*" });
     log.BR_BLUE("Launching serverless-aws-lambda...");
     this.#lambdas = [];
@@ -120,10 +120,6 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       }
     }
 
-    // if (this.tsconfig) {
-    //   esBuildConfig.tsconfig = this.tsconfig;
-    // }
-
     if (this.customEsBuildConfig) {
       if (Array.isArray(this.customEsBuildConfig.plugins)) {
         esBuildConfig.plugins!.push(...this.customEsBuildConfig.plugins);
@@ -195,6 +191,10 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       if (this.customEsBuildConfig.footer && typeof this.customEsBuildConfig.footer == "object") {
         esBuildConfig.footer = this.customEsBuildConfig.footer;
       }
+
+      if (this.customEsBuildConfig.loader && typeof this.customEsBuildConfig.loader == "object") {
+        esBuildConfig.loader = this.customEsBuildConfig.loader;
+      }
     }
 
     this.esBuildConfig = esBuildConfig;
@@ -222,7 +222,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     this.#setLambdaEsOutputPaths(outputs);
 
     if (!isPackaging && !invokeName) {
-      this.listen(ServerlessAlbOffline.PORT, async (port, localIp) => {
+      this.listen(ServerlessAlbOffline.PORT, async (port: number, localIp: string) => {
         AlbRouter.PORT = port;
         await this.load(this.#lambdas);
 
@@ -254,7 +254,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     }
   }
 
-  async #onRebuild(error, result) {
+  async #onRebuild(error: any, result: any) {
     if (error) {
       log.RED("watch build failed:");
       console.error(error);
@@ -307,7 +307,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       //     .includes("alb")
       // );
       if (lambda.events.length) {
-        lambdaDef.endpoints = lambda.events.map(this.#parseSlsEventDefinition).filter((x) => x);
+        lambdaDef.endpoints = lambda.events.map(this.#parseSlsEventDefinition).filter((x: any) => x);
       }
       accum.push(lambdaDef);
       return accum;
@@ -342,7 +342,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     return albs;
   }
 
-  #parseSlsEventDefinition(event): LambdaEndpoint | null {
+  #parseSlsEventDefinition(event: any): LambdaEndpoint | null {
     const supportedEvents = ["http", "httpApi", "alb"];
 
     const keys = Object.keys(event);
@@ -395,7 +395,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
 
     return parsendEvent;
   }
-  #setLambdaEsOutputPaths(outputs) {
+  #setLambdaEsOutputPaths(outputs: any) {
     const outputNames = Object.keys(outputs)
       .filter((x) => !x.endsWith(".map") && outputs[x].entryPoint)
       .map((x) => {
@@ -520,6 +520,9 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       }
       if (customConfig.footer && typeof customConfig.footer == "object") {
         customEsBuild.footer = customConfig.footer;
+      }
+      if (customConfig.loader && typeof customConfig.loader == "object") {
+        customEsBuild.loader = customConfig.loader;
       }
 
       if (Object.keys(customEsBuild).length) {

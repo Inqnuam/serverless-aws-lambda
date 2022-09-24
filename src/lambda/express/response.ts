@@ -97,7 +97,7 @@ export class _Response implements IResponse {
   }
   #sendResponse() {
     if (!this.responseObject.headers["Content-Type"]) {
-      this.type("text/html");
+      this.type("text/html; charset=utf-8");
     }
     this.#resolve(this.responseObject);
   }
