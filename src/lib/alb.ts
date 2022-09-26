@@ -38,6 +38,10 @@ export class ApplicationLoadBalancer extends AlbRouter {
   #server: Server;
   runtimeConfig = {};
   #serve: any;
+  customOfflineRequests?: {
+    filter: RegExp;
+    callback: (req: any, res: any) => {};
+  }[];
   constructor(config = { debug: false }) {
     super(config);
     this.#server = http.createServer(this.#requestListener.bind(this));
@@ -59,7 +63,7 @@ export class ApplicationLoadBalancer extends AlbRouter {
       if (typeof callback == "function") {
         callback(listeningPort, localIp);
       } else {
-        let output = `✅ Application Load Balancer is listening on http://localhost:${listeningPort}`;
+        let output = `✅ AWS Lambda offline server is listening on http://localhost:${listeningPort}`;
 
         if (localIp) {
           output += ` | http://${localIp}:${listeningPort}`;
@@ -73,42 +77,55 @@ export class ApplicationLoadBalancer extends AlbRouter {
   #requestListener(req: IncomingMessage, res: ServerResponse) {
     const { url, method, headers } = req;
 
-    const mockType = (headers["x-mock-type"] ?? "alb") as string;
     const parsedURL = new URL(url as string, "http://localhost:3003");
-    let body = Buffer.alloc(0);
 
-    const contentType = headers["content-type"];
-    let event = mockType == "alb" ? this.#convertReqToAlbEvent(req) : this.#convertReqToApgEvent(req);
+    let customCallback: ((req: any, res: any) => {}) | undefined;
 
-    const lambdaController = this.getHandler(method as HttpMethod, parsedURL.pathname, mockType);
+    if (this.customOfflineRequests) {
+      const foundCustomCallback = this.customOfflineRequests.find((x) => x.filter.test(parsedURL.pathname));
 
-    if (lambdaController) {
-      if (this.debug) {
-        log.YELLOW(`${mockType.toUpperCase()} event`);
-        console.log(event);
-      }
-      req
-        .on("data", (chunk) => {
-          body += chunk;
-        })
-        .on("end", async () => {
-          if (contentType && (contentType.includes("json") || contentType.includes("xml") || contentType.startsWith("text/"))) {
-            event.body = body.toString();
-          }
+      customCallback = foundCustomCallback?.callback;
+    }
 
-          this.#responseHandler(res, event, lambdaController, method as HttpMethod, parsedURL.pathname);
-        })
-        .on("error", (err) => {
-          console.error(err.stack);
+    if (customCallback) {
+      customCallback(req, res);
+    } else {
+      const mockType = (headers["x-mock-type"] ?? "alb") as string;
+      let body = Buffer.alloc(0);
+
+      const contentType = headers["content-type"];
+      let event = mockType == "alb" ? this.#convertReqToAlbEvent(req) : this.#convertReqToApgEvent(req);
+
+      const lambdaController = this.getHandler(method as HttpMethod, parsedURL.pathname, mockType);
+
+      if (lambdaController) {
+        if (this.debug) {
+          log.YELLOW(`${mockType.toUpperCase()} event`);
+          console.log(event);
+        }
+        req
+          .on("data", (chunk) => {
+            body += chunk;
+          })
+          .on("end", async () => {
+            if (contentType && (contentType.includes("json") || contentType.includes("xml") || contentType.startsWith("text/"))) {
+              event.body = body.toString();
+            }
+
+            this.#responseHandler(res, event, lambdaController, method as HttpMethod, parsedURL.pathname);
+          })
+          .on("error", (err) => {
+            console.error(err.stack);
+          });
+      } else if (this.#serve) {
+        this.#serve(req, res, () => {
+          res.statusCode = 404;
+          res.end(html404);
         });
-    } else if (this.#serve) {
-      this.#serve(req, res, () => {
+      } else {
         res.statusCode = 404;
         res.end(html404);
-      });
-    } else {
-      res.statusCode = 404;
-      res.end(html404);
+      }
     }
   }
 

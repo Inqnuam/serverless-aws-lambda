@@ -14,6 +14,7 @@ const workerPath = pathResolve(__dirname, "./worker.js");
  */
 export interface ILambdaMock {
   name: string;
+  outName: string;
   endpoints: LambdaEndpoint[];
   timeout: number;
   memorySize: number;
@@ -39,9 +40,8 @@ export interface LambdaEndpoint {
  */
 export class LambdaMock extends EventEmitter implements ILambdaMock {
   name: string;
-
+  outName: string;
   endpoints: LambdaEndpoint[];
-
   timeout: number;
   memorySize: number;
   environment: { [key: string]: any };
@@ -51,9 +51,10 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   esOutputPath: string;
   entryPoint: string;
   _worker?: Worker;
-  constructor({ name, endpoints, timeout, memorySize, environment, handlerPath, handlerName, esEntryPoint, esOutputPath, entryPoint }: ILambdaMock) {
+  constructor({ name, outName, endpoints, timeout, memorySize, environment, handlerPath, handlerName, esEntryPoint, esOutputPath, entryPoint }: ILambdaMock) {
     super();
     this.name = name;
+    this.outName = outName;
     this.endpoints = endpoints;
     this.timeout = timeout;
     this.memorySize = memorySize;
@@ -99,7 +100,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   }
   async invoke(event: any, res: any, method: string, path: string) {
     if (!this._worker) {
-      log.BR_BLUE(`❄️ Cold start '${this.name}'`);
+      log.BR_BLUE(`❄️ Cold start '${this.outName}'`);
       await this.importEventHandler();
     }
 

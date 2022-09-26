@@ -7,7 +7,6 @@ import { build, BuildOptions } from "esbuild";
 import { nodeExternalsPlugin } from "esbuild-node-externals";
 import { LambdaEndpoint } from "./lib/lambdaMock";
 import { AlbRouter, HttpMethod } from "./lib/router";
-//const { ExpressLambda } = require("./lib/expressLambda.js");
 
 const cwd = process.cwd();
 const DEFAULT_LAMBDA_TIMEOUT = 6;
@@ -20,6 +19,7 @@ const isLocalEnv = {
 class ServerlessAlbOffline extends ApplicationLoadBalancer {
   #lambdas: ILambdaMock[];
   watch = true;
+  isDeploying = false;
   serverless: any;
   options: any;
   pluginConfig: any;
@@ -28,7 +28,10 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
   hooks: any;
   esBuildConfig: any;
   customEsBuildConfig: any;
+  customBuildCallback?: Function;
   runtimeConfig: any;
+  defaultVirtualEnvs: any;
+
   constructor(serverless: any, options: any) {
     super({ debug: process.env.SLS_DEBUG == "*" });
     log.BR_BLUE("Launching serverless-aws-lambda...");
@@ -36,23 +39,18 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     this.serverless = serverless;
     this.options = options;
 
-    this.pluginConfig = this.serverless.service.custom["serverless-aws-lambda"];
+    serverless.configSchemaHandler.defineFunctionProperties("aws", {
+      properties: {
+        virtualEnvs: { type: "object" },
+      },
+    });
 
+    this.pluginConfig = this.serverless.service.custom["serverless-aws-lambda"];
+    this.defaultVirtualEnvs = this.serverless.service.custom["virtualEnvs"] ?? {};
     ServerlessAlbOffline.PORT = this.options.p ?? this.options.port ?? this.pluginConfig?.port ?? process.env.PORT;
 
     this.#setWatchValue();
 
-    if (this.pluginConfig) {
-      if (this.pluginConfig.tsconfig) {
-        this.tsconfig = this.pluginConfig.tsconfig;
-      }
-
-      if (this.pluginConfig.static) {
-        this.serve = this.pluginConfig.static as string;
-      }
-
-      this.#setCustomEsBuildConfig();
-    }
     this.commands = {
       "aws-lambda": {
         usage: "Mock AWS AWS-Lambda",
@@ -78,7 +76,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       // TODO: check signle function deploy
       "aws-lambda:run": this.init.bind(this),
       "before:package:createDeploymentArtifacts": this.init.bind(this, true),
-      "before:deploy:deploy": this.init.bind(this, true),
+      "before:deploy:deploy": this.deploy.bind(this),
       "before:invoke:local:invoke": this.invokeLocal.bind(this),
     };
   }
@@ -86,13 +84,21 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
   async invokeLocal() {
     await this.init(false, this.options.function);
   }
-  async init(isPackaging: boolean, invokeName: string) {
+
+  async deploy() {
+    this.isDeploying = true;
+    await this.init(true);
+  }
+  async init(isPackaging: boolean, invokeName?: string) {
     this.#setRuntimeEnvs();
     this.#lambdas = this.#getAlbLambdas(invokeName);
+
+    await this.#setCustomEsBuildConfig();
     this.#setEsBuildConfig(isPackaging, invokeName);
     await this.buildAndWatch(isPackaging, invokeName);
   }
-  #setEsBuildConfig(isPackaging: boolean, invokeName: string) {
+
+  #setEsBuildConfig(isPackaging: boolean, invokeName?: string) {
     const entryPoints = this.#lambdas.map((x) => x.esEntryPoint);
 
     let esBuildConfig: BuildOptions = {
@@ -195,8 +201,39 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       if (this.customEsBuildConfig.loader && typeof this.customEsBuildConfig.loader == "object") {
         esBuildConfig.loader = this.customEsBuildConfig.loader;
       }
+
+      if (typeof this.customEsBuildConfig.assetNames == "string") {
+        esBuildConfig.assetNames = this.customEsBuildConfig.assetNames;
+      }
+
+      if (typeof this.customEsBuildConfig.entryNames == "string") {
+        esBuildConfig.entryNames = this.customEsBuildConfig.entryNames;
+      }
+
+      if (typeof this.customEsBuildConfig.publicPath == "string") {
+        esBuildConfig.publicPath = this.customEsBuildConfig.publicPath;
+      }
+
+      if (Array.isArray(this.customEsBuildConfig.inject)) {
+        esBuildConfig.inject = this.customEsBuildConfig.inject;
+      }
+
+      if (typeof this.customEsBuildConfig.format == "string") {
+        esBuildConfig.format = this.customEsBuildConfig.format;
+      }
+
+      if (typeof this.customEsBuildConfig.splitting == "boolean") {
+        esBuildConfig.splitting = this.customEsBuildConfig.splitting;
+      }
+
+      if (typeof this.customEsBuildConfig.bundle == "boolean") {
+        esBuildConfig.bundle = this.customEsBuildConfig.bundle;
+      }
     }
 
+    if (!esBuildConfig.bundle) {
+      delete esBuildConfig.external;
+    }
     this.esBuildConfig = esBuildConfig;
   }
 
@@ -216,17 +253,20 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
         }
       });
   }
-  async buildAndWatch(isPackaging: boolean, invokeName: string) {
+  async buildAndWatch(isPackaging: boolean, invokeName?: string) {
     const result = await build(this.esBuildConfig);
     const { outputs } = result.metafile!;
     this.#setLambdaEsOutputPaths(outputs);
+    if (this.customBuildCallback) {
+      await this.customBuildCallback(result);
+    }
 
     if (!isPackaging && !invokeName) {
       this.listen(ServerlessAlbOffline.PORT, async (port: number, localIp: string) => {
         AlbRouter.PORT = port;
         await this.load(this.#lambdas);
 
-        let output = `✅ Application Load Balancer is listening on http://localhost:${port}`;
+        let output = `✅ AWS Lambda offline server is listening on http://localhost:${port}`;
 
         if (localIp) {
           output += ` | http://${localIp}:${port}`;
@@ -247,7 +287,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
         const slsDeclaration = this.serverless.service.getFunction(l.name);
 
         const path = l.esOutputPath;
-        const zipOutputPath = await zip(path.slice(0, -3), slsDeclaration.name);
+        const zipOutputPath = await zip(path.slice(0, -3), l.outName);
 
         slsDeclaration.package = { ...slsDeclaration.package, disable: true, artifact: zipOutputPath };
       }
@@ -260,12 +300,17 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       console.error(error);
     } else {
       this.#setLambdaEsOutputPaths(result.metafile.outputs);
-      await this.load(this.#lambdas);
 
-      log.GREEN("🔄✅ Rebuild ");
+      if (this.customBuildCallback) {
+        await this.customBuildCallback(result);
+        await this.load(this.#lambdas);
+      } else {
+        await this.load(this.#lambdas);
+        log.GREEN(`${new Date().toLocaleString()}🔄✅ Rebuild `);
+      }
     }
   }
-  #getAlbLambdas(invokeName: string) {
+  #getAlbLambdas(invokeName?: string) {
     const funcs = this.serverless.service.functions;
     let functionsNames = Object.keys(funcs);
 
@@ -283,14 +328,18 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
         AWS_REGION: this.runtimeConfig.environment.AWS_REGION ?? this.runtimeConfig.environment.REGION,
       };
 
+      const slsDeclaration = this.serverless.service.getFunction(funcName);
+
       let lambdaDef = {
         name: funcName,
+        outName: slsDeclaration.name,
         handlerPath,
         handlerName,
         esEntryPoint,
         memorySize: lambda.memorySize ?? this.runtimeConfig.memorySize ?? DEFAULT_LAMBDA_MEMORY_SIZE,
         timeout: lambda.timeout ?? this.runtimeConfig.timeout ?? DEFAULT_LAMBDA_TIMEOUT,
         endpoints: [],
+        virtualEnvs: { ...this.defaultVirtualEnvs, ...(slsDeclaration.virtualEnvs ?? {}) },
         environment: {
           ...this.runtimeConfig.environment,
           ...lambda.environment,
@@ -299,13 +348,6 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
         },
       };
 
-      // const events = lambda.events;
-
-      //   ?.filter((x) =>
-      //   Object.keys(x)
-      //     .map((x) => x.toLowerCase())
-      //     .includes("alb")
-      // );
       if (lambda.events.length) {
         lambdaDef.endpoints = lambda.events.map(this.#parseSlsEventDefinition).filter((x: any) => x);
       }
@@ -428,28 +470,45 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     this.runtimeConfig.environment.AWS_PROFILE = process.env.AWS_PROFILE;
   }
 
-  #setCustomEsBuildConfig() {
-    if (typeof this.pluginConfig.esBuildConfig == "string") {
-      const extPoint = this.pluginConfig.esBuildConfig.lastIndexOf(".");
-      const customFilePath = this.pluginConfig.esBuildConfig.slice(0, extPoint);
-      const configObjectName = this.pluginConfig.esBuildConfig.slice(extPoint + 1);
+  async #setCustomEsBuildConfig() {
+    if (typeof this.pluginConfig.configPath == "string") {
+      const setEnv = (lambdaName: string, key: string, value: string) => {
+        console.log("SET ENV", lambdaName, key, value);
+        const foundIndex = this.#lambdas.findIndex((x) => x.name == lambdaName);
 
-      const exportedConfig = require(path.resolve(cwd, customFilePath));
+        if (foundIndex > -1) {
+          this.#lambdas[foundIndex].environment[key] = value;
+          const slsDeclaration = this.serverless.service.getFunction(lambdaName);
+          if (slsDeclaration) {
+            if (!slsDeclaration.environment) {
+              slsDeclaration.environment = {};
+            }
+            slsDeclaration.environment[key] = value;
+          }
+        }
+      };
+      const extPoint = this.pluginConfig.configPath.lastIndexOf(".");
+      const customFilePath = this.pluginConfig.configPath.slice(0, extPoint);
+      const configObjectName = this.pluginConfig.configPath.slice(extPoint + 1);
 
-      if (!exportedConfig) {
+      const exportedFunc = require(path.resolve(cwd, customFilePath));
+
+      if (!exportedFunc) {
         return;
       }
 
-      let customConfig: any = {};
+      const customConfigArgs = [this.#lambdas, this.isDeploying, setEnv];
+      let exportedObject: any = {};
 
-      if (exportedConfig[configObjectName]) {
-        customConfig = exportedConfig[configObjectName];
-      } else if (typeof exportedConfig == "object") {
-        customConfig = exportedConfig;
+      if (typeof exportedFunc[configObjectName] == "function") {
+        exportedObject = await exportedFunc[configObjectName](...customConfigArgs);
+      } else if (typeof exportedFunc == "function") {
+        exportedObject = await exportedFunc(...customConfigArgs);
       } else {
         return;
       }
 
+      const customConfig = exportedObject.esbuild;
       let customEsBuild: any = {};
       if (Array.isArray(customConfig.plugins)) {
         customEsBuild.plugins = customConfig.plugins;
@@ -523,6 +582,46 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       }
       if (customConfig.loader && typeof customConfig.loader == "object") {
         customEsBuild.loader = customConfig.loader;
+      }
+
+      if (typeof customConfig.assetNames == "string") {
+        customEsBuild.assetNames = customConfig.assetNames;
+      }
+      if (typeof customConfig.entryNames == "string") {
+        customEsBuild.entryNames = customConfig.entryNames;
+      }
+
+      if (typeof customConfig.publicPath == "string") {
+        customEsBuild.publicPath = customConfig.publicPath;
+      }
+
+      if (typeof customConfig.format == "string") {
+        customEsBuild.format = customConfig.format;
+      }
+
+      if (typeof customConfig.splitting == "boolean") {
+        customEsBuild.splitting = customConfig.splitting;
+      }
+      if (typeof customConfig.bundle == "boolean") {
+        customEsBuild.bundle = customConfig.bundle;
+      }
+
+      if (Array.isArray(customConfig.inject)) {
+        customEsBuild.inject = customConfig.inject;
+      }
+
+      if (typeof exportedObject.buildCallback == "function") {
+        this.customBuildCallback = exportedObject.buildCallback;
+      }
+
+      if (exportedObject.offline && typeof exportedObject.offline == "object") {
+        if (Array.isArray(exportedObject.offline.request)) {
+          this.customOfflineRequests = exportedObject.offline.request;
+        }
+
+        if (typeof exportedObject.offline.staticPath == "string") {
+          this.serve = exportedObject.offline.staticPath;
+        }
       }
 
       if (Object.keys(customEsBuild).length) {
