@@ -90,6 +90,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     await this.init(true);
   }
   async init(isPackaging: boolean, invokeName?: string) {
+    this.isDeploying = isPackaging;
     this.#setRuntimeEnvs();
     this.#lambdas = this.#getAlbLambdas(invokeName);
 
@@ -473,7 +474,6 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
   async #setCustomEsBuildConfig() {
     if (typeof this.pluginConfig.configPath == "string") {
       const setEnv = (lambdaName: string, key: string, value: string) => {
-        console.log("SET ENV", lambdaName, key, value);
         const foundIndex = this.#lambdas.findIndex((x) => x.name == lambdaName);
 
         if (foundIndex > -1) {
