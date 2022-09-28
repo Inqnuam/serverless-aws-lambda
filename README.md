@@ -1,4 +1,6 @@
-# Motivation
+## Description
+
+> AWS Application Load Balancer and API Gateway - Lambda dev tool for Serverless. Allows Express synthax in handlers. Supports packaging, local invoking and offline real ALB and APG lambda server mocking.
 
 # Installation
 
@@ -23,8 +25,6 @@ custom:
   serverless-aws-lambda:
     port: 3000
     watch: true
-    static: ./public
-    esBuildConfig: ./path/to/esbuild/configFile.default
 ```
 
 to trigger the plugin passe `aws-lambda` into your serverless CLI commande:
@@ -36,3 +36,55 @@ sls aws-lambda -s dev
 It is also possible to passe port and watch options from the CLI with `--port` or `-p` and `--watch` or `-w`.
 
 Command line values will overwrite serverless.yml custom values if they are set.
+
+---
+
+## Advanced configuration
+
+To have more control over the plugin you can passe a config file via `configPath` variable in plugin options:
+
+```yaml
+custom:
+  serverless-aws-lambda:
+    port: 3000
+    watch: true
+    configPath: ./config.default
+```
+
+Exported config must be a function which can take 3 arguments:
+
+- [0] `array` all your Lambda declarations + additional info
+- [1] `boolean` which indicates if your sls is deploying
+- [2] `function` to dynamically set env variables to your lambdas
+
+### esbuild
+
+You can customize esbuild by returning on object with `esbuild` key containing [esbuild configuration.](https://esbuild.github.io)  
+Most of esbuild options are supported. It isn't the case for example for `entryPoints` which is automatically done by serverless-aws-lambda.
+
+See supported options [full list.](resources/esbuild.md)  
+simple example:
+
+```js
+const somePlugin = require("some-plugin");
+
+module.exports = (lambdas, isDeploying, setEnv) => {
+  return {
+    esbuild: {
+      plugins: [somePlugin],
+      external: ["pg-hstore"],
+      loader: {
+        ".png": "file",
+      },
+    },
+  };
+};
+```
+
+### Customize offline server:
+
+[See docs.](resources/offline.md)
+
+### Use [Express](https://expressjs.com) syntax with your lambdas
+
+[See docs.](resources/express.md)
