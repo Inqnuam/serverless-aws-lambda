@@ -329,9 +329,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       const lastPointIndex = handlerPath.lastIndexOf(".");
       const handlerName = handlerPath.slice(lastPointIndex + 1);
       const esEntryPoint = path.join(cwd, handlerPath.slice(0, lastPointIndex));
-      const region = {
-        AWS_REGION: this.runtimeConfig.environment.AWS_REGION ?? this.runtimeConfig.environment.REGION,
-      };
+      const region = this.runtimeConfig.environment.AWS_REGION ?? this.runtimeConfig.environment.REGION;
 
       const slsDeclaration = this.serverless.service.getFunction(funcName);
 
@@ -348,10 +346,12 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
         environment: {
           ...this.runtimeConfig.environment,
           ...lambda.environment,
-          ...region,
           ...isLocalEnv,
         },
       };
+      if (region) {
+        lambdaDef.environment.AWS_REGION = region;
+      }
 
       if (lambda.events.length) {
         lambdaDef.endpoints = lambda.events.map(this.#parseSlsEventDefinition).filter((x: any) => x);
@@ -472,7 +472,10 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     this.runtimeConfig.memorySize = memorySize;
     this.runtimeConfig.timeout = timeout;
     this.runtimeConfig.environment = environment ?? {};
-    this.runtimeConfig.environment.AWS_PROFILE = process.env.AWS_PROFILE;
+
+    if (process.env.AWS_PROFILE) {
+      this.runtimeConfig.environment.AWS_PROFILE = process.env.AWS_PROFILE;
+    }
   }
 
   async #setCustomEsBuildConfig() {
