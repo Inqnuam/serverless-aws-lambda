@@ -51,7 +51,15 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       ServerlessAlbOffline.PORT = this.pluginConfig?.port;
     }
 
-    ServerlessAlbOffline.PORT = this.options.p ?? this.options.port ?? process.env.PORT;
+    const cmdPort = this.options.p ?? this.options.port;
+    if (cmdPort) {
+      ServerlessAlbOffline.PORT = cmdPort;
+    }
+
+    if (!ServerlessAlbOffline.PORT) {
+      const processPort = Number(process.env.PORT);
+      ServerlessAlbOffline.PORT = !isNaN(processPort) ? processPort : 0;
+    }
 
     this.#setWatchValue();
 
@@ -128,7 +136,8 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
         esBuildConfig.watch = {
           onRebuild: this.#onRebuild.bind(this),
         };
-        esBuildConfig.incremental = true;
+        // TODO: needs deep tests as it call rebuild multiple times
+        //  esBuildConfig.incremental = true;
       }
     }
 
@@ -507,13 +516,19 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       return;
     }
 
-    const customConfigArgs = [this.#lambdas, this.isDeploying, setEnv];
+    const customConfigArgs = {
+      lambdas: this.#lambdas,
+      isDeploying: this.isDeploying,
+      setEnv,
+      port: ServerlessAlbOffline.PORT,
+      stage: this.options.stage ?? this.serverless.service.provier.stage ?? "dev",
+    };
     let exportedObject: any = {};
 
     if (typeof exportedFunc[configObjectName] == "function") {
-      exportedObject = await exportedFunc[configObjectName](...customConfigArgs);
+      exportedObject = await exportedFunc[configObjectName](customConfigArgs);
     } else if (typeof exportedFunc == "function") {
-      exportedObject = await exportedFunc(...customConfigArgs);
+      exportedObject = await exportedFunc(customConfigArgs);
     } else {
       return;
     }
