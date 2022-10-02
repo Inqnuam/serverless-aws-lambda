@@ -514,7 +514,24 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       return;
     }
 
+    if (typeof exportedObject.buildCallback == "function") {
+      this.customBuildCallback = exportedObject.buildCallback;
+    }
+
+    if (exportedObject.offline && typeof exportedObject.offline == "object") {
+      if (Array.isArray(exportedObject.offline.request)) {
+        this.customOfflineRequests = exportedObject.offline.request;
+      }
+
+      if (typeof exportedObject.offline.staticPath == "string") {
+        this.serve = exportedObject.offline.staticPath;
+      }
+    }
+
     const customConfig = exportedObject.esbuild;
+    if (!customConfig) {
+      return;
+    }
     let customEsBuild: any = {};
     if (Array.isArray(customConfig.plugins)) {
       customEsBuild.plugins = customConfig.plugins;
@@ -614,20 +631,6 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
 
     if (Array.isArray(customConfig.inject)) {
       customEsBuild.inject = customConfig.inject;
-    }
-
-    if (typeof exportedObject.buildCallback == "function") {
-      this.customBuildCallback = exportedObject.buildCallback;
-    }
-
-    if (exportedObject.offline && typeof exportedObject.offline == "object") {
-      if (Array.isArray(exportedObject.offline.request)) {
-        this.customOfflineRequests = exportedObject.offline.request;
-      }
-
-      if (typeof exportedObject.offline.staticPath == "string") {
-        this.serve = exportedObject.offline.staticPath;
-      }
     }
 
     if (Object.keys(customEsBuild).length) {
