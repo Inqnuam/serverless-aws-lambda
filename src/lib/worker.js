@@ -18,7 +18,7 @@ parentPort.on("message", async (e) => {
       eventHandler = handler[workerData.handlerName];
     }
     if (typeof eventHandler != "function") {
-      throw new Error(`${workerData.name} > ${handlerName} is not a function`);
+      throw new Error(`${workerData.name} > ${workerData.handlerName} is not a function`);
     }
 
     parentPort.postMessage({ channel: "import" });

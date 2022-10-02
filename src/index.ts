@@ -128,6 +128,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
         esBuildConfig.watch = {
           onRebuild: this.#onRebuild.bind(this),
         };
+        esBuildConfig.incremental = true;
       }
     }
 
