@@ -40,7 +40,7 @@ export class AlbRouter {
   }
 
   addHandler(lambdaController: ILambdaMock) {
-    const foundIndex = this.#handlers.findIndex((x) => x.esOutputPath == lambdaController.esOutputPath);
+    const foundIndex = this.#handlers.findIndex((x) => x.name == lambdaController.name && x.esOutputPath == lambdaController.esOutputPath);
 
     if (foundIndex == -1) {
       this.#handlers.push(lambdaController);
