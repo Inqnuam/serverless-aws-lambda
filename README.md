@@ -68,7 +68,7 @@ simple example:
 ```js
 const somePlugin = require("some-plugin");
 
-module.exports = (lambdas, isDeploying, setEnv) => {
+module.exports = ({ lambdas, isDeploying, setEnv, stage, port }) => {
   return {
     esbuild: {
       plugins: [somePlugin],
@@ -81,7 +81,7 @@ module.exports = (lambdas, isDeploying, setEnv) => {
 };
 ```
 
-### Customize offline server:
+### Customize offline server and more:
 
 [See docs.](resources/offline.md)
 

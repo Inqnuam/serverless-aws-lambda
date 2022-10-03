@@ -2,7 +2,7 @@ Set static path and add request handlers:
 `config.js`
 
 ```js
-module.exports = (lambdas, isDeploying, setEnv) => {
+module.exports = ({ lambdas, isDeploying, setEnv, stage, port }) => {
   return {
     esbuild: {
       //...
@@ -28,7 +28,7 @@ Callback after (each) build:
 `config.js`
 
 ```js
-module.exports = (lambdas, isDeploying, setEnv) => {
+module.exports = ({ lambdas, isDeploying, setEnv, stage, port }) => {
   return {
     esbuild: {
       // ...
@@ -50,7 +50,7 @@ Dynamically set env variable to a Lambda:
 `config.js`
 
 ```js
-module.exports = (lambdas, isDeploying, setEnv) => {
+module.exports = ({ lambdas, isDeploying, setEnv, stage, port }) => {
   return {
     esbuild: {
       // ...
@@ -111,7 +111,7 @@ functions:
 `config.js`
 
 ```js
-module.exports = (lambdas, isDeploying, setEnv) => {
+module.exports = ({ lambdas, isDeploying, setEnv, stage, port }) => {
   return {
     esbuild: {
       // ...
