@@ -15,16 +15,6 @@ const fieldContentRegExp = /^[\u0009\u0020-\u007e\u0080-\u00ff]+$/;
 const encode = function encode(val: string) {
   return encodeURIComponent(val);
 };
-function tryDecode(str: string, decode: Function) {
-  try {
-    return decode(str);
-  } catch (e) {
-    return str;
-  }
-}
-function decode(str: string) {
-  return str.indexOf("%") !== -1 ? decodeURIComponent(str) : str;
-}
 
 function isDate(val: any) {
   return Object.prototype.toString.call(val) === "[object Date]" || val instanceof Date;
@@ -135,52 +125,5 @@ export const cookie = {
     }
 
     return str;
-  },
-  parse: (str: string, options?: any) => {
-    if (typeof str !== "string") {
-      throw new TypeError("argument str must be a string");
-    }
-
-    let obj: any = {};
-    let opt = options || {};
-    let dec = opt.decode || decode;
-
-    let index = 0;
-    while (index < str.length) {
-      let eqIdx = str.indexOf("=", index);
-
-      // no more cookie pairs
-      if (eqIdx === -1) {
-        break;
-      }
-
-      let endIdx = str.indexOf(";", index);
-
-      if (endIdx === -1) {
-        endIdx = str.length;
-      } else if (endIdx < eqIdx) {
-        // backtrack on prior semicolon
-        index = str.lastIndexOf(";", eqIdx - 1) + 1;
-        continue;
-      }
-
-      let key = str.slice(index, eqIdx).trim();
-
-      // only assign once
-      if (undefined === obj[key]) {
-        let val = str.slice(eqIdx + 1, endIdx).trim();
-
-        // quoted values
-        if (val.charCodeAt(0) === 0x22) {
-          val = val.slice(1, -1);
-        }
-
-        obj[key] = tryDecode(val, dec);
-      }
-
-      index = endIdx + 1;
-    }
-
-    return obj;
   },
 };

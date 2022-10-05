@@ -1,4 +1,3 @@
-import { cookie, CookieOptions } from "./cookies";
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "ANY";
 
 export interface RawResponseContent {
@@ -17,11 +16,11 @@ export interface IRequest {
   headers: { [key: string]: any };
   isBase64Encoded: boolean;
   query: { [key: string]: string };
-  body: string | null | undefined;
+  body: any;
   method: HttpMethod;
-  cookies: { [key: string]: any };
   get: (headerField: string) => { [key: string]: any } | undefined;
   params: string[];
+  protocol: string;
 }
 
 export const _buildUniversalEvent = (awsAlbEvent: any) => {
@@ -37,19 +36,15 @@ export const _buildUniversalEvent = (awsAlbEvent: any) => {
       const body = JSON.parse(awsAlbEvent.body);
       universalEvent.body = body;
     }
-    universalEvent.cookies = typeof awsAlbEvent.headers.cookie == "string" ? cookie.parse(awsAlbEvent.headers.cookie) : {};
+
     universalEvent.get = (headerField: string) => {
       // TODO: check for both Referrer and Referer
       return awsAlbEvent.headers[headerField.toLowerCase()];
     };
     let reqPath = decodeURIComponent(universalEvent.path);
 
-    // const queryStartPos = reqPath.lastIndexOf("?");
-    // if (queryStartPos != -1) {
-    //   reqPath = reqPath.slice(0, queryStartPos);
-    // }
-
     universalEvent.params = reqPath.split("/").filter((x) => x);
+    universalEvent.protocol = awsAlbEvent.headers["x-forwarded-proto"];
   } catch (err) {}
 
   return universalEvent;

@@ -108,10 +108,7 @@ export class ApplicationLoadBalancer extends AlbRouter {
             body += chunk;
           })
           .on("end", async () => {
-            if (contentType && (contentType.includes("json") || contentType.includes("xml") || contentType.startsWith("text/"))) {
-              event.body = body.toString();
-            }
-
+            event.body = body.length ? body.toString() : "";
             this.#responseHandler(res, event, lambdaController, method as HttpMethod, parsedURL.pathname);
           })
           .on("error", (err) => {

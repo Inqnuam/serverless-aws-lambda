@@ -21,6 +21,7 @@ export interface IResponse {
   getRemainingTimeInMillis: Function;
   status: (code: number) => this;
   send: (content?: string) => void;
+  end: (rawContent: any) => void;
   json: (content: [] | { [key: string]: any }) => void;
   set: (headerKey: string, headerValue: string) => this;
   get: (headerKey: string) => string;
@@ -135,6 +136,9 @@ export class _Response implements IResponse {
 
   send(content?: string) {
     this.#setBody(content).#sendResponse();
+  }
+  end(rawContent: any) {
+    this.#resolve(rawContent);
   }
 
   redirect(...args: RedirectOptions) {

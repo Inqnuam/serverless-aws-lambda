@@ -27,7 +27,7 @@ custom:
     watch: true
 ```
 
-to trigger the plugin passe `aws-lambda` into your serverless CLI commande:
+to trigger offline server passe `aws-lambda` into your serverless CLI commande:
 
 ```bash
 sls aws-lambda -s dev
@@ -35,7 +35,7 @@ sls aws-lambda -s dev
 
 It is also possible to passe port and watch options from the CLI with `--port` or `-p` and `--watch` or `-w`.
 
-Command line values will overwrite serverless.yml custom values if they are set.
+Command line values will overwrite serverless.yml custom > serverless-aws-lambda values if they are set.
 
 ---
 
@@ -51,11 +51,17 @@ custom:
     configPath: ./config.default
 ```
 
-Exported config must be a function which can take 3 arguments:
+Exported config must be a function optionnaly taking one argument, an object which includes:
 
-- [0] `array` all your Lambda declarations + additional info
-- [1] `boolean` which indicates if your sls is deploying
-- [2] `function` to dynamically set env variables to your lambdas
+```jaavscript
+{
+  lambdas: array, // your Lambda declarations + additional info
+  isDeploying: boolean, // indicates if sls is deploying
+  setEnv: function, // to dynamically set env variables to your lambdas
+  stage: string, // current serverless stag
+  port: number // offline server port
+}
+```
 
 ### esbuild
 

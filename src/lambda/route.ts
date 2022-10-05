@@ -3,8 +3,8 @@ import { _buildUniversalEvent, IRequest, RawResponseContent } from "./express/re
 import { _Response, IResponse } from "./express/response";
 
 export type NextFunction = (error?: any) => void;
-export type RouteMiddleware = (error: any, req: IRequest, res: IResponse, next: NextFunction) => Promise<void> | void;
-export type RouteController = (req: IRequest, res: IResponse, next: NextFunction) => Promise<void> | void;
+export type RouteMiddleware = (error: any, req: IRequest & { [key: string]: any }, res: IResponse, next: NextFunction) => Promise<void> | void;
+export type RouteController = (req: IRequest & { [key: string]: any }, res: IResponse, next: NextFunction) => Promise<void> | void;
 
 function* genControllers(controllers: (RouteController | RouteMiddleware)[]) {
   for (const func in controllers) {
