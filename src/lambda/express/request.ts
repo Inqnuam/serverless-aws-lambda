@@ -1,7 +1,7 @@
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "ANY";
 
 export interface RawResponseContent {
-  cookies: string[];
+  cookies?: string[];
   isBase64Encoded: boolean;
   statusCode: number;
   headers: { [key: string]: any };

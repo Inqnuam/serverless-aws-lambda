@@ -9,7 +9,7 @@ parentPort.on("message", async (e) => {
   const { channel, data, awsRequestId } = e;
 
   if (channel == "import") {
-    const handler = await import(`${workerData.esOutputPath}?version=${Date.now()}`);
+    const handler = await import(`file://${workerData.esOutputPath}?version=${Date.now()}`);
 
     // workaround to ES bug
     if (workerData.handlerName == "default" && typeof handler.default == "object" && typeof handler.default.default == "function") {

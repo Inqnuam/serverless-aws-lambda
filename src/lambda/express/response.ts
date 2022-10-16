@@ -23,7 +23,7 @@ export interface IResponse {
   send: (content?: string) => void;
   end: (rawContent: any) => void;
   json: (content: [] | { [key: string]: any }) => void;
-  set: (headerKey: string, headerValue: string) => this;
+  set: (header: string | { [key: string]: string }, value?: string) => this;
   get: (headerKey: string) => string;
   redirect: (...redirectOptions: RedirectOptions) => void;
   location(url: string): this;
@@ -100,6 +100,9 @@ export class _Response implements IResponse {
     if (!this.responseObject.headers["Content-Type"]) {
       this.type("text/html; charset=utf-8");
     }
+    if (!this.responseObject.cookies!.length) {
+      delete this.responseObject.cookies;
+    }
     this.#resolve(this.responseObject);
   }
   #setBody(content?: string): this {
@@ -107,7 +110,7 @@ export class _Response implements IResponse {
     return this;
   }
   cookie(name: string, value: string, options?: CookieOptions): this {
-    this.responseObject.cookies.push(cookie.serialize(name, value, options));
+    this.responseObject.cookies!.push(cookie.serialize(name, value, options));
 
     return this;
   }
@@ -123,10 +126,23 @@ export class _Response implements IResponse {
     this.responseObject.headers["Content-Type"] = contentType;
     return this;
   }
-  set(headerKey: string, headerValue: string): this {
+  #setHeader(headerKey: string, headerValue: any) {
     this.responseObject.headers[headerKey] = headerValue;
+  }
+  set(...args: any): this {
+    const field = args[0];
+    if (args.length === 2) {
+      const val = args[1];
+      var value = Array.isArray(val) ? val.map(String) : String(val);
+      this.#setHeader(field, value);
+    } else {
+      for (var key in field) {
+        this.#setHeader(key, field[key]);
+      }
+    }
     return this;
   }
+
   get(headerKey: string) {
     return this.responseObject.headers[headerKey];
   }
