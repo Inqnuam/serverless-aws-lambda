@@ -56,9 +56,10 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       ServerlessAlbOffline.PORT = cmdPort;
     }
 
-    if (!ServerlessAlbOffline.PORT) {
-      const processPort = Number(process.env.PORT);
-      ServerlessAlbOffline.PORT = !isNaN(processPort) ? processPort : 0;
+    const processPort = Number(process.env.PORT)
+    
+    if (!isNaN(processPort)) {
+      ServerlessAlbOffline.PORT = processPort
     }
 
     this.#setWatchValue();

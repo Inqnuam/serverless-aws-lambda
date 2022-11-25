@@ -16,7 +16,7 @@ if (networkInterfaces) {
     ?.flat()
     // @ts-ignore
     .filter((item) => !item.internal && item.family === "IPv4")
-    .find(Boolean).address;
+    .find(Boolean)?.address;
 }
 
 const debuggerIsAttached = inspector.url() != undefined;
