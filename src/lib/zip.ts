@@ -1,5 +1,6 @@
 import archiver from "archiver";
 import { createReadStream, createWriteStream } from "fs";
+import { access } from "fs/promises";
 import { basename, dirname } from "path";
 
 export const zip = (filePath: string, zipName: string) => {
@@ -18,6 +19,13 @@ export const zip = (filePath: string, zipName: string) => {
 
     const fileName = basename(filePath) + ".js";
     archive.append(createReadStream(`${filePath}.js`), { name: fileName });
+
+    // NOTE: do we really need sourcemaps in AWS ?
+    // const sourceMapPath = filePath + ".js.map";
+    // try {
+    //   await access(sourceMapPath);
+    //   archive.append(createReadStream(`${filePath}.js.map`), { name: fileName + ".map" });
+    // } catch (error) {}
 
     archive.finalize();
   });

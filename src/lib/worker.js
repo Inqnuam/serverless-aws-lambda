@@ -3,9 +3,13 @@ const inspector = require("inspector");
 
 const debuggerIsAttached = inspector.url() != undefined;
 
+function isPromise(promise) {
+  return !!promise && typeof promise.then === "function";
+}
+
 let eventHandler;
-let isAsync = false;
 let hasProxyRouter = false;
+
 parentPort.on("message", async (e) => {
   const { channel, data, awsRequestId } = e;
 
@@ -22,19 +26,8 @@ parentPort.on("message", async (e) => {
       throw new Error(`${workerData.name} > ${workerData.handlerName} is not a function`);
     }
 
-    let contructorName = "";
+    hasProxyRouter = eventHandler._call?.__proto__?.constructor?.name == "AsyncFunction";
 
-    if (eventHandler._call) {
-      contructorName = eventHandler._call?.__proto__?.constructor.name;
-
-      if (contructorName) {
-        hasProxyRouter = true;
-      }
-    } else {
-      contructorName = eventHandler.constructor.name;
-    }
-
-    isAsync = contructorName === "AsyncFunction";
     parentPort.postMessage({ channel: "import" });
   } else if (channel == "exec") {
     const { event } = data;
@@ -104,7 +97,7 @@ parentPort.on("message", async (e) => {
         }
 
         if (err) {
-          !hasProxyRouter && process.env.NODE_ENV == "development" && console.error(err);
+          !hasProxyRouter && console.error(err);
           throw err;
         } else {
           resIsSent();
@@ -142,7 +135,7 @@ parentPort.on("message", async (e) => {
       }
 
       if (error) {
-        !hasProxyRouter && process.env.NODE_ENV == "development" && console.error(error);
+        !hasProxyRouter && console.error(error);
         throw error;
       } else {
         resIsSent();
@@ -163,19 +156,30 @@ parentPort.on("message", async (e) => {
       });
     };
     try {
-      if (isAsync) {
-        const eventResponse = await eventHandler(event, context, callback);
+      const eventResponse = eventHandler(event, context, callback);
+
+      eventResponse.then?.((data) => {
         clearInterval(lambdaTimeoutInterval);
         if (!isSent) {
+          resIsSent();
           parentPort.postMessage({
             channel: "return",
-            data: eventResponse,
+            data,
             awsRequestId,
           });
         }
-      } else {
-        eventHandler(event, context, callback);
-      }
+      });
+
+      // if (!isPromise(eventResponse)) {
+      //   clearInterval(lambdaTimeoutInterval);
+      //   if (!isSent) {
+      //     parentPort.postMessage({
+      //       channel: "return",
+      //       data: eventResponse,
+      //       awsRequestId,
+      //     });
+      //   }
+      // }
     } catch (error) {
       context.fail(error);
     }
