@@ -20,6 +20,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
   #lambdas: ILambdaMock[];
   watch = true;
   isDeploying = false;
+  isPackaging = false;
   serverless: any;
   options: any;
   pluginConfig: any;
@@ -34,11 +35,18 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
 
   constructor(serverless: any, options: any) {
     super({ debug: process.env.SLS_DEBUG == "*" });
-    log.BR_BLUE("Launching serverless-aws-lambda...");
+
     this.#lambdas = [];
     this.serverless = serverless;
     this.options = options;
+    this.isPackaging = this.serverless.processedInput.commands.includes("package");
+    this.isDeploying = this.serverless.processedInput.commands.includes("deploy");
 
+    if (this.isDeploying || this.isPackaging) {
+      log.BR_BLUE("Packaging using serverless-aws-lambda...");
+    } else {
+      log.BR_BLUE("Launching serverless-aws-lambda...");
+    }
     serverless.configSchemaHandler.defineFunctionProperties("aws", {
       properties: {
         virtualEnvs: { type: "object" },
@@ -56,10 +64,10 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       ServerlessAlbOffline.PORT = cmdPort;
     }
 
-    const processPort = Number(process.env.PORT)
-    
+    const processPort = Number(process.env.PORT);
+
     if (!isNaN(processPort)) {
-      ServerlessAlbOffline.PORT = processPort
+      ServerlessAlbOffline.PORT = processPort;
     }
 
     this.#setWatchValue();
@@ -86,10 +94,9 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     };
 
     this.hooks = {
-      // TODO: check signle function deploy
       "aws-lambda:run": this.init.bind(this),
       "before:package:createDeploymentArtifacts": this.init.bind(this, true),
-      "before:deploy:deploy": this.deploy.bind(this),
+      "before:deploy:function:packageFunction": this.init.bind(this, true),
       "before:invoke:local:invoke": this.invokeLocal.bind(this),
     };
   }
@@ -98,10 +105,6 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     await this.init(false, this.options.function);
   }
 
-  async deploy() {
-    this.isDeploying = true;
-    await this.init(true);
-  }
   async init(isPackaging: boolean, invokeName?: string) {
     this.isDeploying = isPackaging;
     this.#setRuntimeEnvs();
@@ -277,7 +280,34 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       await this.customBuildCallback(result);
     }
 
-    if (!isPackaging && !invokeName) {
+    if (invokeName) {
+      const slsDeclaration = this.serverless.service.getFunction(invokeName);
+      const foundLambda = this.#lambdas.find((x) => x.name == invokeName);
+
+      if (foundLambda) {
+        slsDeclaration.handler = foundLambda.esOutputPath.replace(`${cwd}/`, "").replace(".js", `.${foundLambda.handlerName}`);
+      }
+    } else if (this.isDeploying || this.isPackaging) {
+      let packageLambdas: ILambdaMock[] = this.#lambdas;
+
+      if (this.options.function) {
+        const foundLambda = this.#lambdas.find((x) => x.name == this.options.function);
+
+        if (foundLambda) {
+          packageLambdas = [foundLambda];
+        }
+      }
+      // TODO: convert to promise all
+      for (const l of packageLambdas) {
+        const slsDeclaration = this.serverless.service.getFunction(l.name);
+
+        const zipableBundledFilePath = l.esOutputPath.slice(0, -3);
+        const zipOutputPath = await zip(zipableBundledFilePath, l.outName);
+
+        slsDeclaration.package = { ...slsDeclaration.package, disable: true, artifact: zipOutputPath };
+        slsDeclaration.handler = path.basename(l.handlerPath);
+      }
+    } else {
       this.listen(ServerlessAlbOffline.PORT, async (port: number, localIp: string) => {
         AlbRouter.PORT = port;
         await this.load(this.#lambdas);
@@ -290,23 +320,6 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
 
         log.GREEN(output);
       });
-    } else if (invokeName) {
-      const slsDeclaration = this.serverless.service.getFunction(invokeName);
-      const foundLambda = this.#lambdas.find((x) => x.name == invokeName);
-
-      if (foundLambda) {
-        slsDeclaration.handler = foundLambda.esOutputPath.replace(`${cwd}/`, "").replace(".js", `.${foundLambda.handlerName}`);
-      }
-    } else {
-      // TODO: convert to promise all
-      for (const l of this.#lambdas) {
-        const slsDeclaration = this.serverless.service.getFunction(l.name);
-
-        const path = l.esOutputPath;
-        const zipOutputPath = await zip(path.slice(0, -3), l.outName);
-
-        slsDeclaration.package = { ...slsDeclaration.package, disable: true, artifact: zipOutputPath };
-      }
     }
   }
 
@@ -520,6 +533,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     const customConfigArgs = {
       lambdas: this.#lambdas,
       isDeploying: this.isDeploying,
+      isPackaging: this.isPackaging,
       setEnv,
       port: ServerlessAlbOffline.PORT,
       stage: this.options.stage ?? this.serverless.service.provier.stage ?? "dev",

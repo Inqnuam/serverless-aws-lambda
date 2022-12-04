@@ -10,5 +10,7 @@
     "moduleResolution": "Node",
     "removeComments": true,
     "strict": true,
-  }
+    "declarationDir": "./dist/"
+    },
+    "exclude": ["./src/compiler", "./dist/"],
 }

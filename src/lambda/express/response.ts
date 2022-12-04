@@ -1,4 +1,4 @@
-import { RawResponseContent } from "./request";
+import { RawAPIResponseContent, RawResponseContent } from "./request";
 import { cookie, CookieOptions } from "./cookies";
 
 export type RedirectOptions = [code: number, path: string];
@@ -6,9 +6,10 @@ export type RedirectOptions = [code: number, path: string];
 export interface IResponse {
   locals: { [key: string]: any };
   callbackWaitsForEmptyEventLoop: boolean;
-  succeed: (content: RawResponseContent) => void;
+  succeed: (content: RawAPIResponseContent) => void;
   fail: (error: any) => void;
-  done: (error: any, content: RawResponseContent) => void;
+  done: (error: any, content: RawAPIResponseContent) => void;
+  callback: (error: any, content: RawResponseContent) => void;
   functionVersion: string;
   functionName: string;
   memoryLimitInMB: string;
@@ -21,7 +22,7 @@ export interface IResponse {
   getRemainingTimeInMillis: Function;
   status: (code: number) => this;
   send: (content?: string) => void;
-  end: (rawContent: any) => void;
+  end: (rawContent: RawResponseContent) => void;
   json: (content: [] | { [key: string]: any }) => void;
   set: (header: string | { [key: string]: string }, value?: string) => this;
   get: (headerKey: string) => string;
@@ -35,9 +36,9 @@ export interface IResponse {
 export class _Response implements IResponse {
   locals: { [key: string]: any };
   callbackWaitsForEmptyEventLoop: boolean;
-  #succeed: (content: RawResponseContent) => void;
+  #succeed: (content: RawAPIResponseContent) => void;
   #fail: (error: any) => void;
-  #done: (error: any, content: RawResponseContent) => void;
+  #done: (error: any, content: RawAPIResponseContent) => void;
   functionVersion: string;
   functionName: string;
   memoryLimitInMB: string;
@@ -48,8 +49,8 @@ export class _Response implements IResponse {
   invokedFunctionArn: string;
   awsRequestId: string;
   getRemainingTimeInMillis: () => number;
-
-  responseObject: RawResponseContent = {
+  callback: (error: any, content: RawResponseContent) => void;
+  responseObject: RawAPIResponseContent = {
     cookies: [],
     isBase64Encoded: false,
     statusCode: 200,
@@ -58,38 +59,40 @@ export class _Response implements IResponse {
   };
   #resolve: Function;
   #req: any;
-  constructor(context: any, resolve: Function, locals: any, req: any, previousResponse?: any) {
-    this.locals = locals;
-    this.callbackWaitsForEmptyEventLoop = context.callbackWaitsForEmptyEventLoop;
-    this.#succeed = context.succeed;
-    this.#fail = context.fail;
-    this.#done = context.done;
-    this.functionVersion = context.functionVersion;
-    this.functionName = context.functionName;
-    this.memoryLimitInMB = context.memoryLimitInMB;
-    this.logGroupName = context.logGroupName;
-    this.logStreamName = context.logStreamName;
-    this.clientContext = context.clientContext;
-    this.identity = context.identity;
-    this.invokedFunctionArn = context.invokedFunctionArn;
-    this.awsRequestId = context.awsRequestId;
-    this.awsRequestId = context.awsRequestId;
-    this.getRemainingTimeInMillis = context.getRemainingTimeInMillis;
-    this.#resolve = resolve;
-    if (previousResponse) {
-      this.responseObject = previousResponse;
+  constructor(init: { context: any; resolve: Function; locals: any; req: any; previousResponse?: any; callback: (error: any, content: RawResponseContent) => void }) {
+    this.locals = init.locals;
+    this.callbackWaitsForEmptyEventLoop = init.context.callbackWaitsForEmptyEventLoop;
+    this.#succeed = init.context.succeed;
+    this.#fail = init.context.fail;
+    this.#done = init.context.done;
+    this.functionVersion = init.context.functionVersion;
+    this.functionName = init.context.functionName;
+    this.memoryLimitInMB = init.context.memoryLimitInMB;
+    this.logGroupName = init.context.logGroupName;
+    this.logStreamName = init.context.logStreamName;
+    this.clientContext = init.context.clientContext;
+    this.identity = init.context.identity;
+    this.invokedFunctionArn = init.context.invokedFunctionArn;
+    this.awsRequestId = init.context.awsRequestId;
+    this.awsRequestId = init.context.awsRequestId;
+    this.getRemainingTimeInMillis = init.context.getRemainingTimeInMillis;
+    this.callback = init.callback;
+    this.#resolve = init.resolve;
+
+    if (init.previousResponse) {
+      this.responseObject = init.previousResponse;
     }
 
-    if (req) {
-      this.#req = req;
+    if (init.req) {
+      this.#req = init.req;
     }
   }
 
-  succeed(content: RawResponseContent) {
+  succeed(content: RawAPIResponseContent) {
     this.#succeed(content);
   }
 
-  done(err: any, content: RawResponseContent) {
+  done(err: any, content: RawAPIResponseContent) {
     this.#done(err, content);
   }
 
@@ -100,17 +103,22 @@ export class _Response implements IResponse {
     if (!this.responseObject.headers["Content-Type"]) {
       this.type("text/html; charset=utf-8");
     }
-    if (!this.responseObject.cookies!.length) {
+    if (!this.responseObject.cookies?.length) {
       delete this.responseObject.cookies;
     }
-    this.#resolve(this.responseObject);
+
+    this.#resolve({ ...this.responseObject });
   }
   #setBody(content?: string): this {
     this.responseObject.body = content;
     return this;
   }
   cookie(name: string, value: string, options?: CookieOptions): this {
-    this.responseObject.cookies!.push(cookie.serialize(name, value, options));
+    if (Array.isArray(this.responseObject.cookies)) {
+      this.responseObject.cookies.push(cookie.serialize(name, value, options));
+    } else {
+      this.responseObject.cookies = [cookie.serialize(name, value, options)];
+    }
 
     return this;
   }
@@ -153,8 +161,8 @@ export class _Response implements IResponse {
   send(content?: string) {
     this.#setBody(content).#sendResponse();
   }
-  end(rawContent: any) {
-    this.#resolve(rawContent);
+  end(rawContent: RawResponseContent) {
+    this.#resolve({ ...rawContent });
   }
 
   redirect(...args: RedirectOptions) {

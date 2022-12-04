@@ -1,5 +1,4 @@
-import EventEmitter from "events";
-import { _buildUniversalEvent, IRequest, RawResponseContent } from "./express/request";
+import { _buildUniversalEvent, IRequest, RawResponseContent, RawAPIResponseContent } from "./express/request";
 import { _Response, IResponse } from "./express/response";
 
 export type NextFunction = (error?: any) => void;
@@ -37,82 +36,71 @@ export class Route extends Function {
   }
 
   async _call(...args: any[]) {
-    const req = _buildUniversalEvent(args[0]);
-    const context = args[1];
-    let response: RawResponseContent | null = null;
+    const response = await new Promise(async (resolve) => {
+      const req = _buildUniversalEvent(args[0]);
+      const context = args[1];
+      const callback = args[2];
+      const controllersStack = genControllers(this.controllers);
 
-    const controllersStack = genControllers(this.controllers);
-    const resEmitter = new EventEmitter();
+      let res = new _Response({ context, resolve, req, locals: {}, callback });
+      let currentIndex = 0;
 
-    const resolve = (obj: RawResponseContent) => {
-      if (response) {
-        return;
-      }
-      response = obj;
-      resEmitter.emit("end");
-    };
+      const next = async (err?: any) => {
+        const locals = { ...res.locals };
+        const previousResponse = { ...res.responseObject };
+        res = new _Response({ context, resolve, locals, req, previousResponse, callback });
 
-    let res = new _Response(context, resolve, req, {});
-    let currentIndex = 0;
-    const next = async (err?: any) => {
-      const locals = { ...res.locals };
-      const previousResponse = { ...res.responseObject };
-      res = new _Response(context, resolve, locals, previousResponse);
-
-      if (err) {
-        const foundErrorHandler = getMiddlewareAfter(currentIndex, this.controllers, controllersStack);
-
-        if (foundErrorHandler) {
-          try {
-            await foundErrorHandler(err, req, res, next);
-            if (!response) {
-              res.status(204).send();
-            }
-          } catch (error) {
-            res.status(500).send("Unhandled Error");
-          }
-        } else {
-          res.status(500).send("Unhandled Error");
-        }
-
-        controllersStack.return();
-      }
-      const i = controllersStack.next().value;
-
-      if (i) {
-        currentIndex = Number(i);
-        const func = this.controllers[i as unknown as number];
-        try {
-          if (func.length == 3) {
-            const controller = func as RouteController;
-            await controller(req, res, next);
-          } else if (func.length == 4) {
-            const controller = func as RouteMiddleware;
-            await controller(null, req, res, next);
-          }
-        } catch (error) {
+        if (err) {
           const foundErrorHandler = getMiddlewareAfter(currentIndex, this.controllers, controllersStack);
 
           if (foundErrorHandler) {
             try {
-              await foundErrorHandler(error, req, res, next);
-              if (!response) {
-                res.status(204).send();
-              }
+              await foundErrorHandler(err, req, res, next);
             } catch (error) {
+              process.env.NODE_ENV == "development" && console.error(error);
               res.status(500).send("Unhandled Error");
             }
           } else {
+            process.env.NODE_ENV == "development" && console.error(err);
             res.status(500).send("Unhandled Error");
           }
+
           controllersStack.return();
         }
-      }
-    };
+        const i = controllersStack.next().value;
 
-    await new Promise(async (resolve) => {
-      resEmitter.once("end", resolve);
+        if (i) {
+          currentIndex = Number(i);
+          const func = this.controllers[i as unknown as number];
+          try {
+            if (func.length == 3) {
+              const controller = func as RouteController;
+              await controller(req, res, next);
+            } else if (func.length == 4) {
+              const controller = func as RouteMiddleware;
+              await controller(null, req, res, next);
+            }
+          } catch (error) {
+            const foundErrorHandler = getMiddlewareAfter(currentIndex, this.controllers, controllersStack);
+
+            if (foundErrorHandler) {
+              try {
+                await foundErrorHandler(error, req, res, next);
+              } catch (error) {
+                process.env.NODE_ENV == "development" && console.error(error);
+                res.status(500).send("Unhandled Error");
+              }
+            } else {
+              process.env.NODE_ENV == "development" && console.error(error);
+              res.status(500).send("Unhandled Error");
+            }
+            controllersStack.return();
+          }
+        }
+      };
+
       await next();
+      resolve(null);
     });
 
     return response ?? { statusCode: 204 };

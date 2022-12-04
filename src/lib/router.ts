@@ -11,13 +11,20 @@ export class AlbRouter {
   }
 
   getHandler(method: HttpMethod, path: string, kind?: string) {
-    const foundHandler = this.#handlers.find((x) =>
-      x.endpoints
-        .filter((e) => (kind ? e.kind == kind : e))
+    const hasNotWilcard = !path.includes("*");
+    const hasNotBrackets = !path.includes("{") && !path.includes("}");
+
+    const foundHandler = this.#handlers.find((x) => {
+      return x.endpoints
+        .filter((e) => (kind ? e.kind == kind.toLowerCase() : e))
         .find((w) => {
-          return w.paths.includes(path) && (w.methods.includes("ANY") || w.methods.includes(method));
-        })
-    );
+          if (w.kind == "apg") {
+            return hasNotBrackets && w.paths.includes(path) && (w.methods.includes("ANY") || w.methods.includes(method));
+          }
+
+          return hasNotWilcard && w.paths.includes(path) && (w.methods.includes("ANY") || w.methods.includes(method));
+        });
+    });
 
     if (foundHandler) {
       return foundHandler;
@@ -28,10 +35,13 @@ export class AlbRouter {
           .filter((e) => (kind ? e.kind == kind : e))
           .find((w) => {
             const hasPath = w.paths.find((p) => {
-              const rawPattern = p.replace(/\*/g, ".*").replace(/\//g, "\\/");
-              const pattern = new RegExp(`^${rawPattern}$`, "g");
+              const AlbAnyPathMatch = p.replace(/\*/g, ".*").replace(/\//g, "\\/");
+              const ApgPathPartMatch = p.replace(/\{[\w.:-]+\+?\}/g, ".*").replace(/\//g, "\\/");
 
-              return pattern.test(path);
+              const AlbPattern = new RegExp(`^${AlbAnyPathMatch}$`, "g");
+              const ApgPattern = new RegExp(`^${ApgPathPartMatch}$`, "g");
+
+              return (w.kind == "alb" && hasNotWilcard && AlbPattern.test(path)) || (w.kind == "apg" && hasNotBrackets && ApgPattern.test(path));
             });
             return hasPath && (w.methods.includes("ANY") || w.methods.includes(method));
           })

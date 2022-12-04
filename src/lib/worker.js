@@ -4,14 +4,15 @@ const inspector = require("inspector");
 const debuggerIsAttached = inspector.url() != undefined;
 
 let eventHandler;
-
+let isAsync = false;
+let hasProxyRouter = false;
 parentPort.on("message", async (e) => {
   const { channel, data, awsRequestId } = e;
 
   if (channel == "import") {
     const handler = await import(`file://${workerData.esOutputPath}?version=${Date.now()}`);
 
-    // workaround to ES bug
+    // workaround to ES bug #2494
     if (workerData.handlerName == "default" && typeof handler.default == "object" && typeof handler.default.default == "function") {
       eventHandler = handler.default.default;
     } else {
@@ -21,6 +22,19 @@ parentPort.on("message", async (e) => {
       throw new Error(`${workerData.name} > ${workerData.handlerName} is not a function`);
     }
 
+    let contructorName = "";
+
+    if (eventHandler._call) {
+      contructorName = eventHandler._call?.__proto__?.constructor.name;
+
+      if (contructorName) {
+        hasProxyRouter = true;
+      }
+    } else {
+      contructorName = eventHandler.constructor.name;
+    }
+
+    isAsync = contructorName === "AsyncFunction";
     parentPort.postMessage({ channel: "import" });
   } else if (channel == "exec") {
     const { event } = data;
@@ -47,9 +61,14 @@ parentPort.on("message", async (e) => {
     const getRemainingTimeInMillis = () => {
       return timeout;
     };
-
+    let callbackWaitsForEmptyEventLoop = true;
     const context = {
-      callbackWaitsForEmptyEventLoop: true,
+      get callbackWaitsForEmptyEventLoop() {
+        return callbackWaitsForEmptyEventLoop;
+      },
+      set callbackWaitsForEmptyEventLoop(val) {
+        callbackWaitsForEmptyEventLoop = val;
+      },
       succeed: (lambdaRes) => {
         if (isSent) {
           return;
@@ -83,9 +102,13 @@ parentPort.on("message", async (e) => {
         if (isSent) {
           return;
         }
-        // TODO: check what to do with err
-        resIsSent();
 
+        if (err) {
+          !hasProxyRouter && process.env.NODE_ENV == "development" && console.error(err);
+          throw err;
+        } else {
+          resIsSent();
+        }
         let data;
         if (typeof lambdaRes == "object" && lambdaRes.statusCode) {
           data = JSON.stringify(lambdaRes);
@@ -113,15 +136,45 @@ parentPort.on("message", async (e) => {
       getRemainingTimeInMillis,
     };
 
+    const callback = (error, lambdaRes) => {
+      if (isSent) {
+        return;
+      }
+
+      if (error) {
+        !hasProxyRouter && process.env.NODE_ENV == "development" && console.error(error);
+        throw error;
+      } else {
+        resIsSent();
+      }
+      let data;
+      if (typeof lambdaRes == "object" && lambdaRes.statusCode) {
+        data = JSON.stringify(lambdaRes);
+      } else {
+        const errMsg = `typeof 'done' content value must be an object, including at least 'statusCode' key-value.\nReceived: ${typeof lambdaRes}=>\n${lambdaRes} `;
+
+        throw new Error(errMsg);
+      }
+
+      parentPort.postMessage({
+        channel: "done",
+        data: data,
+        awsRequestId,
+      });
+    };
     try {
-      const eventResponse = await eventHandler(event, context);
-      clearInterval(lambdaTimeoutInterval);
-      if (!isSent) {
-        parentPort.postMessage({
-          channel: "return",
-          data: eventResponse,
-          awsRequestId,
-        });
+      if (isAsync) {
+        const eventResponse = await eventHandler(event, context, callback);
+        clearInterval(lambdaTimeoutInterval);
+        if (!isSent) {
+          parentPort.postMessage({
+            channel: "return",
+            data: eventResponse,
+            awsRequestId,
+          });
+        }
+      } else {
+        eventHandler(event, context, callback);
       }
     } catch (error) {
       context.fail(error);

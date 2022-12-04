@@ -3,7 +3,11 @@ const esbuild = require("esbuild");
 const { nodeExternalsPlugin } = require("esbuild-node-externals");
 
 const compileDeclarations = () => {
-  execSync("tsc --p ./src/lambda/tsconfig.json && rm -rf ./express && mv -f ./dist/lambda/* ./ && rm -rf ./dist/lambda");
+  try {
+    execSync("tsc && rm -rf ./express && mv -f dist/lambda/* ./ && rm -rf dist/lambda && mv dist/route.js ./");
+  } catch (error) {
+    console.log(error.output?.[1]?.toString());
+  }
 };
 
 const esBuildConfig = {
@@ -13,25 +17,23 @@ const esBuildConfig = {
   target: "es2018",
   plugins: [nodeExternalsPlugin()],
   outdir: "dist",
-  watch: process.env.DEV
-    ? {
-        onRebuild: () => {
-          console.log("Compiler rebuild");
-          compileDeclarations();
-        },
-      }
-    : false,
+  entryNames: "[name]",
+  watch: process.env.DEV && {
+    onRebuild: () => {
+      console.log("Compiler rebuild", new Date().toLocaleString());
+      compileDeclarations();
+    },
+  },
 };
 
-const run = async () => {
-  const buildIndex = esbuild.build.bind(null, { ...esBuildConfig, external: ["./src/lib/worker.js"], entryPoints: ["./src/index.ts"] });
+const entryPoints = ["./src/index.ts", "./src/lambda/route.ts"];
+
+(async () => {
+  const buildIndex = esbuild.build.bind(null, { ...esBuildConfig, external: ["./src/lib/worker.js"], entryPoints });
   const buildWorker = esbuild.build.bind(null, { ...esBuildConfig, entryPoints: ["./src/lib/worker.js"] });
 
-  const buildRoute = esbuild.build.bind(null, { ...esBuildConfig, entryPoints: ["./src/lambda/route.ts"], outdir: undefined, outfile: "./route.js" });
-  const result = await Promise.all([buildIndex(), buildRoute(), buildWorker()]);
+  const result = await Promise.all([buildIndex(), buildWorker()]);
 
-  console.log(result);
   compileDeclarations();
-};
-
-run();
+  console.log(result);
+})();

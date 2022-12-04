@@ -76,7 +76,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     };
     await new Promise((resolve, reject) => {
       this._worker = new Worker(workerPath, {
-        env: this.environment,
+        env: { ...this.environment, NODE_ENV: process.env.NODE_ENV },
         stackSizeMb: this.memorySize,
         workerData,
       } as WorkerOptions);

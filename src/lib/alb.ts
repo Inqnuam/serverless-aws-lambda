@@ -11,11 +11,12 @@ import serveStatic from "serve-static";
 let localIp: string;
 
 if (networkInterfaces) {
-  // @ts-ignore
   localIp = Object.values(networkInterfaces())
-    ?.flat()
-    // @ts-ignore
-    .filter((item) => !item.internal && item.family === "IPv4")
+    .reduce((accum: any[], obj: any) => {
+      accum.push(...obj);
+      return accum;
+    }, [])
+    ?.filter((item) => !item.internal && item.family === "IPv4")
     .find(Boolean)?.address;
 }
 
@@ -96,7 +97,7 @@ export class ApplicationLoadBalancer extends AlbRouter {
       const contentType = headers["content-type"];
       let event = mockType == "alb" ? this.#convertReqToAlbEvent(req) : this.#convertReqToApgEvent(req);
 
-      const lambdaController = this.getHandler(method as HttpMethod, parsedURL.pathname, mockType);
+      const lambdaController = this.getHandler(method as HttpMethod, decodeURIComponent(parsedURL.pathname), headers["x-mock-type"] as string | undefined);
 
       if (lambdaController) {
         if (this.debug) {

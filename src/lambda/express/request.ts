@@ -1,11 +1,16 @@
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "ANY";
 
-export interface RawResponseContent {
+export interface RawAPIResponseContent {
   cookies?: string[];
   isBase64Encoded: boolean;
   statusCode: number;
   headers: { [key: string]: any };
   body: string | null | undefined;
+}
+
+export interface RawResponseContent {
+  statusCode: number;
+  [key: string]: any;
 }
 
 export interface IRequest {

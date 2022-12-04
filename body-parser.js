@@ -52,3 +52,4 @@ const bodyParser = (error, req, res, next) => {
   next();
 };
 module.exports = bodyParser;
+module.exports.bodyParser = bodyParser;

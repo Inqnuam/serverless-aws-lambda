@@ -65,3 +65,4 @@ const cookieParser = (error, req, res, next) => {
 };
 
 module.exports = cookieParser;
+module.exports.cookieParser = cookieParser;

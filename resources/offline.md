@@ -50,7 +50,7 @@ Dynamically set env variable to a Lambda:
 `config.js`
 
 ```js
-module.exports = ({ lambdas, isDeploying, setEnv, stage, port }) => {
+module.exports = ({ lambdas, isDeploying, isPackaging, setEnv, stage, port }) => {
   return {
     esbuild: {
       // ...
@@ -111,7 +111,7 @@ functions:
 `config.js`
 
 ```js
-module.exports = ({ lambdas, isDeploying, setEnv, stage, port }) => {
+module.exports = ({ lambdas, isDeploying, isPackaging, setEnv, stage, port }) => {
   return {
     esbuild: {
       // ...

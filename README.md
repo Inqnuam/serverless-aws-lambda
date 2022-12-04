@@ -37,6 +37,9 @@ It is also possible to passe port and watch options from the CLI with `--port` o
 
 Command line values will overwrite serverless.yml custom > serverless-aws-lambda values if they are set.
 
+Offline server supports ALB and APG endponts. Appropriate `event` object is sent to the handler based on your lambda declaration. However if your declare both `alb` and `http` into a single lambda `events` you have to set `X-Mock-Type` as header in your request. `X-Mock-Type` accepts `alb` or `apg`.  
+Please note that invoking a lambda from sls CLI (`sls invoke local -f myFunction`) will not trigger the offline server. But you are still able to inject any event with `-d 'someData'` sls CLI option.
+
 ---
 
 ## Advanced configuration
@@ -57,6 +60,7 @@ Exported config must be a function optionnaly taking one argument, an object whi
 {
   lambdas: array, // your Lambda declarations + additional info
   isDeploying: boolean, // indicates if sls is deploying
+  isPackaging: boolean, // indicates if sls is packaging
   setEnv: function, // to dynamically set env variables to your lambdas
   stage: string, // current serverless stag
   port: number // offline server port
