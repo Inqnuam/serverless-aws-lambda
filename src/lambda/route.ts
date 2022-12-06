@@ -26,18 +26,6 @@ const getMiddlewareAfter = (currentPosition: number, controllers: (RouteControll
 
   return func;
 };
-
-const error500 = {
-  statsCode: 500,
-  headers: {
-    "Content-Type": "text/html; charset=utf-8",
-  },
-  body: "Unhandled Error",
-};
-const get500Response = (error: any) => {
-  process.env.NODE_ENV == "development" && console.error(error);
-  return error500;
-};
 export class Route extends Function {
   controllers: (RouteController | RouteMiddleware)[] = [];
 
@@ -52,21 +40,17 @@ export class Route extends Function {
     const req = _buildUniversalEvent(args[0]);
     const context = args[1];
     const callback = args[2];
+    let response: RawResponseContent | null = null;
 
     const controllersStack = genControllers(this.controllers);
     const resEmitter = new EventEmitter();
 
-    const resolve = (obj: any) => {
-      let uniqueResponse = obj && typeof obj == "object" ? { ...obj } : obj;
-
-      Object.keys(uniqueResponse).forEach((key) => {
-        if (Array.isArray(uniqueResponse[key])) {
-          uniqueResponse[key] = [...obj[key]];
-        } else if (uniqueResponse[key] && typeof uniqueResponse[key] == "object") {
-          uniqueResponse[key] = { ...obj[key] };
-        }
-      });
-      resEmitter.emit("end", uniqueResponse);
+    const resolve = (obj: RawResponseContent) => {
+      if (response) {
+        return;
+      }
+      response = obj;
+      resEmitter.emit("end");
     };
 
     let res = new _Response({ context, resolve, req, locals: {}, callback });
@@ -74,7 +58,7 @@ export class Route extends Function {
     const next = async (err?: any) => {
       const locals = { ...res.locals };
       const previousResponse = { ...res.responseObject };
-      res = new _Response({ context, resolve, req, locals, previousResponse, callback });
+      res = new _Response({ context, resolve, locals, req, previousResponse, callback });
 
       if (err) {
         const foundErrorHandler = getMiddlewareAfter(currentIndex, this.controllers, controllersStack);
@@ -82,11 +66,14 @@ export class Route extends Function {
         if (foundErrorHandler) {
           try {
             await foundErrorHandler(err, req, res, next);
+            if (!response) {
+              res.status(204).send();
+            }
           } catch (error) {
-            resEmitter.emit("end", get500Response(error));
+            res.status(500).send("Unhandled Error");
           }
         } else {
-          resEmitter.emit("end", get500Response(err));
+          res.status(500).send("Unhandled Error");
         }
 
         controllersStack.return();
@@ -97,12 +84,12 @@ export class Route extends Function {
         currentIndex = Number(i);
         const func = this.controllers[i as unknown as number];
         try {
-          if (func.length == 4) {
-            const controller = func as RouteMiddleware;
-            await controller(null, req, res, next);
-          } else if (typeof func == "function") {
+          if (func.length == 3) {
             const controller = func as RouteController;
             await controller(req, res, next);
+          } else if (func.length == 4) {
+            const controller = func as RouteMiddleware;
+            await controller(null, req, res, next);
           }
         } catch (error) {
           const foundErrorHandler = getMiddlewareAfter(currentIndex, this.controllers, controllersStack);
@@ -110,28 +97,23 @@ export class Route extends Function {
           if (foundErrorHandler) {
             try {
               await foundErrorHandler(error, req, res, next);
+              if (!response) {
+                res.status(204).send();
+              }
             } catch (error) {
-              resEmitter.emit("end", get500Response(error));
+              res.status(500).send("Unhandled Error");
             }
           } else {
-            resEmitter.emit("end", get500Response(error));
+            res.status(500).send("Unhandled Error");
           }
           controllersStack.return();
         }
       }
     };
 
-    const response = await new Promise(async (resolve) => {
-      let isResolved = false;
-      resEmitter.once("end", (data: any) => {
-        isResolved = true;
-        resolve(data);
-      });
+    await new Promise(async (resolve) => {
+      resEmitter.once("end", resolve);
       await next();
-
-      if (!isResolved) {
-        resolve(null);
-      }
     });
 
     return response ?? { statusCode: 204 };
