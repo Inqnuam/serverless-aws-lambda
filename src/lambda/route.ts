@@ -40,16 +40,29 @@ export class Route extends Function {
     const req = _buildUniversalEvent(args[0]);
     const context = args[1];
     const callback = args[2];
-    let response: RawResponseContent | null = null;
+
+    let response: any = null;
 
     const controllersStack = genControllers(this.controllers);
     const resEmitter = new EventEmitter();
 
-    const resolve = (obj: RawResponseContent) => {
+    const resolve = (obj: any) => {
       if (response) {
         return;
       }
-      response = obj;
+      if (typeof obj == "object") {
+        response = { ...obj };
+        for (const key of Object.keys(response)) {
+          if (Array.isArray(response[key])) {
+            response[key] = [...obj[key]];
+          } else if (response[key] && typeof response[key] == "object") {
+            response[key] = { ...obj[key] };
+          }
+        }
+      } else {
+        response = obj;
+      }
+
       resEmitter.emit("end");
     };
 

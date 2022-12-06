@@ -106,7 +106,6 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
   }
 
   async init(isPackaging: boolean, invokeName?: string) {
-    this.isDeploying = isPackaging;
     this.#setRuntimeEnvs();
     this.#lambdas = this.#getAlbLambdas(invokeName);
 
