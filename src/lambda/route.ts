@@ -1,9 +1,10 @@
-import { _buildUniversalEvent, IRequest, RawResponseContent, RawAPIResponseContent } from "./express/request";
+import EventEmitter from "events";
+import { _buildUniversalEvent, IRequest, RawResponseContent } from "./express/request";
 import { _Response, IResponse } from "./express/response";
 
 export type NextFunction = (error?: any) => void;
-export type RouteMiddleware = (error: any, req: IRequest & { [key: string]: any }, res: IResponse, next: NextFunction) => Promise<void> | void;
-export type RouteController = (req: IRequest & { [key: string]: any }, res: IResponse, next: NextFunction) => Promise<void> | void;
+export type RouteMiddleware = (error: any, req: IRequest, res: IResponse, next: NextFunction) => Promise<void> | void;
+export type RouteController = (req: IRequest, res: IResponse, next: NextFunction) => Promise<void> | void;
 
 function* genControllers(controllers: (RouteController | RouteMiddleware)[]) {
   for (const func in controllers) {
@@ -25,6 +26,18 @@ const getMiddlewareAfter = (currentPosition: number, controllers: (RouteControll
 
   return func;
 };
+
+const error500 = {
+  statsCode: 500,
+  headers: {
+    "Content-Type": "text/html; charset=utf-8",
+  },
+  body: "Unhandled Error",
+};
+const get500Response = (error: any) => {
+  process.env.NODE_ENV == "development" && console.error(error);
+  return error500;
+};
 export class Route extends Function {
   controllers: (RouteController | RouteMiddleware)[] = [];
 
@@ -36,71 +49,89 @@ export class Route extends Function {
   }
 
   async _call(...args: any[]) {
-    const response = await new Promise(async (resolve) => {
-      const req = _buildUniversalEvent(args[0]);
-      const context = args[1];
-      const callback = args[2];
-      const controllersStack = genControllers(this.controllers);
+    const req = _buildUniversalEvent(args[0]);
+    const context = args[1];
+    const callback = args[2];
 
-      let res = new _Response({ context, resolve, req, locals: {}, callback });
-      let currentIndex = 0;
+    const controllersStack = genControllers(this.controllers);
+    const resEmitter = new EventEmitter();
 
-      const next = async (err?: any) => {
-        const locals = { ...res.locals };
-        const previousResponse = { ...res.responseObject };
-        res = new _Response({ context, resolve, locals, req, previousResponse, callback });
+    const resolve = (obj: any) => {
+      let uniqueResponse = obj && typeof obj == "object" ? { ...obj } : obj;
 
-        if (err) {
+      Object.keys(uniqueResponse).forEach((key) => {
+        if (Array.isArray(uniqueResponse[key])) {
+          uniqueResponse[key] = [...obj[key]];
+        } else if (uniqueResponse[key] && typeof uniqueResponse[key] == "object") {
+          uniqueResponse[key] = { ...obj[key] };
+        }
+      });
+      resEmitter.emit("end", uniqueResponse);
+    };
+
+    let res = new _Response({ context, resolve, req, locals: {}, callback });
+    let currentIndex = 0;
+    const next = async (err?: any) => {
+      const locals = { ...res.locals };
+      const previousResponse = { ...res.responseObject };
+      res = new _Response({ context, resolve, req, locals, previousResponse, callback });
+
+      if (err) {
+        const foundErrorHandler = getMiddlewareAfter(currentIndex, this.controllers, controllersStack);
+
+        if (foundErrorHandler) {
+          try {
+            await foundErrorHandler(err, req, res, next);
+          } catch (error) {
+            resEmitter.emit("end", get500Response(error));
+          }
+        } else {
+          resEmitter.emit("end", get500Response(err));
+        }
+
+        controllersStack.return();
+      }
+      const i = controllersStack.next().value;
+
+      if (i) {
+        currentIndex = Number(i);
+        const func = this.controllers[i as unknown as number];
+        try {
+          if (func.length == 4) {
+            const controller = func as RouteMiddleware;
+            await controller(null, req, res, next);
+          } else if (typeof func == "function") {
+            const controller = func as RouteController;
+            await controller(req, res, next);
+          }
+        } catch (error) {
           const foundErrorHandler = getMiddlewareAfter(currentIndex, this.controllers, controllersStack);
 
           if (foundErrorHandler) {
             try {
-              await foundErrorHandler(err, req, res, next);
+              await foundErrorHandler(error, req, res, next);
             } catch (error) {
-              process.env.NODE_ENV == "development" && console.error(error);
-              res.status(500).send("Unhandled Error");
+              resEmitter.emit("end", get500Response(error));
             }
           } else {
-            process.env.NODE_ENV == "development" && console.error(err);
-            res.status(500).send("Unhandled Error");
+            resEmitter.emit("end", get500Response(error));
           }
-
           controllersStack.return();
         }
-        const i = controllersStack.next().value;
+      }
+    };
 
-        if (i) {
-          currentIndex = Number(i);
-          const func = this.controllers[i as unknown as number];
-          try {
-            if (func.length == 3) {
-              const controller = func as RouteController;
-              await controller(req, res, next);
-            } else if (func.length == 4) {
-              const controller = func as RouteMiddleware;
-              await controller(null, req, res, next);
-            }
-          } catch (error) {
-            const foundErrorHandler = getMiddlewareAfter(currentIndex, this.controllers, controllersStack);
-
-            if (foundErrorHandler) {
-              try {
-                await foundErrorHandler(error, req, res, next);
-              } catch (error) {
-                process.env.NODE_ENV == "development" && console.error(error);
-                res.status(500).send("Unhandled Error");
-              }
-            } else {
-              process.env.NODE_ENV == "development" && console.error(error);
-              res.status(500).send("Unhandled Error");
-            }
-            controllersStack.return();
-          }
-        }
-      };
-
+    const response = await new Promise(async (resolve) => {
+      let isResolved = false;
+      resEmitter.once("end", (data: any) => {
+        isResolved = true;
+        resolve(data);
+      });
       await next();
-      resolve(null);
+
+      if (!isResolved) {
+        resolve(null);
+      }
     });
 
     return response ?? { statusCode: 204 };
