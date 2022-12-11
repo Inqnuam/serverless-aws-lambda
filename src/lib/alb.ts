@@ -7,9 +7,11 @@ import { log } from "./colorize";
 import inspector from "inspector";
 import { html404, html500 } from "./htmlStatusMsg";
 import serveStatic from "serve-static";
-
+import { randomUUID } from "crypto";
 let localIp: string;
 
+const accountId = Buffer.from(randomUUID()).toString("hex").slice(0, 16);
+const apiId = Buffer.from(randomUUID()).toString("ascii").slice(0, 10);
 if (networkInterfaces) {
   localIp = Object.values(networkInterfaces())
     .reduce((accum: any[], obj: any) => {
@@ -34,7 +36,34 @@ interface AlbEvent {
   isBase64Encoded: boolean;
   body?: string;
 }
-
+interface ApgEvent {
+  version: string;
+  routeKey: string;
+  rawPath: string;
+  rawQueryString: string;
+  headers: { [key: string]: any };
+  queryStringParameters: { [key: string]: string };
+  isBase64Encoded: boolean;
+  body?: string;
+  requestContext: {
+    accountId: string;
+    apiId: string;
+    domainName: string;
+    domainPrefix: string;
+    http: {
+      method: string;
+      path: string;
+      protocol: string;
+      sourceIp: string;
+      userAgent: string;
+    };
+    requestId: string;
+    routeKey: string;
+    stage: string;
+    time: string;
+    timeEpoch: number;
+  };
+}
 export class ApplicationLoadBalancer extends AlbRouter {
   #server: Server;
   runtimeConfig = {};
@@ -91,15 +120,33 @@ export class ApplicationLoadBalancer extends AlbRouter {
     if (customCallback) {
       customCallback(req, res);
     } else {
-      const mockType = (headers["x-mock-type"] ?? "alb") as string;
       let body = Buffer.alloc(0);
+      let requestMockType: string | undefined | null = undefined;
+
+      if (parsedURL.searchParams.get("x_mock_type") !== null) {
+        requestMockType = parsedURL.searchParams.get("x_mock_type");
+      } else if (headers["x-mock-type"]) {
+        if (Array.isArray(headers["x-mock-type"])) {
+          requestMockType = headers["x-mock-type"][0];
+        } else {
+          requestMockType = headers["x-mock-type"];
+        }
+      }
 
       const contentType = headers["content-type"];
-      let event = mockType == "alb" ? this.#convertReqToAlbEvent(req) : this.#convertReqToApgEvent(req);
 
-      const lambdaController = this.getHandler(method as HttpMethod, decodeURIComponent(parsedURL.pathname), headers["x-mock-type"] as string | undefined);
+      const lambdaController = this.getHandler(method as HttpMethod, decodeURIComponent(parsedURL.pathname), requestMockType);
 
       if (lambdaController) {
+        let mockType = "alb";
+
+        if (lambdaController.endpoints.length == 1) {
+          mockType = lambdaController.endpoints[0].kind;
+        } else if (requestMockType) {
+          mockType = requestMockType.toLowerCase();
+        }
+        let event = mockType == "alb" ? this.#convertReqToAlbEvent(req) : this.#convertReqToApgEvent(req);
+
         if (this.debug) {
           log.YELLOW(`${mockType.toUpperCase()} event`);
           console.log(event);
@@ -110,24 +157,26 @@ export class ApplicationLoadBalancer extends AlbRouter {
           })
           .on("end", async () => {
             event.body = body.length ? body.toString() : "";
-            this.#responseHandler(res, event, lambdaController, method as HttpMethod, parsedURL.pathname);
+            this.#responseHandler(res, event, lambdaController, method as HttpMethod, parsedURL.pathname, mockType);
           })
           .on("error", (err) => {
             console.error(err.stack);
           });
       } else if (this.#serve) {
         this.#serve(req, res, () => {
+          res.setHeader("Content-Type", "text/html");
           res.statusCode = 404;
           res.end(html404);
         });
       } else {
+        res.setHeader("Content-Type", "text/html");
         res.statusCode = 404;
         res.end(html404);
       }
     }
   }
 
-  async #responseHandler(res: ServerResponse, event: any, lambdaController: ILambdaMock, method: HttpMethod, path: string) {
+  async #responseHandler(res: ServerResponse, event: any, lambdaController: ILambdaMock, method: HttpMethod, path: string, mockType: string) {
     const hrTimeStart = process.hrtime();
 
     res.on("finish", () => {
@@ -142,10 +191,10 @@ export class ApplicationLoadBalancer extends AlbRouter {
     });
 
     try {
-      const responseData = await this.#getLambdaResponse(event, lambdaController, res, method, path);
+      const responseData = await this.#getLambdaResponse(event, lambdaController, res, method, path, mockType);
       if (!res.writableFinished) {
-        this.#setResponseHead(res, responseData);
-        this.#writeResponseBody(res, responseData);
+        this.#setResponseHead(res, responseData, mockType);
+        this.#writeResponseBody(res, responseData, mockType);
       }
     } catch (error) {
       if (!res.writableFinished) {
@@ -157,8 +206,13 @@ export class ApplicationLoadBalancer extends AlbRouter {
     }
   }
 
-  #setResponseHead(res: ServerResponse, responseData: any) {
-    res.setHeader("Server", "awselb/2.0");
+  #setResponseHead(res: ServerResponse, responseData: any, mockType: string) {
+    if (mockType == "alb") {
+      res.setHeader("Server", "awselb/2.0");
+    } else if (mockType == "apg") {
+      res.setHeader("Apigw-Requestid", Buffer.from(randomUUID()).toString("base64").slice(0, 16));
+    }
+
     res.setHeader("Date", new Date().toUTCString());
 
     if (responseData) {
@@ -166,7 +220,7 @@ export class ApplicationLoadBalancer extends AlbRouter {
       res.statusMessage = responseData.statusMessage ?? "";
 
       if (typeof responseData.headers == "object" && !Array.isArray(responseData.headers)) {
-        const headersKeys = Object.keys(responseData.headers).filter((key) => key !== "Server" && key !== "Date");
+        const headersKeys = Object.keys(responseData.headers).filter((key) => key !== "Server" && key !== "Apigw-Requestid" && key !== "Date");
         headersKeys.forEach((key) => {
           res.setHeader(key, responseData.headers[key]);
         });
@@ -177,33 +231,44 @@ export class ApplicationLoadBalancer extends AlbRouter {
           res.setHeader("Set-Cookie", responseData.cookies);
         }
 
-        if (!responseData.statusCode) {
-          console.warn("Invalid 'statusCode'. default 200 is sent to client");
+        if (!responseData.statusCode && mockType == "alb") {
+          console.log("Invalid 'statusCode'. ");
         }
       }
     } else {
-      res.statusCode = 200;
+      res.statusCode = mockType == "alb" ? 502 : 200;
     }
   }
 
-  #writeResponseBody(res: ServerResponse, responseData: any) {
+  #writeResponseBody(res: ServerResponse, responseData: any, mockType: string) {
+    let resContent = "";
     if (responseData) {
-      if (responseData.body && typeof responseData.body != "string") {
-        console.warn("response 'body' must be a string. Receievd", typeof responseData.body);
-        responseData.body = "";
-
-        // TODO: if statudCode 404 send html 404 not found as body
+      if (typeof responseData.body == "string") {
+        resContent = responseData.body;
+      } else if (responseData.body) {
+        console.log("response 'body' must be a string. Receievd", typeof responseData.body);
+      } else {
+        if (mockType == "apg") {
+          res.setHeader("Content-Type", "application/json");
+          if (typeof responseData == "string") {
+            resContent = responseData;
+          } else if (typeof responseData == "object") {
+            resContent = JSON.stringify(responseData);
+          }
+        } else {
+          console.log("Invalid response content");
+          res.setHeader("Content-Type", "text/html");
+          res.statusCode = 502;
+          resContent = html500;
+        }
       }
-
-      res.end(responseData.body);
-    } else {
-      res.end("");
     }
+    res.end(resContent);
   }
 
-  async #getLambdaResponse(event: any, lambdaController: ILambdaMock, res: ServerResponse, method: HttpMethod, path: string) {
+  async #getLambdaResponse(event: any, lambdaController: ILambdaMock, res: ServerResponse, method: HttpMethod, path: string, mockType: string) {
     return await new Promise(async (resolve, reject) => {
-      const responseData = await lambdaController.invoke(event, res, method, path);
+      const responseData = await lambdaController.invoke(event, res, method, path, mockType);
 
       resolve(responseData);
     });
@@ -249,12 +314,34 @@ export class ApplicationLoadBalancer extends AlbRouter {
       "x-forwarded-port": this.port,
     };
 
-    let event: AlbEvent = {
+    parsedURL.searchParams.delete("x_mock_type");
+    let event: ApgEvent = {
+      version: "2.0",
+      routeKey: `${method} ${parsedURL.pathname}`,
+      rawPath: parsedURL.pathname,
+      rawQueryString: parsedURL.search ? parsedURL.search.slice(1) : "",
       headers: { ...albDefaultHeaders, ...headers },
-      httpMethod: method as string,
-      path: parsedURL.pathname,
-      queryStringParameters: this.#paramsToAlbObject(url as string),
+      // @ts-ignore
+      queryStringParameters: Object.fromEntries(parsedURL.searchParams),
       isBase64Encoded: false,
+      requestContext: {
+        accountId: String(accountId),
+        apiId: apiId,
+        domainName: `localhost:${this.port}`,
+        domainPrefix: "localhost",
+        http: {
+          method: method as string,
+          path: parsedURL.pathname,
+          protocol: "HTTP/1.1",
+          sourceIp: "127.0.0.1",
+          userAgent: headers["user-agent"] ?? "",
+        },
+        requestId: "",
+        routeKey: `${method} ${parsedURL.pathname}`,
+        stage: "$local",
+        time: new Date().toISOString(),
+        timeEpoch: Date.now(),
+      },
     };
     if (event.headers["x-mock-type"]) {
       delete event.headers["x-mock-type"];
@@ -262,7 +349,6 @@ export class ApplicationLoadBalancer extends AlbRouter {
     if (headers["content-type"]?.includes("multipart/form-data")) {
       event.isBase64Encoded = true;
     }
-
     return event;
   }
 
@@ -276,10 +362,10 @@ export class ApplicationLoadBalancer extends AlbRouter {
 
     queryComponents.forEach((c) => {
       const [key, value] = c.split("=");
-
       queryStringComponents[key] = value;
     });
 
+    delete queryStringComponents.x_mock_type;
     return queryStringComponents;
   }
 

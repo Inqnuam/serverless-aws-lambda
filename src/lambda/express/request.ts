@@ -26,31 +26,44 @@ export interface IRequest {
   get: (headerField: string) => { [key: string]: any } | undefined;
   params: string[];
   protocol: string;
+  secure: boolean;
 }
 
 export const _buildUniversalEvent = (awsAlbEvent: any) => {
-  let universalEvent = { ...awsAlbEvent };
+  let uE = { ...awsAlbEvent };
   try {
-    universalEvent.method = awsAlbEvent.httpMethod;
-    universalEvent.query = {};
+    delete uE.cookies;
+    uE.method = awsAlbEvent.httpMethod;
+    uE.query = {};
 
     for (const [key, value] of Object.entries(awsAlbEvent.queryStringParameters)) {
-      universalEvent.query[key] = decodeURIComponent(value as string);
-    }
-    if (!awsAlbEvent.isBase64Encoded && awsAlbEvent.headers["content-type"] == "application/json") {
-      const body = JSON.parse(awsAlbEvent.body);
-      universalEvent.body = body;
+      uE.query[key] = decodeURIComponent(value as string);
     }
 
-    universalEvent.get = (headerField: string) => {
+    uE.get = (headerField: string) => {
       // TODO: check for both Referrer and Referer
       return awsAlbEvent.headers[headerField.toLowerCase()];
     };
-    let reqPath = decodeURIComponent(universalEvent.path);
+    uE.path = uE.path ?? uE.rawPath;
 
-    universalEvent.params = reqPath.split("/").filter((x) => x);
-    universalEvent.protocol = awsAlbEvent.headers["x-forwarded-proto"];
+    if (uE.requestContext) {
+      if (!uE.method) {
+        uE.method = uE.requestContext.http?.method;
+      }
+
+      if (!uE.path) {
+        uE.path = uE.requestContext.http?.path;
+      }
+    }
+    let reqPath = decodeURIComponent(uE.path);
+
+    uE.params = reqPath.split("/").filter((x) => x);
+    uE.protocol = awsAlbEvent.headers["x-forwarded-proto"];
+    uE.secure = uE.protocol == "https";
+    if (!awsAlbEvent.isBase64Encoded && awsAlbEvent.headers["content-type"] == "application/json") {
+      const body = JSON.parse(awsAlbEvent.body);
+      uE.body = body;
+    }
   } catch (err) {}
-
-  return universalEvent;
+  return uE;
 };

@@ -25,7 +25,7 @@ export interface ILambdaMock {
   esOutputPath: string;
   entryPoint: string;
   _worker?: Worker;
-  invoke: (event: any, res: ServerResponse, method: string, path: string) => Promise<any>;
+  invoke: (event: any, res: ServerResponse, method: string, path: string, mockType: string) => Promise<any>;
 }
 /**
  * @internal
@@ -76,7 +76,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     };
     await new Promise((resolve, reject) => {
       this._worker = new Worker(workerPath, {
-        env: { ...this.environment, NODE_ENV: process.env.NODE_ENV },
+        env: this.environment,
         stackSizeMb: this.memorySize,
         workerData,
       } as WorkerOptions);
@@ -98,7 +98,16 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
       this._worker.postMessage({ channel: "import" });
     });
   }
-  async invoke(event: any, res: any, method: string, path: string) {
+  #setDefaultHeaders(res: any, mockType: string, awsRequestId: string) {
+    if (mockType == "alb") {
+      res.setHeader("Server", "awselb/2.0");
+    } else if ((mockType = "apg")) {
+      res.setHeader("Apigw-Requestid", Buffer.from(awsRequestId).toString("base64").slice(0, 16));
+    }
+
+    res.setHeader("Date", new Date().toUTCString());
+  }
+  async invoke(event: any, res: any, method: string, path: string, mockType: string) {
     if (!this._worker) {
       log.BR_BLUE(`❄️ Cold start '${this.outName}'`);
       await this.importEventHandler();
@@ -131,8 +140,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
             break;
           case "succeed":
             res.statusCode = data.statusCode;
-            res.setHeader("Server", "awselb/2.0");
-            res.setHeader("Date", new Date().toUTCString());
+            this.#setDefaultHeaders(res, mockType, awsRequestId);
             if (data.headers && typeof data.headers == "object") {
               for (const [key, value] of Object.entries(data.headers)) {
                 res.setHeader(key, value);
@@ -147,16 +155,15 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
 
             res.statusCode = 502;
             res.setHeader("Content-Type", "text/html");
-            res.setHeader("Server", "awselb/2.0");
-            res.setHeader("Date", new Date().toUTCString());
+
+            this.#setDefaultHeaders(res, mockType, awsRequestId);
             res.end(html500);
 
             resolve(undefined);
             break;
           case "done":
             res.statusCode = data.statusCode;
-            res.setHeader("Server", "awselb/2.0");
-            res.setHeader("Date", new Date().toUTCString());
+            this.#setDefaultHeaders(res, mockType, awsRequestId);
             if (data.headers && typeof data.headers == "object") {
               for (const [key, value] of Object.entries(data.headers)) {
                 res.setHeader(key, value);

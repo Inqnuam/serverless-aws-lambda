@@ -9,5 +9,5 @@ yarn-error.log
 /.DS_Store
 **/.DS_Store
 /express
-/route.d.ts
-/route.js
+/router.d.ts
+/router.js

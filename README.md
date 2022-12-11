@@ -54,7 +54,7 @@ custom:
     configPath: ./config.default
 ```
 
-Exported config must be a function optionnaly taking one argument, an object which includes:
+Exported config must be a function optionnaly taking one argument, an object which provides following values:
 
 ```jaavscript
 {
@@ -69,7 +69,7 @@ Exported config must be a function optionnaly taking one argument, an object whi
 
 ### esbuild
 
-You can customize esbuild by returning on object with `esbuild` key containing [esbuild configuration.](https://esbuild.github.io)  
+You can customize esbuild by returning an object with `esbuild` key containing [esbuild configuration.](https://esbuild.github.io)  
 Most of esbuild options are supported. It isn't the case for example for `entryPoints` which is automatically done by serverless-aws-lambda.
 
 See supported options [full list.](resources/esbuild.md)  
@@ -78,7 +78,7 @@ simple example:
 ```js
 const somePlugin = require("some-plugin");
 
-module.exports = ({ lambdas, isDeploying, setEnv, stage, port }) => {
+module.exports = ({ lambdas, isDeploying, isPackaging, setEnv, stage, port }) => {
   return {
     esbuild: {
       plugins: [somePlugin],

@@ -4,7 +4,7 @@ const { nodeExternalsPlugin } = require("esbuild-node-externals");
 
 const compileDeclarations = () => {
   try {
-    execSync("tsc && rm -rf ./express && mv -f dist/lambda/* ./ && mv dist/route.js ./ && rm -rf dist/lambda ");
+    execSync("tsc && rm -rf ./express && mv -f dist/lambda/* ./ && mv dist/router.js ./ && rm -rf dist/lambda ");
   } catch (error) {
     console.log(error.output?.[1]?.toString());
   }
@@ -29,7 +29,7 @@ const watch = {
   },
 };
 
-const entryPoints = ["./src/index.ts", "./src/lambda/route.ts"];
+const entryPoints = ["./src/index.ts", "./src/lambda/router.ts"];
 
 (async () => {
   const buildIndex = esbuild.build.bind(null, { ...esBuildConfig, external: ["./src/lib/worker.js"], entryPoints, ...watch });

@@ -10,7 +10,7 @@ export class AlbRouter {
     this.debug = config.debug;
   }
 
-  getHandler(method: HttpMethod, path: string, kind?: string) {
+  getHandler(method: HttpMethod, path: string, kind?: string | null) {
     const hasNotWilcard = !path.includes("*");
     const hasNotBrackets = !path.includes("{") && !path.includes("}");
 
@@ -30,7 +30,7 @@ export class AlbRouter {
       return foundHandler;
     } else {
       // Use Regex to find lambda controller
-      return this.#handlers.find((x) =>
+      const foundHandler = this.#handlers.find((x) =>
         x.endpoints
           .filter((e) => (kind ? e.kind == kind : e))
           .find((w) => {
@@ -46,6 +46,8 @@ export class AlbRouter {
             return hasPath && (w.methods.includes("ANY") || w.methods.includes(method));
           })
       );
+
+      return foundHandler;
     }
   }
 

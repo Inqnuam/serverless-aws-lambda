@@ -219,6 +219,9 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       if (this.customEsBuildConfig.loader && typeof this.customEsBuildConfig.loader == "object") {
         esBuildConfig.loader = this.customEsBuildConfig.loader;
       }
+      if (this.customEsBuildConfig.alias && typeof this.customEsBuildConfig.alias == "object") {
+        esBuildConfig.alias = this.customEsBuildConfig.alias;
+      }
 
       if (typeof this.customEsBuildConfig.assetNames == "string") {
         esBuildConfig.assetNames = this.customEsBuildConfig.assetNames;
@@ -372,6 +375,10 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
           ...isLocalEnv,
         },
       };
+
+      if (process.env.NODE_ENV) {
+        lambdaDef.environment.NODE_ENV = process.env.NODE_ENV;
+      }
       if (region) {
         lambdaDef.environment.AWS_REGION = region;
       }
@@ -638,6 +645,9 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     }
     if (customConfig.loader && typeof customConfig.loader == "object") {
       customEsBuild.loader = customConfig.loader;
+    }
+    if (customConfig.alias && typeof customConfig.alias == "object") {
+      customEsBuild.alias = customConfig.alias;
     }
 
     if (typeof customConfig.assetNames == "string") {

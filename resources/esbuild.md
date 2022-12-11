@@ -26,3 +26,4 @@
 | splitting         | boolean |                                                |                                                            |
 | bundle            | boolean | `true`                                         |                                                            |
 | inject            | array   |                                                |                                                            |
+| alias             | object  |                                                |                                                            |

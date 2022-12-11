@@ -2,7 +2,7 @@ Set static path and add request handlers:
 `config.js`
 
 ```js
-module.exports = ({ lambdas, isDeploying, setEnv, stage, port }) => {
+module.exports = ({ lambdas, isDeploying, isPackaging, setEnv, stage, port }) => {
   return {
     esbuild: {
       //...
@@ -28,7 +28,7 @@ Callback after (each) build:
 `config.js`
 
 ```js
-module.exports = ({ lambdas, isDeploying, setEnv, stage, port }) => {
+module.exports = ({ lambdas, isDeploying, isPackaging, setEnv, stage, port }) => {
   return {
     esbuild: {
       // ...

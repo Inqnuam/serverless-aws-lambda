@@ -22,7 +22,7 @@ export interface IResponse {
   getRemainingTimeInMillis: Function;
   status: (code: number) => this;
   send: (content?: string) => void;
-  end: (rawContent: RawResponseContent) => void;
+  end: (rawContent: any) => void;
   json: (content: [] | { [key: string]: any }) => void;
   set: (header: string | { [key: string]: string }, value?: string) => this;
   get: (headerKey: string) => string;
@@ -150,10 +150,11 @@ export class _Response implements IResponse {
     }
     return this;
   }
-
+  setHeader = this.set;
   get(headerKey: string) {
     return this.responseObject.headers[headerKey];
   }
+  getHeader = this.get;
   json(content: { [key: string]: any }) {
     this.type("application/json").#setBody(JSON.stringify(content)).#sendResponse();
   }
@@ -161,8 +162,16 @@ export class _Response implements IResponse {
   send(content?: string) {
     this.#setBody(content).#sendResponse();
   }
-  end(rawContent: RawResponseContent) {
-    this.#resolve({ ...rawContent });
+  end(rawContent: any) {
+    let resContent = undefined;
+    if (Array.isArray(rawContent)) {
+      resContent = [...rawContent];
+    } else if (typeof rawContent == "object") {
+      resContent = { ...rawContent };
+    } else {
+      resContent = rawContent;
+    }
+    this.#resolve(resContent);
   }
 
   redirect(...args: RedirectOptions) {
@@ -176,7 +185,7 @@ export class _Response implements IResponse {
     let loc = url;
 
     if (url === "back") {
-      loc = this.#req.get("Referrer") || "/";
+      loc = this.#req.get("Referrer") || this.#req.get("Referer") || "/";
     }
     return this.set("Location", encodeURI(loc));
   }

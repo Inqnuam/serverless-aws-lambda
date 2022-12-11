@@ -42,7 +42,7 @@ const parse = (event, spotText) => {
   };
 };
 
-const bodyParser = (error, req, res, next) => {
+const bodyParser = (req, res, next) => {
   try {
     const parsedBody = parse(req, true);
     req.files = parsedBody.files;
@@ -52,4 +52,3 @@ const bodyParser = (error, req, res, next) => {
   next();
 };
 module.exports = bodyParser;
-module.exports.bodyParser = bodyParser;
