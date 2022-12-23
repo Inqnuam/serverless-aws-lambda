@@ -194,7 +194,9 @@ export class ApplicationLoadBalancer extends AlbRouter {
       const responseData = await this.#getLambdaResponse(event, lambdaController, res, method, path, mockType);
       if (!res.writableFinished) {
         this.#setResponseHead(res, responseData, mockType);
+        if (!res.writableFinished) {
         this.#writeResponseBody(res, responseData, mockType);
+        }
       }
     } catch (error) {
       if (!res.writableFinished) {
@@ -216,7 +218,7 @@ export class ApplicationLoadBalancer extends AlbRouter {
     res.setHeader("Date", new Date().toUTCString());
 
     if (responseData) {
-      res.statusCode = responseData.statusCode ?? 200;
+
       res.statusMessage = responseData.statusMessage ?? "";
 
       if (typeof responseData.headers == "object" && !Array.isArray(responseData.headers)) {
@@ -227,12 +229,22 @@ export class ApplicationLoadBalancer extends AlbRouter {
       }
 
       if (responseData) {
-        if (responseData.cookies?.length) {
+       
+
+        if (!responseData.statusCode) {
+          if (mockType == "alb") {
+            console.log("Invalid 'statusCode'. ");
+            res.statusCode = 502;
+            res.setHeader("Content-Type", "text/html");
+            res.end(html500)
+          } else {
+            res.statusCode = 200;
+          }
+        } else {
+          res.statusCode = responseData.statusCode
+           if (responseData.cookies?.length) {
           res.setHeader("Set-Cookie", responseData.cookies);
         }
-
-        if (!responseData.statusCode && mockType == "alb") {
-          console.log("Invalid 'statusCode'. ");
         }
       }
     } else {
