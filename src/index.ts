@@ -32,7 +32,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
   customBuildCallback?: Function;
   runtimeConfig: any;
   defaultVirtualEnvs: any;
-
+  isNode14 = false
   constructor(serverless: any, options: any) {
     super({ debug: process.env.SLS_DEBUG == "*" });
 
@@ -41,7 +41,8 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     this.options = options;
     this.isPackaging = this.serverless.processedInput.commands.includes("package");
     this.isDeploying = this.serverless.processedInput.commands.includes("deploy");
-
+    this.isNode14 = this.serverless.service.provider.runtime?.toLowerCase().startsWith("nodejs14")
+    
     if (this.isDeploying || this.isPackaging) {
       log.BR_BLUE("Packaging using serverless-aws-lambda...");
     } else {
@@ -128,7 +129,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       outbase: "src",
       bundle: true,
       plugins: [],
-      external: ["aws-sdk", "esbuild"],
+      external: ["esbuild"],
       watch: false,
     };
 
@@ -143,6 +144,10 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
         //  esBuildConfig.incremental = true;
       }
     }
+      if(this.isNode14) {
+        esBuildConfig.external?.push("aws-sdk")
+      }
+    
 
     if (this.customEsBuildConfig) {
       if (Array.isArray(this.customEsBuildConfig.plugins)) {
