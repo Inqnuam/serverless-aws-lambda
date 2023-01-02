@@ -1,14 +1,18 @@
-Set static path and add request handlers:  
+Set offline static path, custom port and add request handlers:  
 `config.js`
 
 ```js
 module.exports = ({ lambdas, isDeploying, isPackaging, setEnv, stage, port }) => {
+  /**
+   * @type {import("serverless-aws-lambda").Config}
+   */
   return {
     esbuild: {
       //...
     },
     offline: {
       staticPath: "./public",
+      port: 9999,
       request: [
         {
           filter: /^\/__routes(\/)?$/, // filters request when request URL match /__routes

@@ -3,10 +3,12 @@ import { ApplicationLoadBalancer } from "./lib/alb";
 import { ILambdaMock } from "./lib/lambdaMock";
 import { log } from "./lib/colorize";
 import { zip } from "./lib/zip";
-import { build, BuildOptions } from "esbuild";
+import esbuild from "esbuild";
+import type { BuildOptions } from "esbuild";
 import { nodeExternalsPlugin } from "esbuild-node-externals";
 import { LambdaEndpoint } from "./lib/lambdaMock";
 import { AlbRouter, HttpMethod } from "./lib/router";
+import { awsSdkv3ExternalPlugin } from "./lib/awsSdkv3ExternalPlugin";
 
 const cwd = process.cwd();
 const DEFAULT_LAMBDA_TIMEOUT = 6;
@@ -32,7 +34,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
   customBuildCallback?: Function;
   runtimeConfig: any;
   defaultVirtualEnvs: any;
-  isNode14 = false
+  nodeVersion = false;
   constructor(serverless: any, options: any) {
     super({ debug: process.env.SLS_DEBUG == "*" });
 
@@ -41,8 +43,8 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
     this.options = options;
     this.isPackaging = this.serverless.processedInput.commands.includes("package");
     this.isDeploying = this.serverless.processedInput.commands.includes("deploy");
-    this.isNode14 = this.serverless.service.provider.runtime?.toLowerCase().startsWith("nodejs14")
-    
+    this.nodeVersion = this.serverless.service.provider.runtime?.replace(/[^0-9]/g, "");
+
     if (this.isDeploying || this.isPackaging) {
       log.BR_BLUE("Packaging using serverless-aws-lambda...");
     } else {
@@ -144,10 +146,14 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
         //  esBuildConfig.incremental = true;
       }
     }
-      if(this.isNode14) {
-        esBuildConfig.external?.push("aws-sdk")
+
+    if (typeof this.nodeVersion == "string") {
+      if (Number(this.nodeVersion) < 18) {
+        esBuildConfig.external?.push("aws-sdk");
+      } else {
+        esBuildConfig.plugins?.push(awsSdkv3ExternalPlugin);
       }
-    
+    }
 
     if (this.customEsBuildConfig) {
       if (Array.isArray(this.customEsBuildConfig.plugins)) {
@@ -280,7 +286,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       });
   }
   async buildAndWatch(isPackaging: boolean, invokeName?: string) {
-    const result = await build(this.esBuildConfig);
+    const result = await esbuild.build(this.esBuildConfig);
     const { outputs } = result.metafile!;
     this.#setLambdaEsOutputPaths(outputs);
     if (this.customBuildCallback) {
@@ -548,6 +554,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       setEnv,
       port: ServerlessAlbOffline.PORT,
       stage: this.options.stage ?? this.serverless.service.provier.stage ?? "dev",
+      esbuild: esbuild,
     };
     let exportedObject: any = {};
 
@@ -570,6 +577,9 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
 
       if (typeof exportedObject.offline.staticPath == "string") {
         this.serve = exportedObject.offline.staticPath;
+      }
+      if (typeof exportedObject.offline.port == "number") {
+        ServerlessAlbOffline.PORT = exportedObject.offline.port
       }
     }
 
