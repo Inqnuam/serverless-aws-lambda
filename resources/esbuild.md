@@ -22,8 +22,5 @@
 | assetNames        | string  |                                                |                                                            |
 | entryNames        | string  |                                                |                                                            |
 | publicPath        | string  |                                                |                                                            |
-| format            | string  |                                                |                                                            |
-| splitting         | boolean |                                                |                                                            |
-| bundle            | boolean | `true`                                         |                                                            |
 | inject            | array   |                                                |                                                            |
 | alias             | object  |                                                |                                                            |

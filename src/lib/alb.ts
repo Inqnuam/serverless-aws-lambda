@@ -179,23 +179,21 @@ export class ApplicationLoadBalancer extends AlbRouter {
   async #responseHandler(res: ServerResponse, event: any, lambdaController: ILambdaMock, method: HttpMethod, path: string, mockType: string) {
     const hrTimeStart = process.hrtime();
 
-    res.on("finish", () => {
+    res.on("close", ()=> {
       const endAt = process.hrtime(hrTimeStart);
       const execTime = `${endAt[0]},${endAt[1]}s`;
-
-      log.YELLOW(`⌛️ Lambda execution time: ${execTime}`);
-    });
-
-    res.on("error", (err) => {
-      console.error(err);
-    });
-
+      const executedTime = `⌛️ Lambda execution time: ${execTime}`;
+      // as main and worker process share the same stdout we need a timeout before printing any additionnal info
+      setTimeout(() => {
+        log.YELLOW(executedTime);
+      }, 400);
+    })
     try {
       const responseData = await this.#getLambdaResponse(event, lambdaController, res, method, path, mockType);
       if (!res.writableFinished) {
         this.#setResponseHead(res, responseData, mockType);
         if (!res.writableFinished) {
-        this.#writeResponseBody(res, responseData, mockType);
+          this.#writeResponseBody(res, responseData, mockType);
         }
       }
     } catch (error) {
@@ -218,7 +216,6 @@ export class ApplicationLoadBalancer extends AlbRouter {
     res.setHeader("Date", new Date().toUTCString());
 
     if (responseData) {
-
       res.statusMessage = responseData.statusMessage ?? "";
 
       if (typeof responseData.headers == "object" && !Array.isArray(responseData.headers)) {
@@ -229,22 +226,20 @@ export class ApplicationLoadBalancer extends AlbRouter {
       }
 
       if (responseData) {
-       
-
         if (!responseData.statusCode) {
           if (mockType == "alb") {
             console.log("Invalid 'statusCode'. ");
             res.statusCode = 502;
             res.setHeader("Content-Type", "text/html");
-            res.end(html500)
+            res.end(html500);
           } else {
             res.statusCode = 200;
           }
         } else {
-          res.statusCode = responseData.statusCode
-           if (responseData.cookies?.length) {
-          res.setHeader("Set-Cookie", responseData.cookies);
-        }
+          res.statusCode = responseData.statusCode;
+          if (responseData.cookies?.length) {
+            res.setHeader("Set-Cookie", responseData.cookies);
+          }
         }
       }
     } else {
@@ -268,7 +263,7 @@ export class ApplicationLoadBalancer extends AlbRouter {
             resContent = JSON.stringify(responseData);
           }
         } else {
-          console.log("Invalid response content");
+          log.RED("Invalid response content")
           res.setHeader("Content-Type", "text/html");
           res.statusCode = 502;
           resContent = html500;
