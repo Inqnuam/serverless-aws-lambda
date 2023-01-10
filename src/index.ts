@@ -553,7 +553,7 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
       isPackaging: this.isPackaging,
       setEnv,
       port: ServerlessAlbOffline.PORT,
-      stage: this.options.stage ?? this.serverless.service.provier.stage ?? "dev",
+      stage: this.options.stage ?? this.serverless.service.provider.stage ?? "dev",
       esbuild: esbuild,
     };
     let exportedObject: any = {};
