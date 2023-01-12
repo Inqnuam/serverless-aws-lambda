@@ -43,6 +43,8 @@ interface ApgEvent {
   rawQueryString: string;
   headers: { [key: string]: any };
   queryStringParameters: { [key: string]: string };
+  multiValueHeaders: { [key: string]: any };
+  multiValueQueryStringParameters: { [key: string]: any };
   isBase64Encoded: boolean;
   body?: string;
   requestContext: {
@@ -101,6 +103,7 @@ export class ApplicationLoadBalancer extends AlbRouter {
 
         log.GREEN(output);
       }
+      process.send?.({ port: listeningPort });
     });
   }
 
@@ -118,8 +121,50 @@ export class ApplicationLoadBalancer extends AlbRouter {
     }
 
     if (customCallback) {
+      //SECTION: Route provided by client in config file
       customCallback(req, res);
+    } else if (parsedURL.pathname.startsWith("/2015-03-31")) {
+      //SECTION: Function URL invokation handler
+      const foundHandler = this.getHandlerByName(parsedURL.pathname);
+
+      const invokeType = headers["x-amz-invocation-type"];
+      const exceptedStatusCode = invokeType == "DryRun" ? 204 : invokeType == "Event" ? 202 : 200;
+
+      if (foundHandler) {
+        let event = "";
+        let body = Buffer.alloc(0);
+
+        req
+          .on("data", (chunk) => {
+            body += chunk;
+          })
+          .on("end", async () => {
+            event = body.toString();
+
+            try {
+              const result = await foundHandler.invoke(event, res, method!, url!, "raw");
+              res.statusCode = exceptedStatusCode;
+
+              res.setHeader("Content-Type", "application/json");
+              res.setHeader("x-amzn-RequestId", Buffer.from(randomUUID()).toString("base64"));
+              res.setHeader("X-Amzn-Trace-Id", `root=1-xxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx;sampled=0`);
+
+              res.end(JSON.stringify(result));
+            } catch (error) {
+              res.statusCode = 502;
+              res.end(JSON.stringify(error));
+            }
+          })
+          .on("error", (err) => {
+            res.statusCode = 502;
+            res.end(JSON.stringify(err));
+          });
+      } else {
+        res.statusCode = 404;
+        res.end("Lambda not found");
+      }
     } else {
+      //SECTION: ALB and APG server
       let body = Buffer.alloc(0);
       let requestMockType: string | undefined | null = undefined;
 
@@ -132,8 +177,6 @@ export class ApplicationLoadBalancer extends AlbRouter {
           requestMockType = headers["x-mock-type"];
         }
       }
-
-      const contentType = headers["content-type"];
 
       const lambdaController = this.getHandler(method as HttpMethod, decodeURIComponent(parsedURL.pathname), requestMockType);
 
@@ -179,17 +222,17 @@ export class ApplicationLoadBalancer extends AlbRouter {
   async #responseHandler(res: ServerResponse, event: any, lambdaController: ILambdaMock, method: HttpMethod, path: string, mockType: string) {
     const hrTimeStart = process.hrtime();
 
-    res.on("close", ()=> {
+    res.on("close", () => {
       const endAt = process.hrtime(hrTimeStart);
       const execTime = `${endAt[0]},${endAt[1]}s`;
-      const executedTime = `⌛️ Lambda execution time: ${execTime}`;
-      // as main and worker process share the same stdout we need a timeout before printing any additionnal info
+      const executedTime = `⌛️ '${lambdaController.name}' execution time: ${execTime}`;
+      // NOTE: as main and worker process share the same stdout we need a timeout before printing any additionnal info
       setTimeout(() => {
         log.YELLOW(executedTime);
       }, 400);
-    })
+    });
     try {
-      const responseData = await this.#getLambdaResponse(event, lambdaController, res, method, path, mockType);
+      const responseData = await lambdaController.invoke(event, res, method, path, mockType);
       if (!res.writableFinished) {
         this.#setResponseHead(res, responseData, mockType);
         if (!res.writableFinished) {
@@ -199,6 +242,7 @@ export class ApplicationLoadBalancer extends AlbRouter {
     } catch (error) {
       if (!res.writableFinished) {
         res.statusCode = 500;
+        res.setHeader("Content-Type", "text/html");
         res.end(html500);
       }
 
@@ -263,7 +307,7 @@ export class ApplicationLoadBalancer extends AlbRouter {
             resContent = JSON.stringify(responseData);
           }
         } else {
-          log.RED("Invalid response content")
+          log.RED("Invalid response content");
           res.setHeader("Content-Type", "text/html");
           res.statusCode = 502;
           resContent = html500;
@@ -271,14 +315,6 @@ export class ApplicationLoadBalancer extends AlbRouter {
       }
     }
     res.end(resContent);
-  }
-
-  async #getLambdaResponse(event: any, lambdaController: ILambdaMock, res: ServerResponse, method: HttpMethod, path: string, mockType: string) {
-    return await new Promise(async (resolve, reject) => {
-      const responseData = await lambdaController.invoke(event, res, method, path, mockType);
-
-      resolve(responseData);
-    });
   }
 
   #convertReqToAlbEvent(req: IncomingMessage) {
@@ -320,6 +356,11 @@ export class ApplicationLoadBalancer extends AlbRouter {
       "x-forwarded-proto": "http",
       "x-forwarded-port": this.port,
     };
+    const multiValueQueryStringParameters: any = {};
+
+    for (const k of Array.from(new Set(parsedURL.searchParams.keys()))) {
+      multiValueQueryStringParameters[k] = parsedURL.searchParams.getAll(k);
+    }
 
     parsedURL.searchParams.delete("x_mock_type");
     let event: ApgEvent = {
@@ -331,6 +372,8 @@ export class ApplicationLoadBalancer extends AlbRouter {
       // @ts-ignore
       queryStringParameters: Object.fromEntries(parsedURL.searchParams),
       isBase64Encoded: false,
+      multiValueHeaders: {},
+      multiValueQueryStringParameters,
       requestContext: {
         accountId: String(accountId),
         apiId: apiId,

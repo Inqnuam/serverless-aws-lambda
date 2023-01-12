@@ -66,7 +66,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     this.entryPoint = entryPoint;
   }
 
-  async importEventHandler() {
+  async importEventHandler(res: ServerResponse) {
     const workerData = {
       name: this.name,
       timeout: this.timeout,
@@ -92,7 +92,11 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
       this._worker.on("error", (err) => {
         log.RED("Lambda execution fatal error");
         console.error(err);
-
+        if (!res.writableFinished) {
+          res.statusCode = 502;
+          res.setHeader("Content-Type", "application/json");
+          res.end("Internal Server Error");
+        }
         reject(err);
       });
       this._worker.postMessage({ channel: "import" });
@@ -110,7 +114,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   async invoke(event: any, res: any, method: string, path: string, mockType: string) {
     if (!this._worker) {
       log.BR_BLUE(`❄️ Cold start '${this.outName}'`);
-      await this.importEventHandler();
+      await this.importEventHandler(res);
     }
 
     const eventResponse = await new Promise((resolve, reject) => {
@@ -139,11 +143,13 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
 
             break;
           case "succeed":
-            res.statusCode = data.statusCode;
-            this.#setDefaultHeaders(res, mockType, awsRequestId);
-            if (data.headers && typeof data.headers == "object") {
-              for (const [key, value] of Object.entries(data.headers)) {
-                res.setHeader(key, value);
+            if (mockType != "raw") {
+              res.statusCode = data.statusCode;
+              this.#setDefaultHeaders(res, mockType, awsRequestId);
+              if (data.headers && typeof data.headers == "object") {
+                for (const [key, value] of Object.entries(data.headers)) {
+                  res.setHeader(key, value);
+                }
               }
             }
 
@@ -152,26 +158,28 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
             break;
           case "fail":
             log.RED(data);
+            if (mockType != "raw") {
+              res.statusCode = 502;
+              res.setHeader("Content-Type", "text/html");
 
-            res.statusCode = 502;
-            res.setHeader("Content-Type", "text/html");
+              this.#setDefaultHeaders(res, mockType, awsRequestId);
+            }
 
-            this.#setDefaultHeaders(res, mockType, awsRequestId);
             res.end(html500);
-
             resolve(undefined);
             break;
           case "done":
-            res.statusCode = data.statusCode;
-            this.#setDefaultHeaders(res, mockType, awsRequestId);
-            if (data.headers && typeof data.headers == "object") {
-              for (const [key, value] of Object.entries(data.headers)) {
-                res.setHeader(key, value);
+            if (mockType != "raw") {
+              res.statusCode = data.statusCode;
+              this.#setDefaultHeaders(res, mockType, awsRequestId);
+              if (data.headers && typeof data.headers == "object") {
+                for (const [key, value] of Object.entries(data.headers)) {
+                  res.setHeader(key, value);
+                }
               }
             }
 
             res.end(data.body);
-
             resolve(undefined);
             break;
           default:

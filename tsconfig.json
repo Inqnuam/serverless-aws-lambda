@@ -1,5 +1,4 @@
 {
-// "include": ["./**/*"],
   "compilerOptions": {
     "declaration": true,
     "target": "es2018",

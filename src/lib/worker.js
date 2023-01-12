@@ -3,10 +3,6 @@ const inspector = require("inspector");
 
 const debuggerIsAttached = inspector.url() != undefined;
 
-function isPromise(promise) {
-  return !!promise && typeof promise.then === "function";
-}
-
 let eventHandler;
 let hasProxyRouter = false;
 
@@ -16,7 +12,7 @@ parentPort.on("message", async (e) => {
   if (channel == "import") {
     const handler = await import(`file://${workerData.esOutputPath}?version=${Date.now()}`);
 
-    // workaround to ES bug #2494
+    // workaround to esbuild bug #2494
     if (workerData.handlerName == "default" && typeof handler.default == "object" && typeof handler.default.default == "function") {
       eventHandler = handler.default.default;
     } else {
@@ -155,33 +151,28 @@ parentPort.on("message", async (e) => {
         awsRequestId,
       });
     };
+
+    // NOTE: this is a workaround for async versus callback lambda different behaviour
     try {
       const eventResponse = eventHandler(event, context, callback);
 
-      eventResponse.then?.((data) => {
-        clearInterval(lambdaTimeoutInterval);
-        if (!isSent) {
-          resIsSent();
-          parentPort.postMessage({
-            channel: "return",
-            data,
-            awsRequestId,
-          });
-        }
-      });
-
-      // if (!isPromise(eventResponse)) {
-      //   clearInterval(lambdaTimeoutInterval);
-      //   if (!isSent) {
-      //     parentPort.postMessage({
-      //       channel: "return",
-      //       data: eventResponse,
-      //       awsRequestId,
-      //     });
-      //   }
-      // }
-    } catch (error) {
-      context.fail(error);
+      eventResponse
+        .then?.((data) => {
+          clearInterval(lambdaTimeoutInterval);
+          if (!isSent) {
+            resIsSent();
+            parentPort.postMessage({
+              channel: "return",
+              data,
+              awsRequestId,
+            });
+          }
+        })
+        ?.catch((err) => {
+          context.fail(err);
+        });
+    } catch (err) {
+      context.fail(err);
     }
   }
 });

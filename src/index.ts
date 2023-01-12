@@ -142,8 +142,6 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
         esBuildConfig.watch = {
           onRebuild: this.#onRebuild.bind(this),
         };
-        // TODO: needs deep tests as it call rebuild multiple times
-        //  esBuildConfig.incremental = true;
       }
     }
 
@@ -350,6 +348,8 @@ class ServerlessAlbOffline extends ApplicationLoadBalancer {
         await this.load(this.#lambdas);
         log.GREEN(`${new Date().toLocaleString()}🔄✅ Rebuild `);
       }
+
+      process.send?.({ rebuild: true });
     }
   }
   #getAlbLambdas(invokeName?: string) {

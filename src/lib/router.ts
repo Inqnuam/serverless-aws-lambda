@@ -10,6 +10,13 @@ export class AlbRouter {
     this.debug = config.debug;
   }
 
+  getHandlerByName(lambdaName?: string | null) {
+    if (!lambdaName) {
+      return;
+    }
+    const name = lambdaName.split("/")[3];
+    return this.#handlers.find((x) => x.name == name || x.outName == name);
+  }
   getHandler(method: HttpMethod, path: string, kind?: string | null) {
     const hasNotWilcard = !path.includes("*");
     const hasNotBrackets = !path.includes("{") && !path.includes("}");

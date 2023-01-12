@@ -133,3 +133,26 @@ module.exports = ({ lambdas, isDeploying, isPackaging, setEnv, stage, port }) =>
   };
 };
 ```
+
+## Run serverless-aws-lambda programmatically
+
+```js
+import { Server } from "serverless-aws-lambda/server";
+
+const server = new Server({
+  stage: "dev",
+  port: 9999,
+  watch: true,
+  debug: true,
+  onRebuild: async () => {
+    await doSomething();
+  },
+});
+
+const { port } = await server.start();
+
+// do something
+// then
+// kill it 
+server.stop();
+```

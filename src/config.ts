@@ -13,3 +13,11 @@ export interface Config {
   };
   buildCallback?: (result: BuildResult) => Promise<void> | void;
 }
+
+export interface ServerConfig {
+  stage?: string;
+  watch?: boolean;
+  debug?: boolean;
+  port?: number;
+  onRebuild?: ()=> void | Promise<void>
+}

@@ -40,9 +40,41 @@ Command line values will overwrite serverless.yml custom > serverless-aws-lambda
 Offline server supports ALB and APG endponts. Appropriate `event` object is sent to the handler based on your lambda declaration. However if your declare both `alb` and `http` into a single lambda `events` you have to set `X-Mock-Type` as header in your request or in your query string with `x_mock_type` which accepts `alb` or `apg`.  
 Please note that invoking a lambda from sls CLI (`sls invoke local -f myFunction`) will not trigger the offline server. But you are still able to inject any event with `-d 'someData'` sls CLI option.
 
+You can also invoke your Lmabdas like with Function URL.  
+To inject your custom `event` object make a POST request to:
+http://localhost:3000/2015-03-31/functions/myAwsomeLambda/invocations
+
+or with `aws-sdk` Lambda Client.  
+Example:
+```js
+const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
+
+const client = new LambdaClient({ region: "PARADISE", endpoint: "http://localhost:3000" });
+const DryRun = "DryRun";
+const Event = "Event";
+const RequestResponse = "RequestResponse";
+
+const cmd = new InvokeCommand({
+  FunctionName: "myAwsomeLambda",
+  InvocationType: DryRun,
+  Payload: Buffer.from(JSON.stringify({ foo: "bar" })),
+});
+
+client
+  .send(cmd)
+  .then((data) => {
+    data.Payload = new TextDecoder("utf-8").decode(data.Payload)
+    console.log(data);
+  })
+  .catch((error) => {
+    // 🥲
+    console.log("error", error);
+  });
+
+```
 ---
 
-## Advanced configuration
+## Advanced configuration:
 
 To have more control over the plugin you can passe a config file via `configPath` variable in plugin options:
 
@@ -68,7 +100,7 @@ Exported config must be a function optionnaly taking one argument, an object whi
 }
 ```
 
-### esbuild
+### esbuild:
 
 You can customize esbuild by returning an object with `esbuild` key containing [esbuild configuration.](https://esbuild.github.io)  
 Most of esbuild options are supported. It isn't the case for example for `entryPoints` which is automatically done by serverless-aws-lambda.
@@ -92,10 +124,17 @@ module.exports = ({ lambdas, isDeploying, isPackaging, setEnv, stage, port, esbu
 };
 ```
 
-### Customize offline server and more:
+### Customize offline server and much more:
 
 [See docs.](resources/offline.md)
 
-### Use [Express](https://expressjs.com) syntax with your lambdas
+### Use [Express](https://expressjs.com) syntax with your lambdas:
 
 [See docs.](resources/express.md)
+
+--- 
+### TDD/TI:
+Inside [resources](resources) directory you can find configuration files for test runners:  
+[Vitetest (recommnded)](resources/vitetest.mjs)  
+[Jest](resources/jest.mjs)  
+With theses configurations your project bundeling and serving is delegated to serverless-aws-lambda 🎉

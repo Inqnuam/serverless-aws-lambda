@@ -1,9 +1,27 @@
 {
   "name": "serverless-aws-lambda",
-  "version": "3.0.6",
+  "version": "4.0.0",
   "description": "AWS Application Load Balancer and API Gateway - Lambda dev tool for Serverless. Allows Express synthax in handlers. Supports packaging, local invoking and offline real ALB and APG lambda server mocking.",
-  "main": "dist/index.js",
-  "typings": "dist/config.d.ts",
+  "main": "./dist/index.js",
+  "typings": "./dist/config.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/index.js"
+    },
+    "./router": {
+      "types": "./dist/lambda/router.d.ts",
+      "require": "./dist/lambda/router.cjs",
+      "import": "./dist/lambda/router.mjs"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "require": "./dist/server.cjs",
+      "import": "./dist/server.mjs"
+    },
+    "./body-parser": {
+      "require": "./plugins/body-parser.js"
+    }
+  },
   "author": "Inqnuam",
   "license": "MIT",
   "homepage": "https://github.com/inqnuam/serverless-aws-lambda",
@@ -13,7 +31,7 @@
   },
   "dependencies": {
     "archiver": "^5.3.1",
-    "esbuild": "^0.16.16",
+    "esbuild": "^0.16.17",
     "esbuild-node-externals": "^1.6.0",
     "serve-static": "^1.15.0",
     "typescript": "^4.9.4"
@@ -24,7 +42,7 @@
     "@types/serve-static": "^1.15.0"
   },
   "scripts": {
-    "dev": "DEV=true node ./build.js ",
-    "build": "node ./build.js"
+    "dev": "DEV=true node ./build.mjs ",
+    "build": "node ./build.mjs"
   }
 }
