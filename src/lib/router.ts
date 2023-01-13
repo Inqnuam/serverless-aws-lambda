@@ -14,9 +14,9 @@ export class AlbRouter {
     if (!lambdaName) {
       return;
     }
-    const components = lambdaName.split("/")
+    const components = lambdaName.split("/");
 
-    const name = components[1] == "@invoke" ? components[2] :  components[3];
+    const name = components[1] == "@invoke" ? components[2] : components[3];
     return this.#handlers.find((x) => x.name == name || x.outName == name);
   }
   getHandler(method: HttpMethod, path: string, kind?: string | null) {
@@ -66,11 +66,15 @@ export class AlbRouter {
     if (foundIndex == -1) {
       this.#handlers.push(lambdaController);
       if (this.debug) {
-        lambdaController.endpoints.forEach((x) => {
-          x.paths.forEach((p) => {
-            this.#printPath(x.methods.join(" "), p);
+        if (lambdaController.endpoints.length) {
+          lambdaController.endpoints.forEach((x) => {
+            x.paths.forEach((p) => {
+              this.#printPath(x.methods.join(" "), p);
+            });
           });
-        });
+        } else {
+          this.#printPath("ANY", `/@invoke/${lambdaController.name}`);
+        }
       }
     } else {
       this.#handlers[foundIndex] = lambdaController;

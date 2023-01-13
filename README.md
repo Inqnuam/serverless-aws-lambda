@@ -72,6 +72,10 @@ client
   });
 
 ```
+
+### Environment variable   
+Lambdas are executed in worker threads. Only variables declared in your `serverless.yml` are injected into `process.env` except `IS_LOCAL` and `NODE_ENV` 
+
 ---
 
 ## Advanced configuration:
