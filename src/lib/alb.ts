@@ -35,6 +35,11 @@ interface AlbEvent {
   queryStringParameters: { [key: string]: string };
   isBase64Encoded: boolean;
   body?: string;
+  requestContext: {
+    elb: {
+      targetGroupArn: string;
+    };
+  };
 }
 interface ApgEvent {
   version: string;
@@ -348,6 +353,11 @@ export class ApplicationLoadBalancer extends AlbRouter {
     };
 
     let event: AlbEvent = {
+      requestContext: {
+        elb: {
+          targetGroupArn: "arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/lambda-279XGJDqGZ5rsrHC2Fjr/49e9d65c45c6791a"
+        }
+      },
       headers: { ...albDefaultHeaders, ...headers },
       httpMethod: method as string,
       path: parsedURL.pathname,
