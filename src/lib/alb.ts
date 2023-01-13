@@ -123,8 +123,8 @@ export class ApplicationLoadBalancer extends AlbRouter {
     if (customCallback) {
       //SECTION: Route provided by client in config file
       customCallback(req, res);
-    } else if (parsedURL.pathname.startsWith("/2015-03-31")) {
-      //SECTION: Function URL invokation handler
+    } else if (parsedURL.pathname.startsWith("/2015-03-31") || parsedURL.pathname.startsWith("/@invoke/")) {
+      //SECTION: function invoke from aws-sdk lambda client or from /@invoke/
       const foundHandler = this.getHandlerByName(parsedURL.pathname);
 
       const invokeType = headers["x-amz-invocation-type"];
@@ -132,27 +132,46 @@ export class ApplicationLoadBalancer extends AlbRouter {
 
       if (foundHandler) {
         let event = "";
-        let body = Buffer.alloc(0);
+        let body: any = Buffer.alloc(0);
 
         req
           .on("data", (chunk) => {
             body += chunk;
           })
           .on("end", async () => {
-            event = body.toString();
+            body = body.toString();
 
+            let validBody = false;
             try {
-              const result = await foundHandler.invoke(event, res, method!, url!, "raw");
-              res.statusCode = exceptedStatusCode;
-
-              res.setHeader("Content-Type", "application/json");
-              res.setHeader("x-amzn-RequestId", Buffer.from(randomUUID()).toString("base64"));
-              res.setHeader("X-Amzn-Trace-Id", `root=1-xxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx;sampled=0`);
-
-              res.end(JSON.stringify(result));
+              body = JSON.parse(body);
+              validBody = true;
             } catch (error) {
-              res.statusCode = 502;
-              res.end(JSON.stringify(error));
+              if (body && body.length) {
+                validBody = false;
+              } else {
+                body = {};
+                validBody = true;
+              }
+            }
+            event = body;
+
+            res.setHeader("Content-Type", "application/json");
+            res.setHeader("x-amzn-RequestId", Buffer.from(randomUUID()).toString("base64"));
+            res.setHeader("X-Amzn-Trace-Id", `root=1-xxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx;sampled=0`);
+
+            if (validBody) {
+              try {
+                const result = await foundHandler.invoke(event, res, method!, url!, "raw");
+                res.statusCode = exceptedStatusCode;
+
+                res.end(JSON.stringify(result));
+              } catch (error) {
+                res.statusCode = 502;
+                res.end(JSON.stringify(error));
+              }
+            } else {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ Type: "User" }));
             }
           })
           .on("error", (err) => {

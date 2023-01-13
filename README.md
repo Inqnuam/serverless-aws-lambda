@@ -40,12 +40,12 @@ Command line values will overwrite serverless.yml custom > serverless-aws-lambda
 Offline server supports ALB and APG endponts. Appropriate `event` object is sent to the handler based on your lambda declaration. However if your declare both `alb` and `http` into a single lambda `events` you have to set `X-Mock-Type` as header in your request or in your query string with `x_mock_type` which accepts `alb` or `apg`.  
 Please note that invoking a lambda from sls CLI (`sls invoke local -f myFunction`) will not trigger the offline server. But you are still able to inject any event with `-d 'someData'` sls CLI option.
 
-You can also invoke your Lmabdas like with Function URL.  
-To inject your custom `event` object make a POST request to:
-http://localhost:3000/2015-03-31/functions/myAwsomeLambda/invocations
+You can also invoke your Lambdas with a custom `event` object by making a POST request to:  
+http://localhost:3000/@invoke/myAwsomeLambda  
+for `aws-sdk` Lambda client compatibility it is also possible to request to:  
+http://localhost:3000/2015-03-31/functions/myAwsomeLambda/invocations  
 
-or with `aws-sdk` Lambda Client.  
-Example:
+Example with with `aws-sdk` Lambda Client:  
 ```js
 const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
 
@@ -135,6 +135,6 @@ module.exports = ({ lambdas, isDeploying, isPackaging, setEnv, stage, port, esbu
 --- 
 ### TDD/TI:
 Inside [resources](resources) directory you can find configuration files for test runners:  
-[Vitetest (recommnded)](resources/vitetest.mjs)  
+[Vitest (recommnded)](resources/vitest.mjs)  
 [Jest](resources/jest.mjs)  
 With theses configurations your project bundeling and serving is delegated to serverless-aws-lambda 🎉

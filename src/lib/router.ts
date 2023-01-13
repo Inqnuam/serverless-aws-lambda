@@ -14,7 +14,9 @@ export class AlbRouter {
     if (!lambdaName) {
       return;
     }
-    const name = lambdaName.split("/")[3];
+    const components = lambdaName.split("/")
+
+    const name = components[1] == "@invoke" ? components[2] :  components[3];
     return this.#handlers.find((x) => x.name == name || x.outName == name);
   }
   getHandler(method: HttpMethod, path: string, kind?: string | null) {
