@@ -1,4 +1,4 @@
-import { RawAPIResponseContent, RawResponseContent } from "./request";
+import { RawResponseContent } from "./request";
 import { cookie, CookieOptions } from "./cookies";
 
 export type RedirectOptions = [code: number, path: string];
@@ -6,10 +6,10 @@ export type RedirectOptions = [code: number, path: string];
 export interface IResponse {
   locals: { [key: string]: any };
   callbackWaitsForEmptyEventLoop: boolean;
-  succeed: (content: RawAPIResponseContent) => void;
+  succeed: (content: any) => void;
   fail: (error: any) => void;
-  done: (error: any, content: RawAPIResponseContent) => void;
-  callback: (error: any, content: RawResponseContent) => void;
+  done: (error: any, content: any) => void;
+  callback: (error: any, content: any) => void;
   functionVersion: string;
   functionName: string;
   memoryLimitInMB: string;
@@ -36,9 +36,9 @@ export interface IResponse {
 export class _Response implements IResponse {
   locals: { [key: string]: any };
   callbackWaitsForEmptyEventLoop: boolean;
-  #succeed: (content: RawAPIResponseContent) => void;
+  #succeed: (content: any) => void;
   #fail: (error: any) => void;
-  #done: (error: any, content: RawAPIResponseContent) => void;
+  #done: (error: any, content: any) => void;
   functionVersion: string;
   functionName: string;
   memoryLimitInMB: string;
@@ -50,7 +50,7 @@ export class _Response implements IResponse {
   awsRequestId: string;
   getRemainingTimeInMillis: () => number;
   callback: (error: any, content: RawResponseContent) => void;
-  responseObject: RawAPIResponseContent = {
+  responseObject: any = {
     cookies: [],
     isBase64Encoded: false,
     statusCode: 200,
@@ -88,11 +88,11 @@ export class _Response implements IResponse {
     }
   }
 
-  succeed(content: RawAPIResponseContent) {
+  succeed(content: any) {
     this.#succeed(content);
   }
 
-  done(err: any, content: RawAPIResponseContent) {
+  done(err: any, content: any) {
     this.#done(err, content);
   }
 

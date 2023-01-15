@@ -1,6 +1,6 @@
 {
   "name": "serverless-aws-lambda",
-  "version": "4.0.4",
+  "version": "4.1.0",
   "description": "AWS Application Load Balancer and API Gateway - Lambda dev tool for Serverless. Allows Express synthax in handlers. Supports packaging, local invoking and offline real ALB and APG lambda server mocking.",
   "main": "./dist/index.js",
   "typings": "./dist/config.d.ts",
@@ -31,16 +31,31 @@
   },
   "dependencies": {
     "archiver": "^5.3.1",
-    "esbuild": "^0.16.17",
+    "esbuild": "0.16.17",
     "esbuild-node-externals": "^1.6.0",
-    "serve-static": "^1.15.0",
-    "typescript": "^4.9.4"
+    "serve-static": "^1.15.0"
   },
   "devDependencies": {
     "@types/archiver": "^5.3.1",
     "@types/node": "^14.14.31",
-    "@types/serve-static": "^1.15.0"
+    "@types/serve-static": "^1.15.0",
+    "typescript": "^4.9.4"
   },
+  "keywords": [
+    "aws",
+    "serverless",
+    "offline",
+    "local",
+    "apg",
+    "alb",
+    "lambda",
+    "sns",
+    "invoke",
+    "bundle",
+    "esbuild",
+    "nodejs",
+    "node"
+  ],
   "scripts": {
     "dev": "DEV=true node ./build.mjs ",
     "build": "node ./build.mjs"

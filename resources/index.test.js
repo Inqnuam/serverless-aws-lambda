@@ -1,9 +1,9 @@
 const axios = require("axios");
 
-const { SERVER_PORT } = process.env;
+const { LOCAL_PORT } = process.env;
 
 test("My First test", async () => {
-  const res = await axios.get(`http://localhost:${SERVER_PORT}/myAwsomeLambda`);
+  const res = await axios.get(`http://localhost:${LOCAL_PORT}/myAwsomeLambda`);
 
   expect(res.status).toBe(200);
 });

@@ -64,14 +64,8 @@ parentPort.on("message", async (e) => {
         }
         resIsSent();
 
-        let data;
-        if (typeof lambdaRes == "object" && lambdaRes.statusCode) {
-          data = JSON.stringify(lambdaRes);
-        } else {
-          const errMsg = `typeof 'succeed' content value must be an object, including at least 'statusCode' key-value.\nReceived: ${typeof lambdaRes}=>\n${lambdaRes} `;
+        let data = JSON.stringify(lambdaRes);
 
-          throw new Error(errMsg);
-        }
         parentPort.postMessage({
           channel: "succeed",
           data,
@@ -82,9 +76,8 @@ parentPort.on("message", async (e) => {
         if (isSent) {
           return;
         }
-        console.error(err);
         resIsSent();
-
+        console.error(err);
         parentPort.postMessage({ channel: "fail", data: "Request failed", awsRequestId });
       },
       done: (err, lambdaRes) => {
@@ -94,18 +87,10 @@ parentPort.on("message", async (e) => {
 
         if (err) {
           !hasProxyRouter && console.error(err);
-          throw err;
         } else {
           resIsSent();
         }
-        let data;
-        if (typeof lambdaRes == "object" && lambdaRes.statusCode) {
-          data = JSON.stringify(lambdaRes);
-        } else {
-          const errMsg = `typeof 'done' content value must be an object, including at least 'statusCode' key-value.\nReceived: ${typeof lambdaRes}=>\n${lambdaRes} `;
-
-          throw new Error(errMsg);
-        }
+        let data = JSON.stringify(lambdaRes);
 
         parentPort.postMessage({
           channel: "done",
@@ -132,18 +117,10 @@ parentPort.on("message", async (e) => {
 
       if (error) {
         !hasProxyRouter && console.error(error);
-        throw error;
       } else {
         resIsSent();
       }
-      let data;
-      if (typeof lambdaRes == "object" && lambdaRes.statusCode) {
-        data = JSON.stringify(lambdaRes);
-      } else {
-        const errMsg = `typeof 'done' content value must be an object, including at least 'statusCode' key-value.\nReceived: ${typeof lambdaRes}=>\n${lambdaRes} `;
-
-        throw new Error(errMsg);
-      }
+      let data = JSON.stringify(lambdaRes);
 
       parentPort.postMessage({
         channel: "done",

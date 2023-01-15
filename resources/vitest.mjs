@@ -26,7 +26,7 @@ vite = await createVitest("test", {
   watch,
   watchExclude: [".aws_lambda", "src", "serverless.yml", "node_modules", ".git"],
   env: {
-    SERVER_PORT: port,
+    LOCAL_PORT: port,
   },
 });
 

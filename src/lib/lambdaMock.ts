@@ -16,6 +16,7 @@ export interface ILambdaMock {
   name: string;
   outName: string;
   endpoints: LambdaEndpoint[];
+  sns: any[];
   timeout: number;
   memorySize: number;
   environment: { [key: string]: any };
@@ -25,7 +26,7 @@ export interface ILambdaMock {
   esOutputPath: string;
   entryPoint: string;
   _worker?: Worker;
-  invoke: (event: any, res: ServerResponse, method: string, path: string, mockType: string) => Promise<any>;
+  invoke: (event: any) => Promise<any>;
 }
 /**
  * @internal
@@ -42,6 +43,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   name: string;
   outName: string;
   endpoints: LambdaEndpoint[];
+  sns: any[];
   timeout: number;
   memorySize: number;
   environment: { [key: string]: any };
@@ -51,11 +53,12 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   esOutputPath: string;
   entryPoint: string;
   _worker?: Worker;
-  constructor({ name, outName, endpoints, timeout, memorySize, environment, handlerPath, handlerName, esEntryPoint, esOutputPath, entryPoint }: ILambdaMock) {
+  constructor({ name, outName, endpoints, timeout, memorySize, environment, handlerPath, handlerName, esEntryPoint, esOutputPath, entryPoint, sns }: ILambdaMock) {
     super();
     this.name = name;
     this.outName = outName;
     this.endpoints = endpoints;
+    this.sns = sns;
     this.timeout = timeout;
     this.memorySize = memorySize;
     this.environment = environment;
@@ -66,7 +69,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     this.entryPoint = entryPoint;
   }
 
-  async importEventHandler(res: ServerResponse) {
+  async importEventHandler(callback: (err: any) => void) {
     const workerData = {
       name: this.name,
       timeout: this.timeout,
@@ -92,36 +95,25 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
       this._worker.on("error", (err) => {
         log.RED("Lambda execution fatal error");
         console.error(err);
-        if (!res.writableFinished) {
-          res.statusCode = 502;
-          res.setHeader("Content-Type", "application/json");
-          res.end("Internal Server Error");
-        }
+
+        callback(err);
         reject(err);
       });
       this._worker.postMessage({ channel: "import" });
     });
   }
-  #setDefaultHeaders(res: any, mockType: string, awsRequestId: string) {
-    if (mockType == "alb") {
-      res.setHeader("Server", "awselb/2.0");
-    } else if ((mockType = "apg")) {
-      res.setHeader("Apigw-Requestid", Buffer.from(awsRequestId).toString("base64").slice(0, 16));
-    }
 
-    res.setHeader("Date", new Date().toUTCString());
-  }
-  async invoke(event: any, res: any, method: string, path: string, mockType: string) {
+  async invoke(event: any) {
     if (!this._worker) {
       log.BR_BLUE(`❄️ Cold start '${this.outName}'`);
-      await this.importEventHandler(res);
+      await this.importEventHandler((err) => {
+        throw err;
+      });
     }
 
     const eventResponse = await new Promise((resolve, reject) => {
       const awsRequestId = randomUUID();
 
-      const date = new Date();
-      log.CYAN(`${date.toLocaleDateString()} ${date.toLocaleTimeString()} requestId: ${awsRequestId} | '${this.name}' ${method} ${path}`);
       this._worker?.postMessage({
         channel: "exec",
         data: { event },
@@ -139,48 +131,12 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
         }
         switch (channel) {
           case "return":
-            resolve(data);
-
-            break;
           case "succeed":
-            if (mockType != "raw") {
-              res.statusCode = data.statusCode;
-              this.#setDefaultHeaders(res, mockType, awsRequestId);
-              if (data.headers && typeof data.headers == "object") {
-                for (const [key, value] of Object.entries(data.headers)) {
-                  res.setHeader(key, value);
-                }
-              }
-            }
-
-            res.end(data.body);
-            resolve(undefined);
+          case "done":
+            resolve(data);
             break;
           case "fail":
-            log.RED(data);
-            if (mockType != "raw") {
-              res.statusCode = 502;
-              res.setHeader("Content-Type", "text/html");
-
-              this.#setDefaultHeaders(res, mockType, awsRequestId);
-            }
-
-            res.end(html500);
-            resolve(undefined);
-            break;
-          case "done":
-            if (mockType != "raw") {
-              res.statusCode = data.statusCode;
-              this.#setDefaultHeaders(res, mockType, awsRequestId);
-              if (data.headers && typeof data.headers == "object") {
-                for (const [key, value] of Object.entries(data.headers)) {
-                  res.setHeader(key, value);
-                }
-              }
-            }
-
-            res.end(data.body);
-            resolve(undefined);
+            reject(data);
             break;
           default:
             reject(new Error("Unknown error"));

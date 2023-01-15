@@ -6,12 +6,13 @@ export interface Config {
   offline?: {
     staticPath?: string;
     port?: number;
+    onReady?: (port: number) => Promise<void> | void;
     request?: {
       filter: RegExp;
       callback: (req: IncomingMessage, res: ServerResponse) => Promise<void> | void;
     }[];
   };
-  buildCallback?: (result: BuildResult) => Promise<void> | void;
+  buildCallback?: (result: BuildResult, isRebuild: boolean) => Promise<void> | void;
 }
 
 export interface ServerConfig {
@@ -19,5 +20,5 @@ export interface ServerConfig {
   watch?: boolean;
   debug?: boolean;
   port?: number;
-  onRebuild?: ()=> void | Promise<void>
+  onRebuild?: () => Promise<void> | void;
 }

@@ -43,9 +43,10 @@ Please note that invoking a lambda from sls CLI (`sls invoke local -f myFunction
 You can also invoke your Lambdas with a custom `event` object by making a POST request to:  
 http://localhost:3000/@invoke/myAwsomeLambda  
 for `aws-sdk` Lambda client compatibility it is also possible to request to:  
-http://localhost:3000/2015-03-31/functions/myAwsomeLambda/invocations  
+http://localhost:3000/2015-03-31/functions/myAwsomeLambda/invocations
 
-Example with with `aws-sdk` Lambda Client:  
+Example with with `aws-sdk` Lambda Client:
+
 ```js
 const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
 
@@ -56,25 +57,91 @@ const RequestResponse = "RequestResponse";
 
 const cmd = new InvokeCommand({
   FunctionName: "myAwsomeLambda",
-  InvocationType: DryRun,
+  InvocationType: RequestResponse,
   Payload: Buffer.from(JSON.stringify({ foo: "bar" })),
 });
 
 client
   .send(cmd)
   .then((data) => {
-    data.Payload = new TextDecoder("utf-8").decode(data.Payload)
+    data.Payload = new TextDecoder("utf-8").decode(data.Payload);
     console.log(data);
   })
   .catch((error) => {
     // 🥲
     console.log("error", error);
   });
-
 ```
 
-### Environment variable   
-Lambdas are executed in worker threads. Only variables declared in your `serverless.yml` are injected into `process.env` except `IS_LOCAL` and `NODE_ENV` 
+### AWS SNS
+
+serverless-aws-lambda supports AWS SNS `Publish` and `PublishBatch` actions out of box to invoke linked lambdas.
+Example:
+
+```yaml
+# serverless.yml
+
+functions:
+  myAwsomeLambda:
+    handler: src/myAwsomeLambda.default
+    events:
+      - sns: MyTopic
+```
+
+```js
+// handler.js
+import { SNSClient, PublishCommand } from "@aws-sdk/client-sns";
+
+const params = process.env.IS_LOCAL
+  ? {
+      region: "eu-west-3",
+      endpoint: `http://localhost:${process.env.LOCAL_PORT}/@sns`, // <- important
+    }
+  : {};
+const client = new SNSClient(params);
+
+export default async (event) => {
+  // some app logic ...
+
+  const msg = {
+    order: {
+      id: 1234567890,
+      status: "PUBLISHED",
+    },
+  };
+
+  const cmd = new PublishCommand({
+    TopicArn: "arn:aws:sns:eu-west-3:123456789012:MyTopic",
+    Message: JSON.stringify({
+      default: JSON.stringify(msg),
+    }),
+    MessageStructure: "json",
+    MessageAttributes: {
+      Hello: {
+        DataType: "String",
+        StringValue: "world",
+      },
+    },
+  });
+
+  try {
+    await client.send(cmd);
+    return {
+      statusCode: 200,
+    };
+  } catch {
+    return {
+      statusCode: 502,
+    };
+  }
+};
+```
+
+Topic arn, filterPolicy and filterPolicyScope are supported as well!
+
+### Environment variable
+
+Lambdas are executed in worker threads. Only variables declared in your `serverless.yml` are injected into `process.env` except `IS_LOCAL`, `LOCAL_PORT` and `NODE_ENV`
 
 ---
 
@@ -136,8 +203,10 @@ module.exports = ({ lambdas, isDeploying, isPackaging, setEnv, stage, port, esbu
 
 [See docs.](resources/express.md)
 
---- 
+---
+
 ### TDD/TI:
+
 Inside [resources](resources) directory you can find configuration files for test runners:  
 [Vitest (recommnded)](resources/vitest.mjs)  
 [Jest](resources/jest.mjs)  

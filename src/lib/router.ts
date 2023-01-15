@@ -2,7 +2,7 @@ import { ILambdaMock } from "./lambdaMock";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "ANY";
 
-export class AlbRouter {
+export class Handlers {
   #handlers: ILambdaMock[] = [];
   static PORT = 0;
   debug = false;
@@ -10,6 +10,67 @@ export class AlbRouter {
     this.debug = config.debug;
   }
 
+  getHandlersByTopicArn(body: any) {
+    const arnComponent = body.TopicArn.split(":");
+
+    const name = arnComponent[arnComponent.length - 1];
+
+    const foundHandlers = this.#handlers.filter((x) => {
+      const foundEvents = x.sns.filter((foundEvent) => {
+        if (foundEvent.name !== name) {
+          return false;
+        }
+
+        if (!foundEvent) {
+          return false;
+        }
+
+        if (!foundEvent.filter) {
+          return true;
+        }
+
+        const filterKeys = Object.keys(foundEvent.filter);
+
+        let filterContext: any = {};
+
+        if (foundEvent.filterScope == "MessageAttributes") {
+          if (!body.MessageAttributes) {
+            return false;
+          }
+
+          for (const [k, v] of Object.entries(body.MessageAttributes)) {
+            filterContext[k] = (v as any).Value;
+          }
+        } else if (foundEvent.filterScope == "MessageBody") {
+          if (body.MessageStructure != "json" || !body.Message) {
+            return false;
+          }
+          try {
+            filterContext = JSON.parse(body.Message);
+          } catch (error) {}
+        }
+
+        if (!filterKeys.every((x) => x in filterContext)) {
+          return false;
+        }
+
+        let hasRequiredKey = false;
+
+        for (const k of filterKeys) {
+          if (foundEvent.filter[k].some((x: string) => x == filterContext[k])) {
+            hasRequiredKey = true;
+            break;
+          }
+        }
+
+        return hasRequiredKey;
+      });
+
+      return foundEvents.length ? true : false;
+    });
+
+    return foundHandlers;
+  }
   getHandlerByName(lambdaName?: string | null) {
     if (!lambdaName) {
       return;
@@ -82,7 +143,7 @@ export class AlbRouter {
   }
 
   #printPath(method: string, path: string) {
-    const printingString = `${method}\thttp://localhost:${AlbRouter.PORT}${path}`;
+    const printingString = `${method}\thttp://localhost:${Handlers.PORT}${path}`;
     console.log(`\x1b[36m${printingString}\x1b[0m`);
   }
 }
