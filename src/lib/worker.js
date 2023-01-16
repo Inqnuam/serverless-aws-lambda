@@ -1,4 +1,5 @@
 const { parentPort, workerData } = require("worker_threads");
+const { log } = require("./colorize");
 const inspector = require("inspector");
 
 const debuggerIsAttached = inspector.url() != undefined;
@@ -78,25 +79,26 @@ parentPort.on("message", async (e) => {
         }
         resIsSent();
         console.error(err);
+        log.RED("Request failed");
         parentPort.postMessage({ channel: "fail", data: "Request failed", awsRequestId });
       },
-      done: (err, lambdaRes) => {
+      done: function (err, lambdaRes) {
         if (isSent) {
           return;
         }
 
         if (err) {
-          !hasProxyRouter && console.error(err);
+          this.fail(err);
         } else {
           resIsSent();
-        }
-        let data = JSON.stringify(lambdaRes);
+          let data = JSON.stringify(lambdaRes);
 
-        parentPort.postMessage({
-          channel: "done",
-          data: data,
-          awsRequestId,
-        });
+          parentPort.postMessage({
+            channel: "done",
+            data: data,
+            awsRequestId,
+          });
+        }
       },
       functionVersion: "$LATEST",
       functionName: workerData.name,
@@ -116,17 +118,17 @@ parentPort.on("message", async (e) => {
       }
 
       if (error) {
-        !hasProxyRouter && console.error(error);
+        context.fail(error);
       } else {
         resIsSent();
-      }
-      let data = JSON.stringify(lambdaRes);
+        let data = JSON.stringify(lambdaRes);
 
-      parentPort.postMessage({
-        channel: "done",
-        data: data,
-        awsRequestId,
-      });
+        parentPort.postMessage({
+          channel: "done",
+          data: data,
+          awsRequestId,
+        });
+      }
     };
 
     // NOTE: this is a workaround for async versus callback lambda different behaviour
@@ -134,7 +136,7 @@ parentPort.on("message", async (e) => {
       const eventResponse = eventHandler(event, context, callback);
 
       eventResponse
-        .then?.((data) => {
+        ?.then?.((data) => {
           clearInterval(lambdaTimeoutInterval);
           if (!isSent) {
             resIsSent();

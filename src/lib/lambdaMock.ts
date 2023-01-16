@@ -3,10 +3,7 @@ import { resolve as pathResolve } from "path";
 import { HttpMethod } from "./router";
 import { randomUUID } from "crypto";
 import { EventEmitter } from "events";
-
 import { log } from "./colorize";
-import { IncomingMessage, ServerResponse } from "http";
-import { html500 } from "./htmlStatusMsg";
 const workerPath = pathResolve(__dirname, "./worker.js");
 
 /**
@@ -69,7 +66,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     this.entryPoint = entryPoint;
   }
 
-  async importEventHandler(callback: (err: any) => void) {
+  async importEventHandler() {
     const workerData = {
       name: this.name,
       timeout: this.timeout,
@@ -92,11 +89,10 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
           this.emit(awsRequestId, channel, data);
         }
       });
-      this._worker.on("error", (err) => {
+      this._worker.once("error", (err) => {
         log.RED("Lambda execution fatal error");
         console.error(err);
 
-        callback(err);
         reject(err);
       });
       this._worker.postMessage({ channel: "import" });
@@ -106,22 +102,25 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   async invoke(event: any) {
     if (!this._worker) {
       log.BR_BLUE(`❄️ Cold start '${this.outName}'`);
-      await this.importEventHandler((err) => {
-        throw err;
-      });
+      await this.importEventHandler();
     }
 
     const eventResponse = await new Promise((resolve, reject) => {
       const awsRequestId = randomUUID();
 
-      this._worker?.postMessage({
+      this._worker!.postMessage({
         channel: "exec",
         data: { event },
         awsRequestId,
       });
 
+      this._worker!.once("error", (err) => {
+        this._worker!.removeAllListeners("error");
+        reject(err);
+      });
       this.on(awsRequestId, (channel, rawData) => {
         this.removeAllListeners(awsRequestId);
+        this._worker!.removeAllListeners("error");
 
         let data;
         try {

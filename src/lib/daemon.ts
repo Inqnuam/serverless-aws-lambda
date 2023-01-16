@@ -358,7 +358,11 @@ ${content}
           });
 
           for (const l of deduplicatedHandler) {
-            await l.invoke(event);
+            try {
+              await l.invoke(event);
+            } catch (error) {
+              console.log(error);
+            }
           }
         }
 
@@ -392,7 +396,11 @@ ${content}
         });
 
         for (const l of handlers) {
-          await l.invoke({ Records: body.Records });
+          try {
+            await l.invoke({ Records: body.Records });
+          } catch (error) {
+            console.log(error);
+          }
         }
         res.statusCode = 200;
         res.setHeader("x-amzn-requestid", randomUUID());
@@ -576,8 +584,6 @@ ${content}
         res.setHeader("Content-Type", "text/html");
         res.end(html500);
       }
-
-      console.error(error);
     }
   }
 
