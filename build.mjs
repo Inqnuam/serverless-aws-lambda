@@ -19,6 +19,8 @@ const esBuildConfig = {
   target: "es2018",
   plugins: [nodeExternalsPlugin()],
   outdir: "dist",
+  format: "cjs",
+  outExtension: { ".js": ".cjs" },
 };
 
 const watch = {
@@ -30,29 +32,31 @@ const watch = {
   },
 };
 
-const buildIndex = esbuild.build.bind(null, { ...esBuildConfig, external: ["./src/lib/worker.js"], entryPoints: ["./src/index.ts"], ...watch });
-const buildWorker = esbuild.build.bind(null, { ...esBuildConfig, entryPoints: ["./src/lib/worker.js"], watch: shouldWatch });
-
-const buildRouter = esbuild.build.bind(null, {
+const buildIndex = esbuild.build.bind(null, {
   ...esBuildConfig,
-  entryPoints: ["./src/lambda/router.ts"],
-  watch: shouldWatch,
-  outdir: "dist/lambda",
-  format: "cjs",
-  outExtension: { ".js": ".cjs" },
+  external: ["./src/lib/worker.js", "@aws-sdk/client-dynamodb-streams", "@aws-sdk/client-dynamodb"],
+  entryPoints: [
+    "./src/index.ts",
+    "./src/server.ts",
+    "./src/defineConfig.ts",
+    "./src/lib/worker.js",
+    "./src/lambda/router.ts",
+    "./src/plugins/sns/index.ts",
+    "./src/plugins/ddbstream/index.ts",
+    "./src/plugins/ddbstream/worker.ts",
+  ],
+  ...watch,
 });
+
 const buildRouterESM = esbuild.build.bind(null, {
   ...esBuildConfig,
-  entryPoints: ["./src/lambda/router.ts"],
+  entryPoints: ["./src/lambda/router.ts", "./src/server.ts"],
   watch: shouldWatch,
-  outdir: "dist/lambda",
   format: "esm",
   outExtension: { ".js": ".mjs" },
 });
 
-const buildServerRunnerESM = esbuild.build.bind(null, { ...esBuildConfig, entryPoints: ["./src/server.ts"], watch: shouldWatch, format: "esm", outExtension: { ".js": ".mjs" } });
-const buildServerRunner = esbuild.build.bind(null, { ...esBuildConfig, entryPoints: ["./src/server.ts"], watch: shouldWatch, format: "cjs", outExtension: { ".js": ".cjs" } });
-const result = await Promise.all([buildIndex(), buildWorker(), buildRouter(), buildRouterESM(), buildServerRunnerESM(), buildServerRunner()]);
+const result = await Promise.all([buildIndex(), buildRouterESM()]);
 
 compileDeclarations();
 console.log(result);

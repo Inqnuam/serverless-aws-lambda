@@ -1,7 +1,20 @@
-`/src/routes/players.ts`
+`serverless-aws-lambda` provied `Router` may be used to write a Lambda with ExpressJs compatible syntax, which supports ALB and API Gateway events (including multiValueQueryStringParameters and multiValueHeaders)
 
 ```js
-import { Router } from "serverless-aws-lambda/router"; // important! note the /router
+// src/controllers/playersController.ts
+import type { RouteController } from "serverless-aws-lambda/router";
+
+export const playersController: RouteController = async (req, res, next) => {
+  // dummy app logic
+  const foundUser = await getUserById(req.query.id);
+
+  res.json(foundUser);
+};
+```
+
+```js
+// src/routes/players.ts
+import { Router } from "serverless-aws-lambda/router";
 import { auth } from "../controllers/auth";
 import { playersController } from "../controllers/playersController";
 
@@ -17,9 +30,46 @@ route.use((error, req, res, next) => {
 export default route;
 ```
 
-route.handle is similar to Express [app.METHOD("/somePath, ...")](https://expressjs.com/en/4x/api.html#app), a function (async or not) which accepts 3 arguments. request, response and next.
+`route.handle` is similar to Express [app.METHOD("/somePath, ...")](https://expressjs.com/en/4x/api.html#app), a function (async or not) which accepts 3 arguments. request, response and next.
 
-More info about request, response, and next soon ...
+It is also possible to use `route.use` instead of `route.handle`.
+
+```js
+const route = Router();
+
+route.use(auth);
+route.use(playersController);
+route.use((error, req, res, next) => {
+  console.log(error);
+  res.status(500).send("Internal Server Error");
+});
+```
+
+or by chaning:
+
+```js
+const route = Router();
+
+const errorHandler = (error, req, res, next) => {
+  console.log(error);
+  res.status(500).send("Internal Server Error");
+};
+
+route.use(auth).use(playersController).use(errorHandler);
+```
+
+or with multi argument:
+
+```js
+const route = Router();
+
+const errorHandler = (error, req, res, next) => {
+  console.log(error);
+  res.status(500).send("Internal Server Error");
+};
+
+route.use(auth, playersController, errorHandler);
+```
 
 ### Request
 
@@ -55,3 +105,7 @@ More info about request, response, and next soon ...
 | type        | function  | [doc](https://expressjs.com/en/4x/api.html#res.type)                |                             |
 
 ++ includes also `context` object from AWS Lambda and the third AWS Lambda handler argument "`callback`"
+
+### Next
+
+similar to ExpressJs next function

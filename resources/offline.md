@@ -51,7 +51,8 @@ module.exports = () => {
       request: [
         {
           // filtering all requests to http://localhost:PORT/@s3
-          filter: /^\/@s3\/._/,
+          method: "GET", // default is ANY
+          filter: /^\/@s3\/._/, // string or RegExp
           callback: async (req, res) => {
             const { url, headers } = req;
             const parsedURL = new URL(url, "http://localhost:3000");

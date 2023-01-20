@@ -101,12 +101,24 @@ export class _Response implements IResponse {
   }
   #sendResponse() {
     if (!this.responseObject.headers["Content-Type"]) {
-      this.type("text/html; charset=utf-8");
+      if (this.#req.requestContext?.elb) {
+        this.type("text/html; charset=utf-8");
+      } else {
+        this.type("application/json");
+      }
     }
     if (!this.responseObject.cookies?.length) {
       delete this.responseObject.cookies;
     }
 
+    if (this.#req.requestContext?.elb && (this.#req.multiValueHeaders || this.#req.multiValueQueryStringParameters)) {
+      this.responseObject.multiValueHeaders = {};
+
+      for (const [key, val] of Object.entries(this.responseObject.headers)) {
+        this.responseObject.multiValueHeaders[key] = [val];
+      }
+      delete this.responseObject.headers;
+    }
     this.#resolve({ ...this.responseObject });
   }
   #setBody(content?: string): this {

@@ -1,4 +1,4 @@
-import { ILambdaMock } from "./lambdaMock";
+import { ILambdaMock, LambdaEndpoint } from "./lambdaMock";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "ANY";
 
@@ -84,20 +84,35 @@ export class Handlers {
     const hasNotWilcard = !path.includes("*");
     const hasNotBrackets = !path.includes("{") && !path.includes("}");
 
+    let foundLambda: { event: LambdaEndpoint; handler: ILambdaMock } | undefined;
+
     const foundHandler = this.#handlers.find((x) => {
       return x.endpoints
         .filter((e) => (kind ? e.kind == kind.toLowerCase() : e))
         .find((w) => {
           if (w.kind == "apg") {
-            return hasNotBrackets && w.paths.includes(path) && (w.methods.includes("ANY") || w.methods.includes(method));
+            const isValidApgEvent = hasNotBrackets && w.paths.includes(path) && (w.methods.includes("ANY") || w.methods.includes(method));
+            if (isValidApgEvent) {
+              foundLambda = {
+                event: w,
+                handler: x,
+              };
+            }
+            return isValidApgEvent;
           }
-
-          return hasNotWilcard && w.paths.includes(path) && (w.methods.includes("ANY") || w.methods.includes(method));
+          const isValidAlbEvent = hasNotWilcard && w.paths.includes(path) && (w.methods.includes("ANY") || w.methods.includes(method));
+          if (isValidAlbEvent) {
+            foundLambda = {
+              event: w,
+              handler: x,
+            };
+          }
+          return isValidAlbEvent;
         });
     });
 
     if (foundHandler) {
-      return foundHandler;
+      return foundLambda;
     } else {
       // Use Regex to find lambda controller
       const foundHandler = this.#handlers.find((x) =>
@@ -113,11 +128,21 @@ export class Handlers {
 
               return (w.kind == "alb" && hasNotWilcard && AlbPattern.test(path)) || (w.kind == "apg" && hasNotBrackets && ApgPattern.test(path));
             });
-            return hasPath && (w.methods.includes("ANY") || w.methods.includes(method));
+
+            const isValidEvent = hasPath && (w.methods.includes("ANY") || w.methods.includes(method));
+            if (isValidEvent) {
+              foundLambda = {
+                event: w,
+                handler: x,
+              };
+            }
+            return isValidEvent;
           })
       );
 
-      return foundHandler;
+      if (foundHandler) {
+        return foundLambda;
+      }
     }
   }
 

@@ -1,10 +1,10 @@
 import { Worker, WorkerOptions } from "worker_threads";
 import { resolve as pathResolve } from "path";
-import { HttpMethod } from "./router";
+import { HttpMethod } from "./handlers";
 import { randomUUID } from "crypto";
 import { EventEmitter } from "events";
 import { log } from "./colorize";
-const workerPath = pathResolve(__dirname, "./worker.js");
+const workerPath = pathResolve(__dirname, "./lib/worker.cjs");
 
 /**
  * @internal
@@ -32,6 +32,8 @@ export interface LambdaEndpoint {
   kind: "alb" | "apg";
   paths: string[];
   methods: HttpMethod[];
+  async?: boolean;
+  multiValueHeaders?: boolean;
 }
 /**
  * @internal

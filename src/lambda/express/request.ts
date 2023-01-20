@@ -18,9 +18,9 @@ export interface IRequest {
   httpMethod: HttpMethod;
   queryStringParameters: { [key: string]: string };
   path: string;
-  headers: { [key: string]: any };
+  headers: any;
   isBase64Encoded: boolean;
-  query: { [key: string]: string };
+  query: any;
   body: any;
   method: HttpMethod;
   get: (headerField: string) => { [key: string]: any } | undefined;
@@ -29,41 +29,73 @@ export interface IRequest {
   secure: boolean;
 }
 
-export const _buildUniversalEvent = (awsAlbEvent: any) => {
-  let uE = { ...awsAlbEvent };
+export const _buildUniversalEvent = (event: any) => {
+  let uE = { ...event };
   try {
     delete uE.cookies;
-    uE.method = awsAlbEvent.httpMethod;
+    uE.method = event.httpMethod;
     uE.query = {};
 
-    for (const [key, value] of Object.entries(awsAlbEvent.queryStringParameters)) {
-      uE.query[key] = decodeURIComponent(value as string);
+    if (event.multiValueQueryStringParameters) {
+      for (const [key, value] of Object.entries(event.multiValueQueryStringParameters)) {
+        const parsedValue = (value as unknown as []).map(decodeURIComponent);
+
+        if (parsedValue.length == 1) {
+          uE.query[key] = parsedValue[0];
+        } else {
+          uE.query[key] = parsedValue;
+        }
+      }
+    } else if (event.queryStringParameters) {
+      for (const [key, value] of Object.entries(event.queryStringParameters)) {
+        uE.query[key] = decodeURIComponent(value as string);
+      }
     }
 
+    let headers: any = {};
+
+    if (event.multiValueHeaders) {
+      for (const [key, value] of Object.entries(event.multiValueHeaders)) {
+        const parsedValue = (value as unknown as []).map(decodeURIComponent);
+
+        if (parsedValue.length == 1) {
+          headers[key] = parsedValue[0];
+        } else {
+          headers[key] = parsedValue;
+        }
+      }
+    } else if (event.headers) {
+      for (const [key, value] of Object.entries(event.headers)) {
+        headers[key] = decodeURIComponent(value as string);
+      }
+    }
+    uE.headers = headers;
     uE.get = (headerField: string) => {
       // TODO: check for both Referrer and Referer
-      return awsAlbEvent.headers[headerField.toLowerCase()];
+      return uE.headers[headerField.toLowerCase()];
     };
     uE.path = uE.path ?? uE.rawPath;
 
     if (uE.requestContext) {
       if (!uE.method) {
-        uE.method = uE.requestContext.http?.method;
+        uE.method = uE.requestContext?.http?.method;
       }
 
       if (!uE.path) {
-        uE.path = uE.requestContext.http?.path;
+        uE.path = uE.requestContext?.http?.path;
       }
     }
-    let reqPath = decodeURIComponent(uE.path);
+    let reqPath = uE.path ? decodeURIComponent(uE.path) : undefined;
 
-    uE.params = reqPath.split("/").filter((x) => x);
-    uE.protocol = awsAlbEvent.headers["x-forwarded-proto"];
-    uE.secure = uE.protocol == "https";
-    if (!awsAlbEvent.isBase64Encoded && awsAlbEvent.headers["content-type"] == "application/json") {
-      const body = JSON.parse(awsAlbEvent.body);
+    uE.params = reqPath?.split("/").filter((x) => x);
+    uE.protocol = uE.headers["x-forwarded-proto"] ?? undefined;
+    uE.secure = uE.protocol ? uE.protocol == "https" : undefined;
+    if (!uE.isBase64Encoded && uE.headers["content-type"] == "application/json") {
+      const body = JSON.parse(event.body);
       uE.body = body;
     }
-  } catch (err) {}
+  } catch (err) {
+    console.log(err);
+  }
   return uE;
 };

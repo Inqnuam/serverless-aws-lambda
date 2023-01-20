@@ -10,7 +10,7 @@ yarn add -D serverless-aws-lambda
 npm install -D serverless-aws-lambda
 ```
 
-inside your `serverless.yml`
+a simple configuration (not required) inside your `serverless.yml`
 
 ```yaml
 service: myapp
@@ -37,7 +37,10 @@ It is also possible to passe port and watch options from the CLI with `--port` o
 
 Command line values will overwrite serverless.yml custom > serverless-aws-lambda values if they are set.
 
-Offline server supports ALB and APG endponts. Appropriate `event` object is sent to the handler based on your lambda declaration. However if your declare both `alb` and `http` into a single lambda `events` you have to set `X-Mock-Type` as header in your request or in your query string with `x_mock_type` which accepts `alb` or `apg`.  
+### Invoke
+
+Offline server supports ALB and APG endponts. Appropriate `event` object is sent to the handler based on your lambda declaration.  
+However if your declare both `alb` and `http` into a single lambda `events` you have to set `X-Mock-Type` as header in your request or in your query string with `x_mock_type` which accepts `alb` or `apg`.  
 Please note that invoking a lambda from sls CLI (`sls invoke local -f myFunction`) will not trigger the offline server. But you are still able to inject any event with `-d 'someData'` sls CLI option.
 
 You can also invoke your Lambdas with a custom `event` object by making a POST request to:  
@@ -73,9 +76,67 @@ client
   });
 ```
 
+### Environment variable
+
+Lambdas are executed in worker threads. Only variables declared in your `serverless.yml` are injected into `process.env` except `IS_LOCAL`, `LOCAL_PORT` and `NODE_ENV`
+
+---
+
+## Advanced configuration:
+
+To have more control over the plugin you can passe a config file via `configPath` variable in plugin options:
+
+```yaml
+custom:
+  serverless-aws-lambda:
+    port: 3000
+    watch: true
+    configPath: ./config.default
+```
+
+Exported config must be a function optionnaly taking one argument, an object which provides following values:
+
+```jaavscript
+{
+  lambdas: array, // your Lambda declarations + additional info
+  isDeploying: boolean, // indicates if sls is deploying
+  isPackaging: boolean, // indicates if sls is packaging
+  setEnv: function, // to dynamically set env variables to your lambdas
+  stage: string, // current serverless stag
+  port: number, // offline server port
+  esbuild: object // esbuild instance
+}
+```
+
+### esbuild:
+
+You can customize esbuild by returning an object with `esbuild` key containing [esbuild configuration.](https://esbuild.github.io)  
+Most of esbuild options are supported. It isn't the case for example for `entryPoints` which is automatically done by serverless-aws-lambda.
+
+See supported options [full list.](resources/esbuild.md)  
+simple example:
+
+```js
+const somePlugin = require("some-plugin");
+
+module.exports = ({ lambdas, isDeploying, isPackaging, setEnv, stage, port, esbuild }) => {
+  return {
+    esbuild: {
+      plugins: [somePlugin],
+      external: ["pg-hstore"],
+      loader: {
+        ".png": "file",
+      },
+    },
+  };
+};
+```
+
+`serverless-aws-lambda` provides [defineConfig](resources/defineConfig.md) with TypeScript and a plugin interface support which could improve your config declaration.
+
 ### AWS SNS
 
-serverless-aws-lambda supports AWS SNS `Publish` and `PublishBatch` actions out of box to invoke linked lambdas.
+serverless-aws-lambda supports AWS SNS `Publish` and `PublishBatch` actions with `snsPlugin` (see [defineConfig](resources/defineConfig.md)) to invoke linked lambdas.
 Example:
 
 ```yaml
@@ -138,62 +199,6 @@ export default async (event) => {
 ```
 
 Topic arn, filterPolicy and filterPolicyScope are supported as well!
-
-### Environment variable
-
-Lambdas are executed in worker threads. Only variables declared in your `serverless.yml` are injected into `process.env` except `IS_LOCAL`, `LOCAL_PORT` and `NODE_ENV`
-
----
-
-## Advanced configuration:
-
-To have more control over the plugin you can passe a config file via `configPath` variable in plugin options:
-
-```yaml
-custom:
-  serverless-aws-lambda:
-    port: 3000
-    watch: true
-    configPath: ./config.default
-```
-
-Exported config must be a function optionnaly taking one argument, an object which provides following values:
-
-```jaavscript
-{
-  lambdas: array, // your Lambda declarations + additional info
-  isDeploying: boolean, // indicates if sls is deploying
-  isPackaging: boolean, // indicates if sls is packaging
-  setEnv: function, // to dynamically set env variables to your lambdas
-  stage: string, // current serverless stag
-  port: number, // offline server port
-  esbuild: object // esbuild instance
-}
-```
-
-### esbuild:
-
-You can customize esbuild by returning an object with `esbuild` key containing [esbuild configuration.](https://esbuild.github.io)  
-Most of esbuild options are supported. It isn't the case for example for `entryPoints` which is automatically done by serverless-aws-lambda.
-
-See supported options [full list.](resources/esbuild.md)  
-simple example:
-
-```js
-const somePlugin = require("some-plugin");
-
-module.exports = ({ lambdas, isDeploying, isPackaging, setEnv, stage, port, esbuild }) => {
-  return {
-    esbuild: {
-      plugins: [somePlugin],
-      external: ["pg-hstore"],
-      loader: {
-        ".png": "file",
-      },
-    },
-  };
-};
-```
 
 ### Customize offline server and much more:
 

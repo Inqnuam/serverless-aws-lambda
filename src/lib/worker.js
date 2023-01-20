@@ -5,7 +5,6 @@ const inspector = require("inspector");
 const debuggerIsAttached = inspector.url() != undefined;
 
 let eventHandler;
-let hasProxyRouter = false;
 
 parentPort.on("message", async (e) => {
   const { channel, data, awsRequestId } = e;
@@ -22,8 +21,6 @@ parentPort.on("message", async (e) => {
     if (typeof eventHandler != "function") {
       throw new Error(`${workerData.name} > ${workerData.handlerName} is not a function`);
     }
-
-    hasProxyRouter = eventHandler._call?.__proto__?.constructor?.name == "AsyncFunction";
 
     parentPort.postMessage({ channel: "import" });
   } else if (channel == "exec") {

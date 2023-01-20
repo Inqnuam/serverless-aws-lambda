@@ -10,6 +10,9 @@ const parse = (event, spotText) => {
   }
   const result = {};
 
+  if (event.isBase64Encoded) {
+    event.body = Buffer.from(event.body, "base64").toString("utf-8");
+  }
   event.body.split(boundary).forEach((item) => {
     if (/filename=".+"/g.test(item)) {
       result[item.match(/name=".+";/g)[0].slice(6, -2)] = {

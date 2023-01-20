@@ -1,8 +1,8 @@
 import http, { Server, IncomingMessage, ServerResponse } from "http";
 import { AddressInfo } from "net";
 import { networkInterfaces } from "os";
-import { Handlers, HttpMethod } from "./router";
-import { ILambdaMock, LambdaMock } from "./lambdaMock";
+import { Handlers, HttpMethod } from "./handlers";
+import { ILambdaMock, LambdaMock, LambdaEndpoint } from "./lambdaMock";
 import { log } from "./colorize";
 import inspector from "inspector";
 import { html404, html500 } from "./htmlStatusMsg";
@@ -29,18 +29,26 @@ if (debuggerIsAttached) {
 }
 
 interface AlbEvent {
-  headers: { [key: string]: any };
-  httpMethod: string;
-  path: string;
-  queryStringParameters: { [key: string]: string };
-  isBase64Encoded: boolean;
-  body?: string;
   requestContext: {
     elb: {
       targetGroupArn: string;
     };
   };
+  multiValueHeaders?: {
+    [key: string]: string[];
+  };
+
+  multiValueQueryStringParameters?: {
+    [key: string]: string[];
+  };
+  queryStringParameters?: { [key: string]: string };
+  headers?: { [key: string]: any };
+  httpMethod: string;
+  path: string;
+  isBase64Encoded: boolean;
+  body?: string;
 }
+
 interface ApgEvent {
   version: string;
   routeKey: string;
@@ -79,7 +87,8 @@ export class Daemon extends Handlers {
   runtimeConfig = {};
   #serve: any;
   customOfflineRequests?: {
-    filter: RegExp;
+    method?: string | string[];
+    filter: RegExp | string;
     callback: (req: any, res: any) => {};
   }[];
   onReady?: (port: number) => Promise<void> | void;
@@ -121,299 +130,6 @@ export class Daemon extends Handlers {
     });
   }
 
-  #parseSnsPublishBody(encodedBody: string[]) {
-    let body: any = {};
-
-    try {
-      let MessageAttributes: any = {};
-      let entryMap: any = {};
-      for (const s of encodedBody) {
-        const [k, v] = s.split("=");
-        if (k.startsWith("MessageAttributes")) {
-          const [_, __, entryNumber, entryType, aux] = k.split(".");
-
-          if (entryType == "Name") {
-            MessageAttributes[v] = { Type: "", Value: "" };
-            entryMap[entryNumber] = v;
-          } else if (entryType == "Value") {
-            if (aux == "DataType") {
-              MessageAttributes[entryMap[entryNumber]].Type = v;
-            } else {
-              MessageAttributes[entryMap[entryNumber]].Value = v;
-            }
-          }
-        } else {
-          body[k] = v;
-        }
-      }
-      if (Object.keys(MessageAttributes).length) {
-        body.MessageAttributes = MessageAttributes;
-      }
-    } catch (error) {}
-
-    if (body.MessageStructure == "json") {
-      try {
-        const parsedPsg = JSON.parse(body.Message);
-        body.Message = parsedPsg.default;
-      } catch (error) {
-        throw new Error("Invalid body message");
-      }
-    }
-
-    return body;
-  }
-  #parseSnsPublishBatchBody(encodedBody: string[]) {
-    let body: any = {};
-    let Ids = [];
-    const uid = randomUUID();
-    const Records = [];
-    try {
-      let memberMap = new Map();
-
-      for (const s of encodedBody) {
-        const [k, v] = s.split("=");
-
-        if (k.startsWith("PublishBatchRequestEntries")) {
-          const [_, __, memberNumber, entryType, aux, entryNumber, aux2, aux3] = k.split(".");
-
-          const foundMember = memberMap.get(memberNumber);
-          if (foundMember) {
-            if (entryType == "Message" || entryType == "MessageStructure" || entryType == "Subject" || entryType == "Id") {
-              foundMember.value[entryType] = v;
-            } else if (entryType == "MessageAttributes") {
-              const attribName = foundMember.attributes[entryNumber];
-              if (attribName) {
-                foundMember.value.MessageAttributes[attribName][aux3 == "DataType" ? "Type" : "Value"] = v;
-              } else {
-                foundMember.attributes[entryNumber] = v;
-
-                if (foundMember.value.MessageAttributes) {
-                  foundMember.value.MessageAttributes[v] = {};
-                } else {
-                  foundMember.value.MessageAttributes = {
-                    [v]: {},
-                  };
-                }
-              }
-            }
-          } else {
-            let content: any = {
-              attributes: {},
-              value: {},
-            };
-            if (entryType == "Message" || entryType == "MessageStructure" || entryType == "Subject" || entryType == "Id") {
-              content.value[entryType] = v;
-            } else if (entryType == "MessageAttributes") {
-              content.attributes[entryNumber] = v;
-              content.value.MessageAttributes = {
-                [v]: {},
-              };
-            }
-
-            memberMap.set(memberNumber, content);
-          }
-        } else {
-          body[k] = v;
-        }
-      }
-
-      for (let v of memberMap.values()) {
-        let Sns: any = {
-          Type: "Notification",
-          MessageId: randomUUID(),
-          TopicArn: body.TopicArn,
-          Subject: v.value.Subject ?? null,
-          Message: v.value.Message,
-          Timestamp: new Date().toISOString(),
-          SignatureVersion: "1",
-          Signature: "fake",
-          SigningCertUrl: "fake",
-          UnsubscribeUrl: "fake",
-        };
-
-        if (Object.keys(v.value.MessageAttributes).length) {
-          Sns.MessageAttributes = v.value.MessageAttributes;
-        }
-
-        if (v.value.MessageStructure == "json") {
-          try {
-            Sns.Message = JSON.parse(v.value.Message).default;
-          } catch (error) {
-            log.RED("Can't parse SNS message json body");
-          }
-        }
-        const e = { EventSource: "aws:sns", EventVersion: "1.0", EventSubscriptionArn: `${body.TopicArn}:${uid}`, Sns };
-
-        Ids.push(v.value.Id);
-        Records.push(e);
-      }
-    } catch (error) {
-      console.log(error);
-    }
-
-    return { Records, Ids };
-  }
-  #createSnsTopicEvent(body: any, MessageId: string) {
-    return {
-      Records: [
-        {
-          EventSource: "aws:sns",
-          EventVersion: "1.0",
-          EventSubscriptionArn: body.TopicArn,
-          Sns: {
-            Type: "Notification",
-            MessageId,
-            TopicArn: body.TopicArn,
-            Subject: body.Subject ?? null,
-            Message: body.Message,
-            Timestamp: new Date().toISOString(),
-            SignatureVersion: "1",
-            Signature: "fake",
-            SigningCertUrl: "fake",
-            UnsubscribeUrl: "fake",
-            MessageAttributes: body.MessageAttributes,
-          },
-        },
-      ],
-    };
-  }
-  #genSnsPublishResponse(MessageId: string, RequestId: string) {
-    return `<PublishResponse xmlns="http://sns.amazonaws.com/doc/2010-03-31/">
-    <PublishResult>
-      <MessageId>${MessageId}</MessageId>
-    </PublishResult>
-    <ResponseMetadata>
-      <RequestId>${RequestId}</RequestId>
-    </ResponseMetadata>
-  </PublishResponse>`;
-  }
-  #genSnsPublishBatchResponse(RequestId: string, Successful: any[], Failed: any[]) {
-    let successContent = "<Successful/>";
-    let failedContent = "<Failed/>";
-
-    if (Successful.length) {
-      const content = Successful.map(
-        (x) => `<member>
-  <MessageId>${x.MessageId}</MessageId>
-  <Id>${x.Id}</Id>
-</member>`
-      ).join("\n");
-
-      successContent = `<Successful>
-${content}
-</Successful>`;
-    }
-
-    if (Failed.length) {
-      const content = Successful.map(
-        (x) => `<member>
-  <MessageId>${x.MessageId}</MessageId>
-  <Id>${x.Id}</Id>
-</member>`
-      ).join("\n");
-
-      failedContent = `<Failed>
-${content}
-</Failed>`;
-    }
-    return `<PublishBatchResponse xmlns="http://sns.amazonaws.com/doc/2010-03-31/">
-    <PublishBatchResult>
-      ${failedContent}
-      ${successContent}
-    </PublishBatchResult>
-    <ResponseMetadata>
-      <RequestId>${RequestId}</RequestId>
-    </ResponseMetadata>
-  </PublishBatchResponse>`;
-  }
-  #handleSnsInvoke(req: IncomingMessage, res: ServerResponse) {
-    let data = Buffer.alloc(0);
-    const MessageId = randomUUID();
-    const RequestId = req.headers["amz-sdk-invocation-id"] ?? randomUUID();
-
-    req.on("data", (chunk) => {
-      data += chunk;
-    });
-
-    req.on("end", async () => {
-      const encodedBody = decodeURIComponent(data.toString())?.split("&");
-
-      const Action = encodedBody.find((x) => x.startsWith("Action="))?.split("=")[1];
-
-      if (!Action) {
-        return;
-      }
-
-      if (Action == "Publish") {
-        const body = this.#parseSnsPublishBody(encodedBody);
-
-        const foundHandlers = this.getHandlersByTopicArn(body);
-        const deduplicatedHandler: ILambdaMock[] = [];
-        if (foundHandlers.length) {
-          const event = this.#createSnsTopicEvent(body, MessageId);
-          foundHandlers.forEach((l) => {
-            if (!deduplicatedHandler.find((x) => x.name == l.name)) {
-              deduplicatedHandler.push(l);
-            }
-          });
-
-          for (const l of deduplicatedHandler) {
-            try {
-              await l.invoke(event);
-            } catch (error) {
-              console.log(error);
-            }
-          }
-        }
-
-        res.statusCode = 200;
-        res.setHeader("Content-Type", "text/xml");
-
-        const snsResponse = this.#genSnsPublishResponse(MessageId, Array.isArray(RequestId) ? RequestId[0] : RequestId);
-        res.end(snsResponse);
-      } else if (Action == "PublishBatch") {
-        const body = this.#parseSnsPublishBatchBody(encodedBody);
-
-        const Successful: any = [];
-        const Failed: any = [];
-        let handlers: ILambdaMock[] = [];
-
-        body.Records.forEach((x, index) => {
-          const foundHandlers = this.getHandlersByTopicArn(x.Sns);
-
-          const Id = body.Ids[index];
-          if (foundHandlers.length) {
-            Successful.push({ Id, MessageId: x.Sns.MessageId });
-
-            foundHandlers.forEach((l) => {
-              if (!handlers.find((x) => x.name == l.name)) {
-                handlers.push(l);
-              }
-            });
-          } else {
-            Failed.push({ Id, MessageId: x.Sns.MessageId });
-          }
-        });
-
-        for (const l of handlers) {
-          try {
-            await l.invoke({ Records: body.Records });
-          } catch (error) {
-            console.log(error);
-          }
-        }
-        res.statusCode = 200;
-        res.setHeader("x-amzn-requestid", randomUUID());
-        res.setHeader("Content-Type", "text/xml");
-        const snsResponse = this.#genSnsPublishBatchResponse(Array.isArray(RequestId) ? RequestId[0] : RequestId, Successful, Failed);
-        res.end(snsResponse);
-      } else {
-        res.statusCode = 502;
-        res.setHeader("Content-Type", "text/xml");
-        res.end("Internal Server Error");
-      }
-    });
-  }
   #handleCustomInvoke(req: IncomingMessage, res: ServerResponse, parsedURL: URL) {
     const { url, method, headers } = req;
 
@@ -478,26 +194,48 @@ ${content}
       res.end("Lambda not found");
     }
   }
+  #findCustomOfflineRequest(method: string, pathname: string) {
+    if (!this.customOfflineRequests) {
+      return;
+    }
+    const foundCustomCallback = this.customOfflineRequests.find((x) => {
+      let validPath = false;
+      let validMethod = true;
+      if (typeof x.filter == "string") {
+        if (!x.filter.endsWith("/")) {
+          x.filter += "/";
+        }
+        validPath = x.filter == pathname;
+      } else if (x.filter instanceof RegExp) {
+        validPath = x.filter.test(pathname);
+      }
+      if (typeof x.method == "string" && x.method.toUpperCase() != "ANY") {
+        validMethod = x.method.toUpperCase() == method;
+      } else if (Array.isArray(x.method)) {
+        const foundAny = x.method.findIndex((x) => x.toUpperCase() == "ANY") !== -1;
+        if (!foundAny) {
+          validMethod = x.method.findIndex((x) => x.toUpperCase() == method) !== -1;
+        }
+      }
+
+      return validPath && validMethod;
+    });
+    if (foundCustomCallback) {
+      return foundCustomCallback.callback;
+    }
+  }
   #requestListener(req: IncomingMessage, res: ServerResponse) {
     const { url, method, headers } = req;
     const parsedURL = new URL(url as string, "http://localhost:3003");
 
-    let customCallback: ((req: any, res: any) => {}) | undefined;
-
-    if (this.customOfflineRequests) {
-      const foundCustomCallback = this.customOfflineRequests.find((x) => x.filter.test(parsedURL.pathname));
-
-      customCallback = foundCustomCallback?.callback;
-    }
+    const customCallback = this.#findCustomOfflineRequest(method!, parsedURL.pathname);
 
     if (customCallback) {
-      //SECTION: Route provided by client in config file
+      //SECTION: Route provided by client in config file and/or by plugins
       customCallback(req, res);
     } else if (parsedURL.pathname.startsWith("/2015-03-31") || parsedURL.pathname.startsWith("/@invoke/")) {
       //SECTION: function invoke from aws-sdk lambda client or from /@invoke/
       this.#handleCustomInvoke(req, res, parsedURL);
-    } else if (method == "POST" && parsedURL.pathname.startsWith("/@sns/")) {
-      this.#handleSnsInvoke(req, res);
     } else {
       //SECTION: ALB and APG server
       let body = Buffer.alloc(0);
@@ -516,26 +254,27 @@ ${content}
       const lambdaController = this.getHandler(method as HttpMethod, decodeURIComponent(parsedURL.pathname), requestMockType);
 
       if (lambdaController) {
-        let mockType = "alb";
+        const mockEvent = lambdaController.event;
 
-        if (lambdaController.endpoints.length == 1) {
-          mockType = lambdaController.endpoints[0].kind;
-        } else if (requestMockType) {
-          mockType = requestMockType.toLowerCase();
-        }
-        let event = mockType == "alb" ? this.#convertReqToAlbEvent(req) : this.#convertReqToApgEvent(req);
+        let event = mockEvent.kind == "alb" ? this.#convertReqToAlbEvent(req, mockEvent) : this.#convertReqToApgEvent(req, mockEvent);
 
-        if (this.debug) {
-          log.YELLOW(`${mockType.toUpperCase()} event`);
-          console.log(event);
-        }
         req
           .on("data", (chunk) => {
             body += chunk;
           })
           .on("end", async () => {
-            event.body = body.length ? body.toString() : "";
-            this.#responseHandler(res, event, lambdaController, method as HttpMethod, parsedURL.pathname, mockType);
+            const isBase64 = headers["content-type"]?.includes("multipart/form-data");
+            event.body = body.length ? body.toString() : mockEvent.kind == "alb" ? "" : undefined;
+
+            if (isBase64 && event.body) {
+              event.body = Buffer.from(event.body).toString("base64");
+            }
+
+            if (this.debug) {
+              log.YELLOW(`${mockEvent.kind.toUpperCase()} event`);
+              console.log(event);
+            }
+            this.#responseHandler(res, event, lambdaController.handler, method as HttpMethod, parsedURL.pathname, mockEvent);
           })
           .on("error", (err) => {
             console.error(err.stack);
@@ -554,7 +293,7 @@ ${content}
     }
   }
 
-  async #responseHandler(res: ServerResponse, event: any, lambdaController: ILambdaMock, method: HttpMethod, path: string, mockType: string) {
+  async #responseHandler(res: ServerResponse, event: any, lambdaController: ILambdaMock, method: HttpMethod, path: string, mockEvent: LambdaEndpoint) {
     const hrTimeStart = process.hrtime();
 
     res.on("close", () => {
@@ -570,12 +309,16 @@ ${content}
       const date = new Date();
       const awsRequestId = randomUUID();
       log.CYAN(`${date.toLocaleDateString()} ${date.toLocaleTimeString()} requestId: ${awsRequestId} | '${lambdaController.name}' ${method} ${path}`);
-      const responseData = await lambdaController.invoke(event);
 
+      if (mockEvent.async) {
+        res.statusCode = 200;
+        res.end();
+      }
+      const responseData = await lambdaController.invoke(event);
       if (!res.writableFinished) {
-        this.#setResponseHead(res, responseData, mockType);
+        this.#setResponseHead(res, responseData, mockEvent);
         if (!res.writableFinished) {
-          this.#writeResponseBody(res, responseData, mockType);
+          this.#writeResponseBody(res, responseData, mockEvent.kind);
         }
       }
     } catch (error) {
@@ -587,48 +330,96 @@ ${content}
     }
   }
 
-  #setResponseHead(res: ServerResponse, responseData: any, mockType: string) {
-    if (mockType == "alb") {
+  #setResponseHead(res: ServerResponse, responseData: any, mockEvent: LambdaEndpoint) {
+    if (mockEvent.kind == "alb") {
       res.setHeader("Server", "awselb/2.0");
-    } else if (mockType == "apg") {
+      const { statusDescription } = responseData;
+      if (typeof responseData.statusCode == "number" && typeof statusDescription == "string") {
+        const descComponents = statusDescription.split(" ");
+        if (isNaN(descComponents[0] as unknown as number)) {
+          log.RED("statusDescription must start with a statusCode number followed by a space + status description text");
+          log.YELLOW("example: '200 Found'");
+        } else {
+          const desc = descComponents.slice(1).join(" ");
+          if (desc.length) {
+            res.statusMessage = desc;
+          }
+        }
+      }
+    } else if (mockEvent.kind == "apg") {
       res.setHeader("Apigw-Requestid", Buffer.from(randomUUID()).toString("base64").slice(0, 16));
     }
 
     res.setHeader("Date", new Date().toUTCString());
 
     if (responseData) {
-      res.statusMessage = responseData.statusMessage ?? "";
-
-      if (typeof responseData.headers == "object" && !Array.isArray(responseData.headers)) {
-        const headersKeys = Object.keys(responseData.headers).filter((key) => key !== "Server" && key !== "Apigw-Requestid" && key !== "Date");
-        headersKeys.forEach((key) => {
-          res.setHeader(key, responseData.headers[key]);
-        });
+      if (mockEvent.kind == "alb") {
+        if (mockEvent.multiValueHeaders) {
+          if (responseData.multiValueHeaders) {
+            const headersKeys = Object.keys(responseData.multiValueHeaders).filter((key) => key !== "Server" && key !== "Apigw-Requestid" && key !== "Date");
+            headersKeys.forEach((key) => {
+              if (Array.isArray(responseData.multiValueHeaders[key])) {
+                res.setHeader(key, responseData.multiValueHeaders[key]);
+              } else {
+                log.RED("multiValueHeaders values must be an array");
+                log.YELLOW("example:");
+                log.GREEN("'Content-Type': ['application/json']");
+              }
+            });
+          } else if (responseData.headers) {
+            log.RED("An ALB Lambda with 'multiValueHeaders enabled' must return 'multiValueHeaders' instead of 'headers'");
+            res.statusCode = 502;
+            res.setHeader("Content-Type", "text/html; charset=utf-8");
+            res.end(html500);
+          }
+        } else {
+          if (typeof responseData.headers == "object" && !Array.isArray(responseData.headers)) {
+            const headersKeys = Object.keys(responseData.headers).filter((key) => key !== "Server" && key !== "Apigw-Requestid" && key !== "Date");
+            headersKeys.forEach((key) => {
+              res.setHeader(key, responseData.headers[key]);
+            });
+          }
+        }
+      } else {
+        if (typeof responseData.headers == "object" && !Array.isArray(responseData.headers)) {
+          const headersKeys = Object.keys(responseData.headers).filter((key) => key !== "Server" && key !== "Apigw-Requestid" && key !== "Date");
+          headersKeys.forEach((key) => {
+            res.setHeader(key, responseData.headers[key]);
+          });
+        }
       }
 
-      if (responseData) {
-        if (!responseData.statusCode) {
-          if (mockType == "alb") {
-            console.log("Invalid 'statusCode'.\nALB Lambdas must return a valid 'statusCode' value");
-            res.statusCode = 502;
-            res.setHeader("Content-Type", "text/html");
-            res.end(html500);
+      if (!responseData.statusCode) {
+        if (mockEvent.kind == "alb") {
+          log.RED("Invalid 'statusCode'.\nALB Lambdas must return a valid 'statusCode' number");
+          res.statusCode = 502;
+          res.setHeader("Content-Type", "text/html");
+          res.end(html500);
+        } else {
+          res.statusCode = 200;
+        }
+      } else {
+        if (mockEvent.kind == "alb") {
+          if (typeof responseData.statusCode == "number") {
+            res.statusCode = responseData.statusCode;
           } else {
-            res.statusCode = 200;
+            log.RED("Invalid 'statusCode'.\nALB Lambdas must return a valid 'statusCode' number");
+            res.statusCode = 502;
           }
         } else {
           res.statusCode = responseData.statusCode;
-          if (responseData.cookies?.length) {
-            res.setHeader("Set-Cookie", responseData.cookies);
-          }
+        }
+
+        if (responseData.cookies?.length) {
+          res.setHeader("Set-Cookie", responseData.cookies);
         }
       }
     } else {
-      res.statusCode = mockType == "alb" ? 502 : 200;
+      res.statusCode = mockEvent.kind == "alb" ? 502 : 200;
     }
   }
 
-  #writeResponseBody(res: ServerResponse, responseData: any, mockType: string) {
+  #writeResponseBody(res: ServerResponse, responseData: any, mockEvent: string) {
     let resContent = "";
     if (responseData) {
       if (typeof responseData.body == "string") {
@@ -636,7 +427,7 @@ ${content}
       } else if (responseData.body) {
         console.log("response 'body' must be a string. Receievd", typeof responseData.body);
       } else {
-        if (mockType == "apg") {
+        if (mockEvent == "apg") {
           res.setHeader("Content-Type", "application/json");
           if (typeof responseData == "string") {
             resContent = responseData;
@@ -654,67 +445,102 @@ ${content}
     res.end(resContent);
   }
 
-  #convertReqToAlbEvent(req: IncomingMessage) {
-    const { method, headers, url } = req;
+  #getMultiValueHeaders(rawHeaders: string[]) {
+    let multiValueHeaders: any = {};
+    const multiKeys = rawHeaders.filter((x, i) => i % 2 == 0).map((x) => x.toLowerCase());
+    const multiValues = rawHeaders.filter((x, i) => i % 2 !== 0);
+
+    multiKeys.forEach((x, i) => {
+      if (x == "x-mock-type") {
+        return;
+      }
+      if (multiValueHeaders[x]) {
+        multiValueHeaders[x].push(multiValues[i]);
+      } else {
+        multiValueHeaders[x] = [multiValues[i]];
+      }
+    });
+
+    return multiValueHeaders;
+  }
+  #convertReqToAlbEvent(req: IncomingMessage, mockEvent: LambdaEndpoint) {
+    const { method, headers, url, rawHeaders } = req;
 
     const parsedURL = new URL(url as string, "http://localhost:3003");
 
-    const albDefaultHeaders = {
-      "x-forwarded-for": req.socket.remoteAddress,
-      "x-forwarded-proto": "http",
-      "x-forwarded-port": this.port,
-    };
-
-    let event: AlbEvent = {
+    let event: Partial<AlbEvent> = {
       requestContext: {
         elb: {
           targetGroupArn: "arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/lambda-279XGJDqGZ5rsrHC2Fjr/49e9d65c45c6791a",
         },
       },
-      headers: { ...albDefaultHeaders, ...headers },
       httpMethod: method as string,
       path: parsedURL.pathname,
-      queryStringParameters: this.#paramsToAlbObject(url as string),
       isBase64Encoded: false,
     };
 
-    if (event.headers["x-mock-type"]) {
-      delete event.headers["x-mock-type"];
-    }
-    if (headers["content-type"]?.includes("multipart/form-data")) {
-      event.isBase64Encoded = true;
+    if (mockEvent.multiValueHeaders) {
+      event.multiValueHeaders = {
+        "x-forwarded-for": [String(req.socket.remoteAddress)],
+        "x-forwarded-proto": ["http"],
+        "x-forwarded-port": [String(this.port)],
+        ...this.#getMultiValueHeaders(rawHeaders),
+      };
+
+      event.multiValueQueryStringParameters = {};
+
+      const parsedURL = new URL(url as string, "http://localhost:3003");
+      parsedURL.searchParams.delete("x_mock_type");
+
+      for (const k of Array.from(new Set(parsedURL.searchParams.keys()))) {
+        event.multiValueQueryStringParameters[k] = parsedURL.searchParams.getAll(k).map(encodeURI);
+      }
+    } else {
+      event.headers = {
+        "x-forwarded-for": req.socket.remoteAddress,
+        "x-forwarded-proto": "http",
+        "x-forwarded-port": this.port,
+        ...headers,
+      };
+      event.queryStringParameters = this.#paramsToAlbObject(url as string);
+
+      if (event.headers["x-mock-type"]) {
+        delete event.headers["x-mock-type"];
+      }
+      if (headers["content-type"]?.includes("multipart/form-data")) {
+        event.isBase64Encoded = true;
+      }
     }
 
     return event;
   }
 
-  #convertReqToApgEvent(req: IncomingMessage) {
-    const { method, headers, url } = req;
+  #convertReqToApgEvent(req: IncomingMessage, mockEvent: LambdaEndpoint) {
+    const { method, headers, url, rawHeaders } = req;
 
     const parsedURL = new URL(url as string, "http://localhost:3003");
-
-    const albDefaultHeaders = {
-      "x-forwarded-for": req.socket.remoteAddress,
-      "x-forwarded-proto": "http",
-      "x-forwarded-port": this.port,
-    };
+    parsedURL.searchParams.delete("x_mock_type");
     const multiValueQueryStringParameters: any = {};
 
     for (const k of Array.from(new Set(parsedURL.searchParams.keys()))) {
       multiValueQueryStringParameters[k] = parsedURL.searchParams.getAll(k);
     }
 
-    parsedURL.searchParams.delete("x_mock_type");
     let event: ApgEvent = {
       version: "2.0",
       routeKey: `${method} ${parsedURL.pathname}`,
       rawPath: parsedURL.pathname,
       rawQueryString: parsedURL.search ? parsedURL.search.slice(1) : "",
-      headers: { ...albDefaultHeaders, ...headers },
+      headers: { "x-forwarded-for": req.socket.remoteAddress, "x-forwarded-proto": "http", "x-forwarded-port": this.port, ...headers },
       // @ts-ignore
       queryStringParameters: Object.fromEntries(parsedURL.searchParams),
       isBase64Encoded: false,
-      multiValueHeaders: {},
+      multiValueHeaders: {
+        "x-forwarded-for": [String(req.socket.remoteAddress)],
+        "x-forwarded-proto": ["http"],
+        "x-forwarded-port": [String(this.port)],
+        ...this.#getMultiValueHeaders(rawHeaders),
+      },
       multiValueQueryStringParameters,
       requestContext: {
         accountId: String(accountId),

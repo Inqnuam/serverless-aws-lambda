@@ -7,7 +7,7 @@ import esbuild from "esbuild";
 import type { BuildOptions } from "esbuild";
 import { nodeExternalsPlugin } from "esbuild-node-externals";
 import { LambdaEndpoint } from "./lib/lambdaMock";
-import { Handlers, HttpMethod } from "./lib/router";
+import { Handlers, HttpMethod } from "./lib/handlers";
 import { awsSdkv3ExternalPlugin } from "./lib/awsSdkv3ExternalPlugin";
 
 const cwd = process.cwd();
@@ -288,7 +288,7 @@ class ServerlessAwsLambda extends Daemon {
     const { outputs } = result.metafile!;
     this.#setLambdaEsOutputPaths(outputs);
     if (this.customBuildCallback) {
-      await this.customBuildCallback(result);
+      await this.customBuildCallback(result, false);
     }
 
     if (invokeName) {
@@ -494,6 +494,7 @@ class ServerlessAwsLambda extends Daemon {
     }
   }
   #parseSlsEventDefinition(event: any): LambdaEndpoint | null {
+    // console.log(event);
     const supportedEvents = ["http", "httpApi", "alb"];
 
     const keys = Object.keys(event);
@@ -512,14 +513,20 @@ class ServerlessAwsLambda extends Daemon {
       if (!event.alb.conditions || !event.alb.conditions.path?.length) {
         return null;
       }
-
       parsendEvent.kind = "alb";
       parsendEvent.paths = event.alb.conditions.path;
 
       if (event.alb.conditions.method?.length) {
         parsendEvent.methods = event.alb.conditions.method.map((x: string) => x.toUpperCase());
       }
+      if (event.alb.multiValueHeaders) {
+        parsendEvent.multiValueHeaders = true;
+      }
     } else if (event.http || event.httpApi) {
+      if (event.http && event.http.async) {
+        parsendEvent.async = true;
+      }
+
       parsendEvent.kind = "apg";
       const httpEvent = event.http ?? event.httpApi;
 
