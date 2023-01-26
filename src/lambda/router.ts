@@ -62,6 +62,19 @@ class Route extends Function {
       resEmitter.emit("end");
     };
 
+    const handleError = async (error: any, req: any, res: any, next: any) => {
+      try {
+        controllers.shift();
+        const foundErrorHandler = getMiddleware(controllers, error);
+        if (foundErrorHandler) {
+          await foundErrorHandler(error, req, res, next);
+        } else {
+          resolve({ statusCode: 500, body: "Internal Server Error" });
+        }
+      } catch (err) {
+        handleError(err, req, res, next);
+      }
+    };
     let res = new _Response({ context, resolve, req, locals: {}, callback });
     let err;
     const next = async (error?: any) => {
@@ -74,10 +87,14 @@ class Route extends Function {
       const foundHandler = getMiddleware(controllers, err);
 
       if (foundHandler) {
-        if (foundHandler.length == 4) {
-          await (foundHandler as RouteMiddleware)(err, req, res, next);
-        } else {
-          await (foundHandler as RouteController)(req, res, next);
+        try {
+          if (foundHandler.length == 4) {
+            await (foundHandler as RouteMiddleware)(err, req, res, next);
+          } else {
+            await (foundHandler as RouteController)(req, res, next);
+          }
+        } catch (error) {
+          await handleError(error, res, res, next);
         }
 
         if (!response) {
@@ -95,7 +112,12 @@ class Route extends Function {
       resEmitter.once("end", resolve);
       const foundHandler = getMiddleware(controllers);
       if (foundHandler) {
-        await (foundHandler as RouteController)(req, res, next);
+        try {
+          await (foundHandler as RouteController)(req, res, next);
+        } catch (error) {
+          await handleError(error, res, res, next);
+          resolve(undefined);
+        }
       } else {
         resolve(undefined);
       }
