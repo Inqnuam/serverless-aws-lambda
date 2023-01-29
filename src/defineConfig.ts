@@ -73,16 +73,6 @@ function defineConfig(options: Options) {
     this: ClientConfigParams,
     { stop, lambdas, isDeploying, isPackaging, setEnv, stage, port, esbuild, serverless }: ClientConfigParams
   ): Promise<Omit<Config, "config" | "options">> {
-    this.stop = stop;
-    this.lambdas = lambdas;
-    this.isDeploying = isDeploying;
-    this.isPackaging = isPackaging;
-    this.setEnv = setEnv;
-    this.stage = stage;
-    this.port = port;
-    this.esbuild = esbuild;
-    this.serverless = serverless;
-
     let config: Config = {
       esbuild: options.esbuild ?? {},
       offline: {
@@ -91,14 +81,25 @@ function defineConfig(options: Options) {
       },
     };
 
-    this.config = config;
-    this.options = options;
+    const self = {
+      stop,
+      lambdas,
+      isDeploying,
+      isPackaging,
+      setEnv,
+      stage,
+      port,
+      esbuild,
+      serverless,
+      options,
+      config,
+    };
     if (options.plugins) {
       config.offline!.onReady = async (port) => {
         for (const plugin of options.plugins!) {
           if (plugin.offline?.onReady) {
             try {
-              await plugin.offline.onReady!.call(this, port);
+              await plugin.offline.onReady!.call(self, port);
             } catch (error) {
               log.RED(plugin.name);
               console.error(error);
@@ -111,7 +112,7 @@ function defineConfig(options: Options) {
         for (const plugin of options.plugins!) {
           if (plugin.buildCallback) {
             try {
-              await plugin.buildCallback.call(this, result, isRebuild);
+              await plugin.buildCallback.call(self, result, isRebuild);
             } catch (error) {
               log.RED(plugin.name);
               console.error(error);
@@ -128,7 +129,7 @@ function defineConfig(options: Options) {
       }, []);
       if (pluginsRequests?.length) {
         config.offline!.request = pluginsRequests.map((x) => {
-          x.callback = x.callback.bind(this);
+          x.callback = x.callback.bind(self);
 
           return x;
         });
@@ -136,7 +137,7 @@ function defineConfig(options: Options) {
       for (const plugin of options.plugins!) {
         if (plugin.onInit) {
           try {
-            await plugin.onInit.call(this);
+            await plugin.onInit.call(self);
           } catch (error) {
             log.RED(plugin.name);
             console.error(error);
