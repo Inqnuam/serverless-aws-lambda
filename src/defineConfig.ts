@@ -4,6 +4,7 @@ import type { BuildResult } from "esbuild";
 import type { ILambdaMock } from "./lib/lambdaMock";
 import type { HttpMethod } from "./lib/handlers";
 import type { IncomingMessage, ServerResponse } from "http";
+import type Serverless from "serverless";
 import { log } from "./lib/colorize";
 
 export interface ILambda {
@@ -14,6 +15,7 @@ export interface ILambda {
 }
 
 export interface ClientConfigParams {
+  stop: (err?: any) => void;
   lambdas: (ILambda & Omit<ILambdaMock, "_worker">)[];
   isDeploying: boolean;
   isPackaging: boolean;
@@ -23,6 +25,7 @@ export interface ClientConfigParams {
   esbuild: PluginBuild["esbuild"];
   config: Config;
   options: Options;
+  serverless: Serverless;
 }
 
 export interface SlsAwsLambdaPlugin {
@@ -68,8 +71,9 @@ function defineConfig(options: Options) {
   }
   return async function config(
     this: ClientConfigParams,
-    { lambdas, isDeploying, isPackaging, setEnv, stage, port, esbuild }: ClientConfigParams
+    { stop, lambdas, isDeploying, isPackaging, setEnv, stage, port, esbuild, serverless }: ClientConfigParams
   ): Promise<Omit<Config, "config" | "options">> {
+    this.stop = stop;
     this.lambdas = lambdas;
     this.isDeploying = isDeploying;
     this.isPackaging = isPackaging;
@@ -77,6 +81,7 @@ function defineConfig(options: Options) {
     this.stage = stage;
     this.port = port;
     this.esbuild = esbuild;
+    this.serverless = serverless;
 
     let config: Config = {
       esbuild: options.esbuild ?? {},

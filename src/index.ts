@@ -5,6 +5,7 @@ import { log } from "./lib/colorize";
 import { zip } from "./lib/zip";
 import esbuild from "esbuild";
 import type { BuildOptions } from "esbuild";
+import type Serverless from "serverless";
 import { nodeExternalsPlugin } from "esbuild-node-externals";
 import { LambdaEndpoint } from "./lib/lambdaMock";
 import { Handlers, HttpMethod } from "./lib/handlers";
@@ -23,13 +24,14 @@ class ServerlessAwsLambda extends Daemon {
   watch = true;
   isDeploying = false;
   isPackaging = false;
-  serverless: any;
+  serverless: Serverless;
   options: any;
   pluginConfig: any;
   tsconfig: any;
   commands: any;
   hooks: any;
   esBuildConfig: any;
+  buildContext: any;
   customEsBuildConfig: any;
   customBuildCallback?: Function;
   runtimeConfig: any;
@@ -41,8 +43,11 @@ class ServerlessAwsLambda extends Daemon {
     this.#lambdas = [];
     this.serverless = serverless;
     this.options = options;
+    // @ts-ignore
     this.isPackaging = this.serverless.processedInput.commands.includes("package");
+    // @ts-ignore
     this.isDeploying = this.serverless.processedInput.commands.includes("deploy");
+    // @ts-ignore
     this.nodeVersion = this.serverless.service.provider.runtime?.replace(/[^0-9]/g, "");
 
     if (this.isDeploying || this.isPackaging) {
@@ -110,6 +115,7 @@ class ServerlessAwsLambda extends Daemon {
 
   async init(isPackaging: boolean, invokeName?: string) {
     this.#setRuntimeEnvs();
+
     this.#lambdas = this.#getAlbLambdas(invokeName);
 
     await this.#setCustomEsBuildConfig();
@@ -285,6 +291,15 @@ class ServerlessAwsLambda extends Daemon {
   }
   async buildAndWatch(isPackaging: boolean, invokeName?: string) {
     const result = await esbuild.build(this.esBuildConfig);
+
+    this.buildContext = {
+      stop: result.stop,
+    };
+
+    if (result.stop) {
+      this.buildContext.watch = true;
+    }
+
     const { outputs } = result.metafile!;
     this.#setLambdaEsOutputPaths(outputs);
     if (this.customBuildCallback) {
@@ -296,7 +311,7 @@ class ServerlessAwsLambda extends Daemon {
       const foundLambda = this.#lambdas.find((x) => x.name == invokeName);
 
       if (foundLambda) {
-        slsDeclaration.handler = foundLambda.esOutputPath.replace(`${cwd}/`, "").replace(".js", `.${foundLambda.handlerName}`);
+        (slsDeclaration as Serverless.FunctionDefinitionHandler).handler = foundLambda.esOutputPath.replace(`${cwd}/`, "").replace(".js", `.${foundLambda.handlerName}`);
       }
     } else if (this.isDeploying || this.isPackaging) {
       let packageLambdas: ILambdaMock[] = this.#lambdas;
@@ -310,11 +325,12 @@ class ServerlessAwsLambda extends Daemon {
       }
       // TODO: convert to promise all
       for (const l of packageLambdas) {
-        const slsDeclaration = this.serverless.service.getFunction(l.name);
+        const slsDeclaration = this.serverless.service.getFunction(l.name) as Serverless.FunctionDefinitionHandler;
 
         const zipableBundledFilePath = l.esOutputPath.slice(0, -3);
         const zipOutputPath = await zip(zipableBundledFilePath, l.outName);
 
+        // @ts-ignore
         slsDeclaration.package = { ...slsDeclaration.package, disable: true, artifact: zipOutputPath };
         slsDeclaration.handler = path.basename(l.handlerPath);
       }
@@ -364,15 +380,15 @@ class ServerlessAwsLambda extends Daemon {
     const albs = functionsNames.reduce((accum: any[], funcName: string) => {
       const lambda = funcs[funcName];
 
-      const handlerPath = lambda.handler;
+      const handlerPath = (lambda as Serverless.FunctionDefinitionHandler).handler;
       const lastPointIndex = handlerPath.lastIndexOf(".");
       const handlerName = handlerPath.slice(lastPointIndex + 1);
       const esEntryPoint = path.join(cwd, handlerPath.slice(0, lastPointIndex));
       const region = this.runtimeConfig.environment.AWS_REGION ?? this.runtimeConfig.environment.REGION;
 
-      const slsDeclaration = this.serverless.service.getFunction(funcName);
+      const slsDeclaration: any = this.serverless.service.getFunction(funcName);
 
-      let lambdaDef = {
+      let lambdaDef: any = {
         name: funcName,
         outName: slsDeclaration.name,
         handlerPath,
@@ -382,6 +398,7 @@ class ServerlessAwsLambda extends Daemon {
         timeout: lambda.timeout ?? this.runtimeConfig.timeout ?? DEFAULT_LAMBDA_TIMEOUT,
         endpoints: [],
         sns: [],
+        ddbstream: [],
         virtualEnvs: { ...this.defaultVirtualEnvs, ...(slsDeclaration.virtualEnvs ?? {}) },
         environment: {
           ...this.runtimeConfig.environment,
@@ -494,7 +511,6 @@ class ServerlessAwsLambda extends Daemon {
     }
   }
   #parseSlsEventDefinition(event: any): LambdaEndpoint | null {
-    // console.log(event);
     const supportedEvents = ["http", "httpApi", "alb"];
 
     const keys = Object.keys(event);
@@ -578,7 +594,7 @@ class ServerlessAwsLambda extends Daemon {
   }
 
   #setRuntimeEnvs() {
-    const { environment, memorySize, timeout } = this.serverless.service.provider;
+    const { environment, memorySize, timeout } = this.serverless.service.provider as any;
 
     this.runtimeConfig.memorySize = memorySize;
     this.runtimeConfig.timeout = timeout;
@@ -619,6 +635,13 @@ class ServerlessAwsLambda extends Daemon {
     }
 
     const customConfigArgs = {
+      stop: (cb: (err?: any) => void) => {
+        this.stop(cb);
+        if (this.buildContext.stop) {
+          this.buildContext.stop();
+        }
+      },
+
       lambdas: this.#lambdas,
       isDeploying: this.isDeploying,
       isPackaging: this.isPackaging,
@@ -628,6 +651,8 @@ class ServerlessAwsLambda extends Daemon {
       port: ServerlessAwsLambda.PORT,
       stage: this.options.stage ?? this.serverless.service.provider.stage ?? "dev",
       esbuild: esbuild,
+      serverless: this.serverless,
+      // watch: this.buildContext.watch,
     };
     let exportedObject: any = {};
 

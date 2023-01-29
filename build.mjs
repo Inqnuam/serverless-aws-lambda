@@ -34,17 +34,8 @@ const watch = {
 
 const buildIndex = esbuild.build.bind(null, {
   ...esBuildConfig,
-  external: ["./src/lib/worker.js", "@aws-sdk/client-dynamodb-streams", "@aws-sdk/client-dynamodb"],
-  entryPoints: [
-    "./src/index.ts",
-    "./src/server.ts",
-    "./src/defineConfig.ts",
-    "./src/lib/worker.js",
-    "./src/lambda/router.ts",
-    "./src/plugins/sns/index.ts",
-    "./src/plugins/ddbstream/index.ts",
-    "./src/plugins/ddbstream/worker.ts",
-  ],
+  external: ["./src/lib/worker.js"],
+  entryPoints: ["./src/index.ts", "./src/server.ts", "./src/defineConfig.ts", "./src/lib/worker.js", "./src/lambda/router.ts", "./src/plugins/sns/index.ts"],
   ...watch,
 });
 

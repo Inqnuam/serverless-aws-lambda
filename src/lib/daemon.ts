@@ -92,6 +92,9 @@ export class Daemon extends Handlers {
     callback: (req: any, res: any) => {};
   }[];
   onReady?: (port: number) => Promise<void> | void;
+  stop(cb: (err?: any) => void) {
+    this.#server.close(cb);
+  }
   constructor(config: IDaemonConfig = { debug: false }) {
     super(config);
     this.#server = http.createServer(this.#requestListener.bind(this));

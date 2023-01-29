@@ -6,10 +6,10 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "emitDeclarationOnly": true,
-    "moduleResolution": "Node",
+    "moduleResolution": "nodenext",
     "removeComments": true,
     "strict": true,
     "declarationDir": "./dist/"
   },
-  "exclude": ["./dist/", "./src/plugins/ddbstream"]
+  "exclude": ["./dist/"]
 }
