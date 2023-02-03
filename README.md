@@ -214,5 +214,5 @@ Topic arn, filterPolicy and filterPolicyScope are supported as well!
 
 Inside [resources](resources) directory you can find configuration files for test runners:  
 [Vitest (recommnded)](resources/vitest.mjs)  
-[Jest](resources/jest.mjs)  
+[Jest](https://github.com/Inqnuam/serverless-aws-lambda-jest)  
 With theses configurations your project bundeling and serving is delegated to serverless-aws-lambda 🎉
