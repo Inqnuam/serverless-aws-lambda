@@ -27,6 +27,7 @@ export interface IRequest {
   params: string[];
   protocol: string;
   secure: boolean;
+  files?: any[];
 }
 
 export const _buildUniversalEvent = (event: any) => {

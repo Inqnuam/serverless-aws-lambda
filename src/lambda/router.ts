@@ -2,6 +2,7 @@ import EventEmitter from "events";
 import { _buildUniversalEvent, IRequest, RawResponseContent } from "./express/request";
 import { _Response, IResponse } from "./express/response";
 
+export { IRequest, IResponse };
 export type NextFunction = (error?: any) => void;
 export type RouteMiddleware = (error: any, req: IRequest, res: IResponse, next: NextFunction) => Promise<void> | void;
 export type RouteController = (req: IRequest, res: IResponse, next: NextFunction) => Promise<void> | void;

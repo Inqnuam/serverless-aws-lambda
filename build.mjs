@@ -35,13 +35,21 @@ const watch = {
 const buildIndex = esbuild.build.bind(null, {
   ...esBuildConfig,
   external: ["./src/lib/worker.js"],
-  entryPoints: ["./src/index.ts", "./src/server.ts", "./src/defineConfig.ts", "./src/lib/worker.js", "./src/lambda/router.ts", "./src/plugins/sns/index.ts"],
+  entryPoints: [
+    "./src/index.ts",
+    "./src/server.ts",
+    "./src/defineConfig.ts",
+    "./src/lib/worker.js",
+    "./src/lambda/router.ts",
+    "./src/plugins/sns/index.ts",
+    "./src/plugins/body-parser.ts",
+  ],
   ...watch,
 });
 
 const buildRouterESM = esbuild.build.bind(null, {
   ...esBuildConfig,
-  entryPoints: ["./src/lambda/router.ts", "./src/server.ts"],
+  entryPoints: ["./src/lambda/router.ts", "./src/server.ts", "./src/plugins/body-parser.ts"],
   watch: shouldWatch,
   format: "esm",
   outExtension: { ".js": ".mjs" },

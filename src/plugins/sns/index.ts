@@ -3,14 +3,14 @@ import type { ILambdaMock } from "../../lib/lambdaMock";
 import { randomUUID } from "crypto";
 import { parseSnsPublishBody, parseSnsPublishBatchBody, createSnsTopicEvent, getHandlersByTopicArn, genSnsPublishResponse, genSnsPublishBatchResponse } from "./utils";
 
-export const snsPlugin = (endpoint: string = "/@sns"): SlsAwsLambdaPlugin => {
+export const snsPlugin = (): SlsAwsLambdaPlugin => {
   return {
     name: "sns-plugin",
     offline: {
       request: [
         {
           method: "POST",
-          filter: endpoint,
+          filter: "/@sns",
           callback: function (req, res) {
             let data = Buffer.alloc(0);
             const MessageId = randomUUID();

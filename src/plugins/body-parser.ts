@@ -1,6 +1,8 @@
-const parse = (event, spotText) => {
-  const files = [];
-  let body = {};
+import type { RouteController, IRequest } from "../lambda/router";
+
+const parse = (event: IRequest, spotText: boolean) => {
+  const files: any[] = [];
+  let body: any = {};
   const boundary = event.headers?.["content-type"]?.split("=")[1];
   if (!boundary) {
     return {
@@ -8,12 +10,12 @@ const parse = (event, spotText) => {
       body,
     };
   }
-  const result = {};
+  const result: any = {};
 
   if (event.isBase64Encoded) {
     event.body = Buffer.from(event.body, "base64").toString("utf-8");
   }
-  event.body.split(boundary).forEach((item) => {
+  event.body.split(boundary).forEach((item: any) => {
     if (/filename=".+"/g.test(item)) {
       result[item.match(/name=".+";/g)[0].slice(6, -2)] = {
         type: "file",
@@ -45,7 +47,7 @@ const parse = (event, spotText) => {
   };
 };
 
-const bodyParser = (req, res, next) => {
+const bodyParser: RouteController = (req, res, next) => {
   try {
     const parsedBody = parse(req, true);
     req.files = parsedBody.files;
@@ -54,4 +56,5 @@ const bodyParser = (req, res, next) => {
 
   next();
 };
-module.exports = bodyParser;
+export default bodyParser;
+export { bodyParser };
