@@ -52,6 +52,17 @@ interface AlbEvent {
 interface CommonApgEvent {
   version: string;
   body?: string;
+  queryStringParameters: { [key: string]: string };
+  isBase64Encoded: boolean;
+  headers: { [key: string]: any };
+  pathParameters?: { [key: string]: any };
+}
+
+type ApgHttpApiEvent = {
+  routeKey: string;
+  rawPath: string;
+  rawQueryString: string;
+  cookies?: string[];
   requestContext: {
     accountId: string;
     apiId: string;
@@ -70,17 +81,6 @@ interface CommonApgEvent {
     time: string;
     timeEpoch: number;
   };
-  queryStringParameters: { [key: string]: string };
-  isBase64Encoded: boolean;
-  headers: { [key: string]: any };
-  pathParameters?: { [key: string]: any };
-}
-
-type ApgHttpApiEvent = {
-  routeKey: string;
-  rawPath: string;
-  rawQueryString: string;
-  cookies?: string[];
 } & CommonApgEvent;
 
 type ApgHttpEvent = {
@@ -89,6 +89,21 @@ type ApgHttpEvent = {
   httpMethod: string;
   multiValueHeaders: { [key: string]: any };
   multiValueQueryStringParameters: { [key: string]: any };
+  requestContext: {
+    accountId: string;
+    apiId: string;
+    domainName: string;
+    domainPrefix: string;
+    extendedRequestId: string;
+    httpMethod: string;
+    path: string;
+    protocol: string;
+    requestId: string;
+    requestTime: string;
+    requestTimeEpoch: number;
+    resourcePath: string;
+    stage: string;
+  };
 } & CommonApgEvent;
 
 interface IDaemonConfig {
@@ -562,24 +577,6 @@ export class Daemon extends Handlers {
         pathParameters[k.slice(1, -1)] = reqParams[i];
       }
     });
-    const requestContext = {
-      accountId: String(accountId),
-      apiId: apiId,
-      domainName: `localhost:${this.port}`,
-      domainPrefix: "localhost",
-      http: {
-        method: method as string,
-        path: parsedURL.pathname,
-        protocol: "HTTP/1.1",
-        sourceIp: "127.0.0.1",
-        userAgent: headers["user-agent"] ?? "",
-      },
-      requestId: "",
-      routeKey: `${method} ${parsedURL.pathname}`,
-      stage: "$local",
-      time: new Date().toISOString(),
-      timeEpoch: Date.now(),
-    };
 
     const customHeaders: any = { "x-forwarded-for": req.socket.remoteAddress, "x-forwarded-proto": "http", "x-forwarded-port": this.port, ...headers };
 
@@ -606,7 +603,21 @@ export class Daemon extends Handlers {
         // @ts-ignore
         queryStringParameters: Object.fromEntries(parsedURL.searchParams),
         multiValueQueryStringParameters,
-        requestContext,
+        requestContext: {
+          accountId: String(accountId),
+          apiId: apiId,
+          domainName: `localhost:${this.port}`,
+          domainPrefix: "localhost",
+          extendedRequestId: "fake-id",
+          path: parsedURL.pathname,
+          protocol: "HTTP/1.1",
+          httpMethod: method!,
+          resourcePath: `/${lambdaName}`,
+          requestId: "",
+          requestTime: new Date().toISOString(),
+          requestTimeEpoch: Date.now(),
+          stage: "$local",
+        },
         isBase64Encoded: false,
       };
       if (Object.keys(pathParameters).length) {
@@ -636,7 +647,24 @@ export class Daemon extends Handlers {
         headers: customHeaders,
         queryStringParameters,
         isBase64Encoded: false,
-        requestContext,
+        requestContext: {
+          accountId: String(accountId),
+          apiId: apiId,
+          domainName: `localhost:${this.port}`,
+          domainPrefix: "localhost",
+          http: {
+            method: method as string,
+            path: parsedURL.pathname,
+            protocol: "HTTP/1.1",
+            sourceIp: "127.0.0.1",
+            userAgent: headers["user-agent"] ?? "",
+          },
+          requestId: "",
+          routeKey: `${method} ${parsedURL.pathname}`,
+          stage: "$local",
+          time: new Date().toISOString(),
+          timeEpoch: Date.now(),
+        },
       };
       if (Object.keys(pathParameters).length) {
         apgEvent.pathParameters = pathParameters;
