@@ -23,6 +23,7 @@ export interface ILambdaMock {
   esOutputPath: string;
   entryPoint: string;
   _worker?: Worker;
+  invokeSub: ((event: any) => void)[];
   invoke: (event: any) => Promise<any>;
 }
 /**
@@ -34,6 +35,7 @@ export interface LambdaEndpoint {
   methods: HttpMethod[];
   async?: boolean;
   multiValueHeaders?: boolean;
+  version?: 1 | 2;
 }
 /**
  * @internal
@@ -52,7 +54,8 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   esOutputPath: string;
   entryPoint: string;
   _worker?: Worker;
-  constructor({ name, outName, endpoints, timeout, memorySize, environment, handlerPath, handlerName, esEntryPoint, esOutputPath, entryPoint, sns }: ILambdaMock) {
+  invokeSub: ((event: any) => void)[];
+  constructor({ name, outName, endpoints, timeout, memorySize, environment, handlerPath, handlerName, esEntryPoint, esOutputPath, entryPoint, sns, invokeSub }: ILambdaMock) {
     super();
     this.name = name;
     this.outName = outName;
@@ -66,6 +69,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     this.esEntryPoint = esEntryPoint;
     this.esOutputPath = esOutputPath;
     this.entryPoint = entryPoint;
+    this.invokeSub = invokeSub;
   }
 
   async importEventHandler() {
@@ -106,6 +110,10 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
       log.BR_BLUE(`❄️ Cold start '${this.outName}'`);
       await this.importEventHandler();
     }
+
+    try {
+      this.invokeSub.forEach((x) => x(event));
+    } catch (error) {}
 
     const eventResponse = await new Promise((resolve, reject) => {
       const awsRequestId = randomUUID();

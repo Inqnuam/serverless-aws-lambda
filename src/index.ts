@@ -415,9 +415,14 @@ class ServerlessAwsLambda extends Daemon {
             return;
           }
         },
+        invokeSub: [],
         setEnv: (key: string, value: string) => {
           this.setEnv(funcName, key, value);
         },
+      };
+
+      lambdaDef.onInvoke = (callback: (event: any) => void) => {
+        lambdaDef.invokeSub.push(callback);
       };
 
       if (process.env.NODE_ENV) {
@@ -539,8 +544,13 @@ class ServerlessAwsLambda extends Daemon {
         parsendEvent.multiValueHeaders = true;
       }
     } else if (event.http || event.httpApi) {
-      if (event.http && event.http.async) {
-        parsendEvent.async = true;
+      if (event.http) {
+        parsendEvent.version = 1;
+        if (event.http.async) {
+          parsendEvent.async = true;
+        }
+      } else {
+        parsendEvent.version = 2;
       }
 
       parsendEvent.kind = "apg";
@@ -554,13 +564,13 @@ class ServerlessAwsLambda extends Daemon {
           return null;
         }
 
-        parsendEvent.methods = [declarationComponents[0].toUpperCase() as HttpMethod];
+        parsendEvent.methods = [declarationComponents[0] == "*" ? "ANY" : (declarationComponents[0].toUpperCase() as HttpMethod)];
         parsendEvent.paths = [declarationComponents[1]];
       } else if (typeof httpEvent == "object" && httpEvent.path) {
         parsendEvent.paths = [httpEvent.path];
 
         if (httpEvent.method) {
-          parsendEvent.methods = [httpEvent.method.toUpperCase()];
+          parsendEvent.methods = [httpEvent.method == "*" ? "ANY" : httpEvent.method.toUpperCase()];
         }
       } else {
         return null;

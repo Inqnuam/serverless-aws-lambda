@@ -12,6 +12,7 @@ export interface ILambda {
   virtualEnvs?: {
     [key: string]: any;
   };
+  onInvoke: (callback: Function) => void;
 }
 
 export interface ClientConfigParams {

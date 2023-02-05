@@ -49,16 +49,8 @@ interface AlbEvent {
   body?: string;
 }
 
-interface ApgEvent {
+interface CommonApgEvent {
   version: string;
-  routeKey: string;
-  rawPath: string;
-  rawQueryString: string;
-  headers: { [key: string]: any };
-  queryStringParameters: { [key: string]: string };
-  multiValueHeaders: { [key: string]: any };
-  multiValueQueryStringParameters: { [key: string]: any };
-  isBase64Encoded: boolean;
   body?: string;
   requestContext: {
     accountId: string;
@@ -78,7 +70,27 @@ interface ApgEvent {
     time: string;
     timeEpoch: number;
   };
+  queryStringParameters: { [key: string]: string };
+  isBase64Encoded: boolean;
+  headers: { [key: string]: any };
+  pathParameters?: { [key: string]: any };
 }
+
+type ApgHttpApiEvent = {
+  routeKey: string;
+  rawPath: string;
+  rawQueryString: string;
+  cookies?: string[];
+} & CommonApgEvent;
+
+type ApgHttpEvent = {
+  resource: string;
+  path: string;
+  httpMethod: string;
+  multiValueHeaders: { [key: string]: any };
+  multiValueQueryStringParameters: { [key: string]: any };
+} & CommonApgEvent;
+
 interface IDaemonConfig {
   debug: boolean;
 }
@@ -259,7 +271,7 @@ export class Daemon extends Handlers {
       if (lambdaController) {
         const mockEvent = lambdaController.event;
 
-        let event = mockEvent.kind == "alb" ? this.#convertReqToAlbEvent(req, mockEvent) : this.#convertReqToApgEvent(req, mockEvent);
+        let event = mockEvent.kind == "alb" ? this.#convertReqToAlbEvent(req, mockEvent) : this.#convertReqToApgEvent(req, mockEvent, lambdaController.handler.outName);
 
         req
           .on("data", (chunk) => {
@@ -390,6 +402,19 @@ export class Daemon extends Handlers {
             res.setHeader(key, responseData.headers[key]);
           });
         }
+
+        if (mockEvent.version == 1 && responseData.multiValueHeaders) {
+          const headersKeys = Object.keys(responseData.multiValueHeaders).filter((key) => key !== "Server" && key !== "Apigw-Requestid" && key !== "Date");
+          headersKeys.forEach((key) => {
+            if (Array.isArray(responseData.multiValueHeaders[key])) {
+              res.setHeader(key, responseData.multiValueHeaders[key]);
+            } else {
+              log.RED("multiValueHeaders values must be an array");
+              log.YELLOW("example:");
+              log.GREEN("'Content-Type': ['application/json']");
+            }
+          });
+        }
       }
 
       if (!responseData.statusCode) {
@@ -414,7 +439,11 @@ export class Daemon extends Handlers {
         }
 
         if (responseData.cookies?.length) {
-          res.setHeader("Set-Cookie", responseData.cookies);
+          if (mockEvent.version == 2) {
+            res.setHeader("Set-Cookie", responseData.cookies);
+          } else {
+            log.RED(`'cookies' as return value is supported only in API Gateway HTTP API (httpApi).\nUse 'Set-Cookie' header instead`);
+          }
         }
       }
     } else {
@@ -514,56 +543,110 @@ export class Daemon extends Handlers {
         event.isBase64Encoded = true;
       }
     }
-
     return event;
   }
 
-  #convertReqToApgEvent(req: IncomingMessage, mockEvent: LambdaEndpoint) {
+  #convertReqToApgEvent(req: IncomingMessage, mockEvent: LambdaEndpoint, lambdaName: string): ApgHttpApiEvent | ApgHttpEvent {
     const { method, headers, url, rawHeaders } = req;
 
     const parsedURL = new URL(url as string, "http://localhost:3003");
     parsedURL.searchParams.delete("x_mock_type");
-    const multiValueQueryStringParameters: any = {};
 
-    for (const k of Array.from(new Set(parsedURL.searchParams.keys()))) {
-      multiValueQueryStringParameters[k] = parsedURL.searchParams.getAll(k);
-    }
+    const paramDeclarations = mockEvent.paths[0].split("/");
+    const reqParams = parsedURL.pathname.split("/");
 
-    let event: ApgEvent = {
-      version: "2.0",
+    let pathParameters: any = {};
+
+    paramDeclarations.forEach((k, i) => {
+      if (k.startsWith("{") && k.endsWith("}")) {
+        pathParameters[k.slice(1, -1)] = reqParams[i];
+      }
+    });
+    const requestContext = {
+      accountId: String(accountId),
+      apiId: apiId,
+      domainName: `localhost:${this.port}`,
+      domainPrefix: "localhost",
+      http: {
+        method: method as string,
+        path: parsedURL.pathname,
+        protocol: "HTTP/1.1",
+        sourceIp: "127.0.0.1",
+        userAgent: headers["user-agent"] ?? "",
+      },
+      requestId: "",
       routeKey: `${method} ${parsedURL.pathname}`,
-      rawPath: parsedURL.pathname,
-      rawQueryString: parsedURL.search ? parsedURL.search.slice(1) : "",
-      headers: { "x-forwarded-for": req.socket.remoteAddress, "x-forwarded-proto": "http", "x-forwarded-port": this.port, ...headers },
-      // @ts-ignore
-      queryStringParameters: Object.fromEntries(parsedURL.searchParams),
-      isBase64Encoded: false,
-      multiValueHeaders: {
+      stage: "$local",
+      time: new Date().toISOString(),
+      timeEpoch: Date.now(),
+    };
+
+    const customHeaders: any = { "x-forwarded-for": req.socket.remoteAddress, "x-forwarded-proto": "http", "x-forwarded-port": this.port, ...headers };
+
+    let event: any;
+    if (mockEvent.version == 1) {
+      const multiValueQueryStringParameters: any = {};
+
+      for (const k of Array.from(new Set(parsedURL.searchParams.keys()))) {
+        multiValueQueryStringParameters[k] = parsedURL.searchParams.getAll(k);
+      }
+      const multiValueHeaders = {
         "x-forwarded-for": [String(req.socket.remoteAddress)],
         "x-forwarded-proto": ["http"],
         "x-forwarded-port": [String(this.port)],
         ...this.#getMultiValueHeaders(rawHeaders),
-      },
-      multiValueQueryStringParameters,
-      requestContext: {
-        accountId: String(accountId),
-        apiId: apiId,
-        domainName: `localhost:${this.port}`,
-        domainPrefix: "localhost",
-        http: {
-          method: method as string,
-          path: parsedURL.pathname,
-          protocol: "HTTP/1.1",
-          sourceIp: "127.0.0.1",
-          userAgent: headers["user-agent"] ?? "",
-        },
-        requestId: "",
-        routeKey: `${method} ${parsedURL.pathname}`,
-        stage: "$local",
-        time: new Date().toISOString(),
-        timeEpoch: Date.now(),
-      },
-    };
+      };
+      const apgEvent: ApgHttpEvent = {
+        version: "1.0",
+        resource: `/${lambdaName}`,
+        path: parsedURL.pathname,
+        httpMethod: method!,
+        headers: customHeaders,
+        multiValueHeaders,
+        // @ts-ignore
+        queryStringParameters: Object.fromEntries(parsedURL.searchParams),
+        multiValueQueryStringParameters,
+        requestContext,
+        isBase64Encoded: false,
+      };
+      if (Object.keys(pathParameters).length) {
+        apgEvent.pathParameters = pathParameters;
+      }
+      event = apgEvent;
+    } else {
+      const customMethod = mockEvent.methods.find((x) => x == method) ?? "ANY";
+
+      let queryStringParameters: any = {};
+      let rawQueryString = "";
+      for (const k of Array.from(new Set(parsedURL.searchParams.keys()))) {
+        const values = parsedURL.searchParams.getAll(k);
+
+        rawQueryString += `&${values.map((x) => encodeURI(`${k}=${x}`)).join("&")}`;
+        queryStringParameters[k] = values.join(",");
+      }
+      if (rawQueryString) {
+        rawQueryString = rawQueryString.slice(1);
+      }
+
+      const apgEvent: ApgHttpApiEvent = {
+        version: "2.0",
+        routeKey: `${customMethod} ${parsedURL.pathname}`,
+        rawPath: parsedURL.pathname,
+        rawQueryString,
+        headers: customHeaders,
+        queryStringParameters,
+        isBase64Encoded: false,
+        requestContext,
+      };
+      if (Object.keys(pathParameters).length) {
+        apgEvent.pathParameters = pathParameters;
+      }
+      if (headers.cookie) {
+        apgEvent.cookies = headers.cookie.split("; ");
+      }
+
+      event = apgEvent;
+    }
     if (event.headers["x-mock-type"]) {
       delete event.headers["x-mock-type"];
     }

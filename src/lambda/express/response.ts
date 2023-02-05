@@ -109,6 +109,16 @@ export class _Response implements IResponse {
     }
     if (!this.responseObject.cookies?.length) {
       delete this.responseObject.cookies;
+    } else {
+      if (this.#req.version == "1.0") {
+        this.responseObject.multiValueHeaders = {};
+        this.responseObject.multiValueHeaders["Set-Cookie"] = [...this.responseObject.cookies];
+        delete this.responseObject.cookies;
+      }
+      if (this.#req.requestContext?.elb && !this.#req.multiValueHeaders && !this.#req.multiValueQueryStringParameters) {
+        this.#setHeader("Set-Cookie", this.responseObject.cookies[this.responseObject.cookies.length - 1]);
+        delete this.responseObject.cookies;
+      }
     }
 
     if (this.#req.requestContext?.elb && (this.#req.multiValueHeaders || this.#req.multiValueQueryStringParameters)) {
@@ -116,6 +126,10 @@ export class _Response implements IResponse {
 
       for (const [key, val] of Object.entries(this.responseObject.headers)) {
         this.responseObject.multiValueHeaders[key] = [val];
+      }
+      if (this.responseObject.cookies?.length) {
+        this.responseObject.multiValueHeaders["Set-Cookie"] = [...this.responseObject.cookies];
+        delete this.responseObject.cookies;
       }
       delete this.responseObject.headers;
     }
