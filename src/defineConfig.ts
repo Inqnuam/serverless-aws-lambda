@@ -7,17 +7,17 @@ import type { IncomingMessage, ServerResponse } from "http";
 import type Serverless from "serverless";
 import { log } from "./lib/colorize";
 
-export interface ILambda {
+export type ILambda = {
   setEnv: (key: string, value: string) => void;
   virtualEnvs?: {
     [key: string]: any;
   };
-  onInvoke: (callback: Function) => void;
-}
+  onInvoke: (callback: (event: any, info?: any) => void) => void;
+} & Omit<ILambdaMock, "_worker">;
 
 export interface ClientConfigParams {
   stop: (err?: any) => void;
-  lambdas: (ILambda & Omit<ILambdaMock, "_worker">)[];
+  lambdas: ILambda[];
   isDeploying: boolean;
   isPackaging: boolean;
   setEnv: (lambdaName: string, key: string, value: string) => void;
@@ -33,6 +33,7 @@ export interface SlsAwsLambdaPlugin {
   name: string;
   buildCallback?: (this: ClientConfigParams, result: BuildResult, isRebuild: boolean) => Promise<void> | void;
   onInit?: (this: ClientConfigParams) => Promise<void> | void;
+  onExit?: (this: ClientConfigParams, code: string | number) => Promise<void> | void;
   offline?: {
     onReady?: (this: ClientConfigParams, port: number) => Promise<void> | void;
     request?: {
@@ -51,6 +52,47 @@ export interface Options {
   };
   plugins?: SlsAwsLambdaPlugin[];
 }
+
+const exitEvents = [
+  "exit",
+  "beforeExit",
+  "uncaughtException",
+  "unhandledRejection",
+  "SIGHUP",
+  "SIGINT",
+  "SIGQUIT",
+  "SIGILL",
+  "SIGTRAP",
+  "SIGABRT",
+  "SIGBUS",
+  "SIGFPE",
+  "SIGUSR1",
+  "SIGSEGV",
+  "SIGUSR2",
+  "SIGTERM",
+];
+
+let exiting = false;
+
+const exitCallbacks: ((code: string | number) => void | Promise<void>)[] = [];
+
+const exitCallback = (e: any) => {
+  if (exiting) {
+    return;
+  }
+  exiting = true;
+  for (const cb of exitCallbacks) {
+    try {
+      cb(e);
+    } catch (error) {
+      console.log(error);
+    }
+  }
+  process.exit();
+};
+exitEvents.forEach((e) => {
+  process.on(e, exitCallback);
+});
 
 function defineConfig(options: Options) {
   // validate plugin names
@@ -136,6 +178,10 @@ function defineConfig(options: Options) {
         });
       }
       for (const plugin of options.plugins!) {
+        if (plugin.onExit) {
+          exitCallbacks.push(plugin.onExit.bind(self));
+        }
+
         if (plugin.onInit) {
           try {
             await plugin.onInit.call(self);

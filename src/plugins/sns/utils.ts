@@ -1,6 +1,7 @@
 import { log } from "../../lib/colorize";
-import type { ClientConfigParams } from "../../defineConfig";
+import type { ILambda } from "../../defineConfig";
 import { randomUUID } from "crypto";
+
 export const parseSnsPublishBody = (encodedBody: string[]) => {
   let body: any = {};
 
@@ -158,18 +159,15 @@ export const createSnsTopicEvent = (body: any, MessageId: string) => {
     ],
   };
 };
-export const getHandlersByTopicArn = (body: any, handlers: ClientConfigParams["lambdas"]) => {
+export const getHandlersByTopicArn = (body: any, handlers: ILambda[]) => {
   const arnComponent = body.TopicArn.split(":");
-
   const name = arnComponent[arnComponent.length - 1];
 
-  const foundHandlers = handlers.filter((x) => {
-    const foundEvents = x.sns.filter((foundEvent) => {
-      if (foundEvent.name !== name) {
-        return false;
-      }
+  const foundHandlers: { handler: ILambda; event: any }[] = [];
 
-      if (!foundEvent) {
+  handlers.forEach((x) => {
+    const streamEvent: any = x.sns.find((foundEvent) => {
+      if (!foundEvent || foundEvent.name !== name) {
         return false;
       }
 
@@ -214,7 +212,12 @@ export const getHandlersByTopicArn = (body: any, handlers: ClientConfigParams["l
       return hasRequiredKey;
     });
 
-    return foundEvents.length ? true : false;
+    if (streamEvent) {
+      foundHandlers.push({
+        handler: x,
+        event: streamEvent,
+      });
+    }
   });
 
   return foundHandlers;

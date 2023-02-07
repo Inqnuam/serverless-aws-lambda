@@ -344,7 +344,7 @@ export class Daemon extends Handlers {
         res.statusCode = 200;
         res.end();
       }
-      const responseData = await lambdaController.invoke(event);
+      const responseData = await lambdaController.invoke(event, mockEvent);
       if (!res.writableFinished) {
         this.#setResponseHead(res, responseData, mockEvent);
         if (!res.writableFinished) {

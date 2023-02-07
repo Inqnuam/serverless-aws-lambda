@@ -33,18 +33,18 @@ export const snsPlugin = (): SlsAwsLambdaPlugin => {
                 const body = parseSnsPublishBody(encodedBody);
 
                 const foundHandlers = getHandlersByTopicArn(body, this.lambdas);
-                const deduplicatedHandler: ILambdaMock[] = [];
+                const deduplicatedHandler: { handler: ILambdaMock; event: any }[] = [];
                 if (foundHandlers.length) {
                   const event = createSnsTopicEvent(body, MessageId);
                   foundHandlers.forEach((l) => {
-                    if (!deduplicatedHandler.find((x) => x.name == l.name)) {
+                    if (!deduplicatedHandler.find((x) => x.handler.name == l.handler.name)) {
                       deduplicatedHandler.push(l);
                     }
                   });
 
-                  for (const l of deduplicatedHandler) {
+                  for (const { handler, event: info } of deduplicatedHandler) {
                     try {
-                      await l.invoke(event);
+                      await handler.invoke(event, { kind: "sns", event: info });
                     } catch (error) {
                       console.log(error);
                     }
@@ -61,7 +61,7 @@ export const snsPlugin = (): SlsAwsLambdaPlugin => {
 
                 const Successful: any = [];
                 const Failed: any = [];
-                let handlers: ILambdaMock[] = [];
+                let handlers: { handler: ILambdaMock; event: any }[] = [];
 
                 body.Records.forEach((x, index) => {
                   const foundHandlers = getHandlersByTopicArn(x.Sns, this.lambdas);
@@ -71,7 +71,7 @@ export const snsPlugin = (): SlsAwsLambdaPlugin => {
                     Successful.push({ Id, MessageId: x.Sns.MessageId });
 
                     foundHandlers.forEach((l) => {
-                      if (!handlers.find((x) => x.name == l.name)) {
+                      if (!handlers.find((x) => x.handler.name == l.handler.name)) {
                         handlers.push(l);
                       }
                     });
@@ -80,9 +80,9 @@ export const snsPlugin = (): SlsAwsLambdaPlugin => {
                   }
                 });
 
-                for (const l of handlers) {
+                for (const { handler, event: info } of handlers) {
                   try {
-                    await l.invoke({ Records: body.Records });
+                    await handler.invoke({ Records: body.Records }, { kind: "sns", event: info });
                   } catch (error) {
                     console.log(error);
                   }

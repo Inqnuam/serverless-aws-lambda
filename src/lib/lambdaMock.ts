@@ -14,6 +14,7 @@ export interface ILambdaMock {
   outName: string;
   endpoints: LambdaEndpoint[];
   sns: any[];
+  ddb: any[];
   timeout: number;
   memorySize: number;
   environment: { [key: string]: any };
@@ -24,7 +25,7 @@ export interface ILambdaMock {
   entryPoint: string;
   _worker?: Worker;
   invokeSub: ((event: any) => void)[];
-  invoke: (event: any) => Promise<any>;
+  invoke: (event: any, info?: any) => Promise<any>;
 }
 /**
  * @internal
@@ -45,6 +46,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   outName: string;
   endpoints: LambdaEndpoint[];
   sns: any[];
+  ddb: any[];
   timeout: number;
   memorySize: number;
   environment: { [key: string]: any };
@@ -54,13 +56,14 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   esOutputPath: string;
   entryPoint: string;
   _worker?: Worker;
-  invokeSub: ((event: any) => void)[];
-  constructor({ name, outName, endpoints, timeout, memorySize, environment, handlerPath, handlerName, esEntryPoint, esOutputPath, entryPoint, sns, invokeSub }: ILambdaMock) {
+  invokeSub: ((event: any, info?: any) => void)[];
+  constructor({ name, outName, endpoints, timeout, memorySize, environment, handlerPath, handlerName, esEntryPoint, esOutputPath, entryPoint, sns, ddb, invokeSub }: ILambdaMock) {
     super();
     this.name = name;
     this.outName = outName;
     this.endpoints = endpoints;
     this.sns = sns;
+    this.ddb = ddb;
     this.timeout = timeout;
     this.memorySize = memorySize;
     this.environment = environment;
@@ -105,14 +108,14 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     });
   }
 
-  async invoke(event: any) {
+  async invoke(event: any, info?: any) {
     if (!this._worker) {
       log.BR_BLUE(`❄️ Cold start '${this.outName}'`);
       await this.importEventHandler();
     }
 
     try {
-      this.invokeSub.forEach((x) => x(event));
+      this.invokeSub.forEach((x) => x(event, info));
     } catch (error) {}
 
     const eventResponse = await new Promise((resolve, reject) => {

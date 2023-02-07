@@ -7,9 +7,9 @@ import esbuild from "esbuild";
 import type { BuildOptions } from "esbuild";
 import type Serverless from "serverless";
 import { nodeExternalsPlugin } from "esbuild-node-externals";
-import { LambdaEndpoint } from "./lib/lambdaMock";
-import { Handlers, HttpMethod } from "./lib/handlers";
+import { Handlers } from "./lib/handlers";
 import { awsSdkv3ExternalPlugin } from "./lib/awsSdkv3ExternalPlugin";
+import { parseEvents } from "./lib/parseEvents/index";
 
 const cwd = process.cwd();
 const DEFAULT_LAMBDA_TIMEOUT = 6;
@@ -398,17 +398,17 @@ class ServerlessAwsLambda extends Daemon {
         timeout: lambda.timeout ?? this.runtimeConfig.timeout ?? DEFAULT_LAMBDA_TIMEOUT,
         endpoints: [],
         sns: [],
-        ddbstream: [],
+        ddb: [],
         virtualEnvs: { ...this.defaultVirtualEnvs, ...(slsDeclaration.virtualEnvs ?? {}) },
         environment: {
           ...this.runtimeConfig.environment,
           ...lambda.environment,
           ...isLocalEnv,
         },
-        invoke: async (event: any) => {
+        invoke: async (event: any, info?: any) => {
           const foundLambda = this.getHandlerByName(`/@invoke/${funcName}`);
           if (foundLambda) {
-            const res = await foundLambda.invoke(event);
+            const res = await foundLambda.invoke(event, info);
             return res;
           } else {
             log.RED(`'${funcName}' is not mounted yet.\nPlease invoke it after the initial build is completed.`);
@@ -421,7 +421,7 @@ class ServerlessAwsLambda extends Daemon {
         },
       };
 
-      lambdaDef.onInvoke = (callback: (event: any) => void) => {
+      lambdaDef.onInvoke = (callback: (event: any, info?: any) => void) => {
         lambdaDef.invokeSub.push(callback);
       };
 
@@ -433,151 +433,17 @@ class ServerlessAwsLambda extends Daemon {
       }
 
       if (lambda.events.length) {
-        // TODO: needs to be combined into single function
-        lambdaDef.endpoints = lambda.events.map(this.#parseSlsEventDefinition).filter((x: any) => x);
-        lambdaDef.sns = lambda.events.map(this.#parseSnsEventDefinitions).filter((x: any) => x);
+        const { endpoints, sns, ddb } = parseEvents(lambda.events, this.serverless);
+        lambdaDef.endpoints = endpoints;
+        lambdaDef.sns = sns;
+        lambdaDef.ddb = ddb;
       }
       // console.log(lambdaDef);
       accum.push(lambdaDef);
       return accum;
-
-      // events.forEach((event) => {
-      //   const alb = event.alb;
-
-      //   // NOTE: httpApi = APG v2 (HTTP)
-      //   // http = APG v1 (REST)
-      //   // both are:
-      //   // objects with path (string) and optionnal method (string)
-      //   // OR both are string including method - path
-
-      //   // alb application load balancer
-
-      //   // alb.method (array) is not required, default is "any"
-
-      //   if (alb?.conditions && alb.conditions.path?.length && alb.conditions.method?.length) {
-      //     // @ts-ignore
-      //     lambdaDef.path = alb.conditions.path[0];
-      //     // @ts-ignore
-      //     lambdaDef.method = alb.conditions.method[0].toUpperCase();
-      //     // @ts-ignore
-      //     lambdaDef.kind = "ALB";
-      //     accum.push(lambdaDef);
-      //   }
-      // });
-
-      // return accum;
     }, []);
 
     return albs;
-  }
-
-  #parseSnsEventDefinitions(event: any) {
-    if (!event.sns) {
-      return;
-    }
-    let sns: any = {};
-
-    if (typeof event.sns == "string") {
-      if (event.sns.startsWith("arn:")) {
-        const arnComponents = event.sns.split(":");
-        sns.name = arnComponents[arnComponents.length - 1];
-      } else {
-        sns.name = event.sns;
-      }
-    } else {
-      const { arn, topicName, filterPolicyScope, filterPolicy, displayName } = event.sns;
-
-      if (arn) {
-        const arnComponents = arn.split(":");
-        sns.name = arnComponents[arnComponents.length - 1];
-        sns.arn = arn;
-      }
-
-      if (!sns.name && topicName) {
-        sns.name = topicName.split("-")[0];
-      }
-
-      if (topicName) {
-        sns.topicName = topicName;
-      }
-
-      if (filterPolicy) {
-        sns.filterScope = filterPolicyScope ?? "MessageAttributes";
-
-        sns.filter = filterPolicy;
-      }
-
-      if (displayName) {
-        sns.displayName = displayName;
-      }
-    }
-    if (Object.keys(sns).length) {
-      return sns;
-    }
-  }
-  #parseSlsEventDefinition(event: any): LambdaEndpoint | null {
-    const supportedEvents = ["http", "httpApi", "alb"];
-
-    const keys = Object.keys(event);
-
-    if (!keys.length || !supportedEvents.includes(keys[0])) {
-      return null;
-    }
-
-    let parsendEvent: LambdaEndpoint = {
-      kind: "alb",
-      paths: [],
-      methods: ["ANY"],
-    };
-
-    if (event.alb) {
-      if (!event.alb.conditions || !event.alb.conditions.path?.length) {
-        return null;
-      }
-      parsendEvent.kind = "alb";
-      parsendEvent.paths = event.alb.conditions.path;
-
-      if (event.alb.conditions.method?.length) {
-        parsendEvent.methods = event.alb.conditions.method.map((x: string) => x.toUpperCase());
-      }
-      if (event.alb.multiValueHeaders) {
-        parsendEvent.multiValueHeaders = true;
-      }
-    } else if (event.http || event.httpApi) {
-      if (event.http) {
-        parsendEvent.version = 1;
-        if (event.http.async) {
-          parsendEvent.async = true;
-        }
-      } else {
-        parsendEvent.version = 2;
-      }
-
-      parsendEvent.kind = "apg";
-      const httpEvent = event.http ?? event.httpApi;
-
-      if (typeof httpEvent == "string") {
-        // ex: 'PUT /users/update'
-        const declarationComponents = httpEvent.split(" ");
-
-        if (declarationComponents.length != 2) {
-          return null;
-        }
-
-        parsendEvent.methods = [declarationComponents[0] == "*" ? "ANY" : (declarationComponents[0].toUpperCase() as HttpMethod)];
-        parsendEvent.paths = [declarationComponents[1]];
-      } else if (typeof httpEvent == "object" && httpEvent.path) {
-        parsendEvent.paths = [httpEvent.path];
-
-        if (httpEvent.method) {
-          parsendEvent.methods = [httpEvent.method == "*" ? "ANY" : httpEvent.method.toUpperCase()];
-        }
-      } else {
-        return null;
-      }
-    }
-
-    return parsendEvent;
   }
   #setLambdaEsOutputPaths(outputs: any) {
     const outputNames = Object.keys(outputs)
@@ -651,7 +517,6 @@ class ServerlessAwsLambda extends Daemon {
           this.buildContext.stop();
         }
       },
-
       lambdas: this.#lambdas,
       isDeploying: this.isDeploying,
       isPackaging: this.isPackaging,
