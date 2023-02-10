@@ -433,10 +433,11 @@ class ServerlessAwsLambda extends Daemon {
       }
 
       if (lambda.events.length) {
-        const { endpoints, sns, ddb } = parseEvents(lambda.events, this.serverless);
+        const { endpoints, sns, ddb, s3 } = parseEvents(lambda.events, this.serverless);
         lambdaDef.endpoints = endpoints;
         lambdaDef.sns = sns;
         lambdaDef.ddb = ddb;
+        lambdaDef.s3 = s3;
       }
       // console.log(lambdaDef);
       accum.push(lambdaDef);

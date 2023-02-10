@@ -6,6 +6,11 @@ import { EventEmitter } from "events";
 import { log } from "./colorize";
 const workerPath = pathResolve(__dirname, "./lib/worker.cjs");
 
+interface IS3Event {
+  bucket: string;
+  type: [string, string];
+  rules: any[];
+}
 /**
  * @internal
  */
@@ -13,6 +18,7 @@ export interface ILambdaMock {
   name: string;
   outName: string;
   endpoints: LambdaEndpoint[];
+  s3: IS3Event[];
   sns: any[];
   ddb: any[];
   timeout: number;
@@ -45,6 +51,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   name: string;
   outName: string;
   endpoints: LambdaEndpoint[];
+  s3: any[];
   sns: any[];
   ddb: any[];
   timeout: number;
@@ -57,11 +64,28 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   entryPoint: string;
   _worker?: Worker;
   invokeSub: ((event: any, info?: any) => void)[];
-  constructor({ name, outName, endpoints, timeout, memorySize, environment, handlerPath, handlerName, esEntryPoint, esOutputPath, entryPoint, sns, ddb, invokeSub }: ILambdaMock) {
+  constructor({
+    name,
+    outName,
+    endpoints,
+    timeout,
+    memorySize,
+    environment,
+    handlerPath,
+    handlerName,
+    esEntryPoint,
+    esOutputPath,
+    entryPoint,
+    s3,
+    sns,
+    ddb,
+    invokeSub,
+  }: ILambdaMock) {
     super();
     this.name = name;
     this.outName = outName;
     this.endpoints = endpoints;
+    this.s3 = s3;
     this.sns = sns;
     this.ddb = ddb;
     this.timeout = timeout;

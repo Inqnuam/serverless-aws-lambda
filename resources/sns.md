@@ -1,6 +1,6 @@
 ## AWS Local SNS
 
-Test AWS SNS `Publish` and `PublishBatch` actions locally.  
+Supports AWS SNS `Publish` and `PublishBatch` actions locally.  
 Subscribed functions are invoked automatically after a publish action.
 
 ### Installation

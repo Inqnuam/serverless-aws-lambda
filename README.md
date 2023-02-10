@@ -114,6 +114,7 @@ See [defineConfig](resources/defineConfig.md) for advanced configuration.
 
 ## Plugins:
 
+- [AWS Local S3](resources/s3.md)
 - [AWS Local SNS](resources/sns.md)
 - [DynamoDB Local Streams](https://github.com/Inqnuam/serverless-aws-lambda-ddb-streams)
 - [Jest](https://github.com/Inqnuam/serverless-aws-lambda-jest)

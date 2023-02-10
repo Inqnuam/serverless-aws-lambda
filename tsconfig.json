@@ -9,7 +9,8 @@
     "moduleResolution": "nodenext",
     "removeComments": true,
     "strict": true,
-    "declarationDir": "./dist/"
+    "declarationDir": "./dist/",
+    "rootDir": "./src/"
   },
-  "exclude": ["./dist/"]
+  "exclude": ["./dist/**/*"]
 }

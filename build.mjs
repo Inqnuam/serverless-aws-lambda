@@ -42,6 +42,7 @@ const buildIndex = esbuild.build.bind(null, {
     "./src/lib/worker.js",
     "./src/lambda/router.ts",
     "./src/plugins/sns/index.ts",
+    "./src/plugins/s3/index.ts",
     "./src/plugins/body-parser.ts",
   ],
   ...watch,

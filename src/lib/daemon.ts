@@ -8,10 +8,11 @@ import inspector from "inspector";
 import { html404, html500 } from "./htmlStatusMsg";
 import serveStatic from "serve-static";
 import { randomUUID } from "crypto";
-let localIp: string;
 
 const accountId = Buffer.from(randomUUID()).toString("hex").slice(0, 16);
 const apiId = Buffer.from(randomUUID()).toString("ascii").slice(0, 10);
+
+let localIp: string;
 if (networkInterfaces) {
   localIp = Object.values(networkInterfaces())
     .reduce((accum: any[], obj: any) => {
