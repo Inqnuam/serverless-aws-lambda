@@ -112,7 +112,7 @@ interface IDaemonConfig {
 }
 export class Daemon extends Handlers {
   #server: Server;
-  runtimeConfig = {};
+  runtimeConfig: any = {};
   #serve: any;
   customOfflineRequests?: {
     method?: string | string[];

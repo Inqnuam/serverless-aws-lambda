@@ -27,7 +27,6 @@ export const parseEvents = (events: any[], serverless: any) => {
       ddb.push(ddbSteam);
     }
 
-    // @ts-ignore
     if (s3Event) {
       s3.push(s3Event);
     }

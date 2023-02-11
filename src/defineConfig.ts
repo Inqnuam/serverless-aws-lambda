@@ -1,6 +1,5 @@
-import type { PluginBuild } from "esbuild";
+import type { PluginBuild, BuildResult } from "esbuild";
 import type { Config, OfflineConfig } from "./config";
-import type { BuildResult } from "esbuild";
 import type { ILambdaMock } from "./lib/lambdaMock";
 import type { HttpMethod } from "./lib/handlers";
 import type { IncomingMessage, ServerResponse } from "http";
@@ -99,7 +98,10 @@ function defineConfig(options: Options) {
   const pluginNames = new Set();
 
   if (options.plugins) {
-    options.plugins.forEach((plugin, index) => {
+    options.plugins = options.plugins.filter((plugin, index) => {
+      if (!plugin) {
+        return false;
+      }
       if (!plugin.name || !plugin.name.length || typeof plugin.name != "string") {
         plugin.name = "plugin-" + index;
         log.YELLOW(`Invalid plugin name at index ${index}`);
@@ -110,6 +112,7 @@ function defineConfig(options: Options) {
       } else {
         pluginNames.add(plugin.name);
       }
+      return true;
     });
   }
   return async function config(

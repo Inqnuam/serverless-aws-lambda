@@ -4,11 +4,10 @@ import { ILambdaMock } from "./lib/lambdaMock";
 import { log } from "./lib/colorize";
 import { zip } from "./lib/zip";
 import esbuild from "esbuild";
-import type { BuildOptions } from "esbuild";
+import type { BuildOptions, BuildResult } from "esbuild";
 import type Serverless from "serverless";
-import { nodeExternalsPlugin } from "esbuild-node-externals";
 import { Handlers } from "./lib/handlers";
-import { awsSdkv3ExternalPlugin } from "./lib/awsSdkv3ExternalPlugin";
+import { buildOptimizer } from "./lib/esbuild/buildOptimizer";
 import { parseEvents } from "./lib/parseEvents/index";
 
 const cwd = process.cwd();
@@ -34,9 +33,9 @@ class ServerlessAwsLambda extends Daemon {
   buildContext: any;
   customEsBuildConfig: any;
   customBuildCallback?: Function;
-  runtimeConfig: any;
   defaultVirtualEnvs: any;
   nodeVersion = false;
+  invokeName?: string;
   constructor(serverless: any, options: any) {
     super({ debug: process.env.SLS_DEBUG == "*" });
 
@@ -49,8 +48,8 @@ class ServerlessAwsLambda extends Daemon {
     this.isDeploying = this.serverless.processedInput.commands.includes("deploy");
     // @ts-ignore
     this.nodeVersion = this.serverless.service.provider.runtime?.replace(/[^0-9]/g, "");
-
-    if (this.isDeploying || this.isPackaging) {
+    this.watch = !this.isPackaging && !this.isDeploying;
+    if (!this.watch) {
       log.BR_BLUE("Packaging using serverless-aws-lambda...");
     } else {
       log.BR_BLUE("Launching serverless-aws-lambda...");
@@ -77,8 +76,6 @@ class ServerlessAwsLambda extends Daemon {
     if (!isNaN(processPort)) {
       ServerlessAwsLambda.PORT = processPort;
     }
-
-    this.#setWatchValue();
 
     this.commands = {
       "aws-lambda": {
@@ -110,20 +107,19 @@ class ServerlessAwsLambda extends Daemon {
   }
 
   async invokeLocal() {
-    await this.init(false, this.options.function);
+    this.invokeName = this.options.function;
+    await this.init(false);
   }
 
-  async init(isPackaging: boolean, invokeName?: string) {
+  async init(isPackaging: boolean) {
     this.#setRuntimeEnvs();
-
-    this.#lambdas = this.#getAlbLambdas(invokeName);
-
+    this.#lambdas = this.#getLambdas();
     await this.#setCustomEsBuildConfig();
-    this.#setEsBuildConfig(isPackaging, invokeName);
-    await this.buildAndWatch(isPackaging, invokeName);
+    this.setEsBuildConfig(isPackaging);
+    await this.buildAndWatch();
   }
 
-  #setEsBuildConfig(isPackaging: boolean, invokeName?: string) {
+  setEsBuildConfig = (isPackaging: boolean) => {
     const entryPoints = this.#lambdas.map((x) => x.esEntryPoint);
 
     let esBuildConfig: BuildOptions = {
@@ -131,32 +127,17 @@ class ServerlessAwsLambda extends Daemon {
       sourcemap: !isPackaging,
       minify: isPackaging,
       metafile: true,
-      target: "ES2018",
+      target: "ES6",
       entryPoints: entryPoints,
       outdir: path.join(cwd, ".aws_lambda"),
       outbase: "src",
       bundle: true,
       plugins: [],
       external: ["esbuild"],
-      watch: false,
     };
 
-    if (!isPackaging) {
-      esBuildConfig.plugins!.unshift(nodeExternalsPlugin());
-
-      if (!invokeName && this.watch) {
-        esBuildConfig.watch = {
-          onRebuild: this.#onRebuild.bind(this),
-        };
-      }
-    }
-
     if (typeof this.nodeVersion == "string") {
-      if (Number(this.nodeVersion) < 18) {
-        esBuildConfig.external?.push("aws-sdk");
-      } else {
-        esBuildConfig.plugins?.push(awsSdkv3ExternalPlugin);
-      }
+      esBuildConfig.plugins?.push(buildOptimizer({ isLocal: !this.isDeploying && !this.isPackaging, nodeVersion: Number(this.nodeVersion), buildCallback: this.buildCallback }));
     }
 
     if (this.customEsBuildConfig) {
@@ -271,111 +252,109 @@ class ServerlessAwsLambda extends Daemon {
       delete esBuildConfig.external;
     }
     this.esBuildConfig = esBuildConfig;
-  }
+  };
 
-  #setWatchValue() {
-    const opts = { ...this.pluginConfig, ...this.options };
-    Object.keys(opts)
-      .filter((e) => e == "w" || e == "watch")
-      .forEach((k) => {
-        const w = opts[k];
-
-        if (typeof w == "string") {
-          if (w == "false") {
-            this.watch = false;
-          }
-        } else if (typeof w == "boolean") {
-          this.watch = w;
-        }
-      });
-  }
-  async buildAndWatch(isPackaging: boolean, invokeName?: string) {
-    const result = await esbuild.build(this.esBuildConfig);
-
+  async buildAndWatch() {
+    const result = await esbuild.context(this.esBuildConfig);
     this.buildContext = {
-      stop: result.stop,
+      stop: result.dispose,
     };
 
-    if (result.stop) {
-      this.buildContext.watch = true;
-    }
-
-    const { outputs } = result.metafile!;
-    this.#setLambdaEsOutputPaths(outputs);
-    if (this.customBuildCallback) {
-      await this.customBuildCallback(result, false);
-    }
-
-    if (invokeName) {
-      const slsDeclaration = this.serverless.service.getFunction(invokeName);
-      const foundLambda = this.#lambdas.find((x) => x.name == invokeName);
-
-      if (foundLambda) {
-        (slsDeclaration as Serverless.FunctionDefinitionHandler).handler = foundLambda.esOutputPath.replace(`${cwd}/`, "").replace(".js", `.${foundLambda.handlerName}`);
-      }
-    } else if (this.isDeploying || this.isPackaging) {
-      let packageLambdas: ILambdaMock[] = this.#lambdas;
-
-      if (this.options.function) {
-        const foundLambda = this.#lambdas.find((x) => x.name == this.options.function);
-
-        if (foundLambda) {
-          packageLambdas = [foundLambda];
-        }
-      }
-      // TODO: convert to promise all
-      for (const l of packageLambdas) {
-        const slsDeclaration = this.serverless.service.getFunction(l.name) as Serverless.FunctionDefinitionHandler;
-
-        const zipableBundledFilePath = l.esOutputPath.slice(0, -3);
-        const zipOutputPath = await zip(zipableBundledFilePath, l.outName);
-
-        // @ts-ignore
-        slsDeclaration.package = { ...slsDeclaration.package, disable: true, artifact: zipOutputPath };
-        slsDeclaration.handler = path.basename(l.handlerPath);
-      }
-    } else {
-      this.listen(ServerlessAwsLambda.PORT, async (port: number, localIp: string) => {
-        Handlers.PORT = port;
-        await this.load(this.#lambdas);
-
-        let output = `✅ AWS Lambda offline server is listening on http://localhost:${port}`;
-
-        if (localIp) {
-          output += ` | http://${localIp}:${port}`;
-        }
-
-        // @ts-ignore
-        this.#lambdas.forEach((x) => x.setEnv("LOCAL_PORT", port));
-        log.GREEN(output);
-      });
+    await result.watch();
+    if (!this.watch) {
+      await result.dispose();
     }
   }
 
-  async #onRebuild(error: any, result: any) {
-    if (error) {
-      log.RED("watch build failed:");
-      console.error(error);
+  buildCallback = async (result: BuildResult, isRebuild: boolean) => {
+    if (isRebuild) {
+      await this.#onRebuild(result);
     } else {
-      this.#setLambdaEsOutputPaths(result.metafile.outputs);
-
+      const { outputs } = result.metafile!;
+      this.#setLambdaEsOutputPaths(outputs);
       if (this.customBuildCallback) {
-        await this.customBuildCallback(result, true);
-        await this.load(this.#lambdas);
-      } else {
-        await this.load(this.#lambdas);
-        log.GREEN(`${new Date().toLocaleString()}🔄✅ Rebuild `);
+        try {
+          await this.customBuildCallback(result, false);
+        } catch (error) {
+          console.log(error);
+        }
       }
 
+      if (this.invokeName) {
+        const slsDeclaration = this.serverless.service.getFunction(this.invokeName);
+        const foundLambda = this.#lambdas.find((x) => x.name == this.invokeName);
+
+        if (foundLambda) {
+          (slsDeclaration as Serverless.FunctionDefinitionHandler).handler = foundLambda.esOutputPath.replace(`${cwd}/`, "").replace(".js", `.${foundLambda.handlerName}`);
+        }
+      } else if (this.isDeploying || this.isPackaging) {
+        let packageLambdas: ILambdaMock[] = this.#lambdas;
+
+        if (this.options.function) {
+          const foundLambda = this.#lambdas.find((x) => x.name == this.options.function);
+
+          if (foundLambda) {
+            packageLambdas = [foundLambda];
+          }
+        }
+        // TODO: convert to promise all
+        for (const l of packageLambdas) {
+          const slsDeclaration = this.serverless.service.getFunction(l.name) as Serverless.FunctionDefinitionHandler;
+
+          const zipableBundledFilePath = l.esOutputPath.slice(0, -3);
+          const zipOutputPath = await zip(zipableBundledFilePath, l.outName);
+
+          // @ts-ignore
+          slsDeclaration.package = { ...slsDeclaration.package, disable: true, artifact: zipOutputPath };
+          slsDeclaration.handler = path.basename(l.handlerPath);
+        }
+      } else {
+        this.listen(ServerlessAwsLambda.PORT, async (port: number, localIp: string) => {
+          Handlers.PORT = port;
+          await this.load(this.#lambdas);
+
+          let output = `✅ AWS Lambda offline server is listening on http://localhost:${port}`;
+
+          if (localIp) {
+            output += ` | http://${localIp}:${port}`;
+          }
+
+          // @ts-ignore
+          this.#lambdas.forEach((x) => x.setEnv("LOCAL_PORT", port));
+          log.GREEN(output);
+        });
+      }
+    }
+  };
+
+  async #onRebuild(result: BuildResult) {
+    if (result.errors) {
+      log.RED("watch build failed:");
+      console.error(result.errors);
+    } else {
+      this.#setLambdaEsOutputPaths(result.metafile!.outputs);
+
+      try {
+        if (this.customBuildCallback) {
+          await this.customBuildCallback(result, true);
+          await this.load(this.#lambdas);
+        } else {
+          await this.load(this.#lambdas);
+        }
+      } catch (error) {
+        console.error(error);
+      }
+
+      log.GREEN(`${new Date().toLocaleString()} 🔄✅ Rebuild `);
       process.send?.({ rebuild: true });
     }
   }
-  #getAlbLambdas(invokeName?: string) {
+  #getLambdas() {
     const funcs = this.serverless.service.functions;
     let functionsNames = Object.keys(funcs);
 
-    if (invokeName) {
-      functionsNames = functionsNames.filter((x) => x == invokeName);
+    if (this.invokeName) {
+      functionsNames = functionsNames.filter((x) => x == this.invokeName);
     }
     const albs = functionsNames.reduce((accum: any[], funcName: string) => {
       const lambda = funcs[funcName];
@@ -399,6 +378,7 @@ class ServerlessAwsLambda extends Daemon {
         endpoints: [],
         sns: [],
         ddb: [],
+        s3: [],
         virtualEnvs: { ...this.defaultVirtualEnvs, ...(slsDeclaration.virtualEnvs ?? {}) },
         environment: {
           ...this.runtimeConfig.environment,
@@ -494,6 +474,8 @@ class ServerlessAwsLambda extends Daemon {
         }
         slsDeclaration.environment[key] = value;
       }
+    } else {
+      log.RED(`Can not set env var on '${lambdaName}'`);
     }
   }
   async #setCustomEsBuildConfig() {
@@ -528,7 +510,6 @@ class ServerlessAwsLambda extends Daemon {
       stage: this.options.stage ?? this.serverless.service.provider.stage ?? "dev",
       esbuild: esbuild,
       serverless: this.serverless,
-      // watch: this.buildContext.watch,
     };
     let exportedObject: any = {};
 

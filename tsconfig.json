@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "declaration": true,
-    "target": "es2018",
-    "module": "CommonJS",
+    "target": "es2022",
+    "module": "NodeNext",
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "emitDeclarationOnly": true,

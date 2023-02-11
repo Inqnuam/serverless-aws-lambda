@@ -62,6 +62,6 @@ export const parseEndpoints = (event: any): LambdaEndpoint | null => {
       return null;
     }
   }
-
+  parsendEvent.paths = parsendEvent.paths.map((x) => (x.startsWith("/") ? x : `/${x}`));
   return parsendEvent;
 };

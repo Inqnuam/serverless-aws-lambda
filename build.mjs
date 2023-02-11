@@ -1,6 +1,5 @@
 import esbuild from "esbuild";
 import { execSync } from "child_process";
-import { nodeExternalsPlugin } from "esbuild-node-externals";
 
 const shouldWatch = process.env.DEV == "true";
 
@@ -11,30 +10,31 @@ const compileDeclarations = () => {
     console.log(error.output?.[1]?.toString());
   }
 };
-
-const esBuildConfig = {
-  bundle: true,
-  minify: !process.env.DEV,
-  platform: "node",
-  target: "es2018",
-  plugins: [nodeExternalsPlugin()],
-  outdir: "dist",
-  format: "cjs",
-  outExtension: { ".js": ".cjs" },
-};
-
-const watch = {
-  watch: shouldWatch && {
-    onRebuild: () => {
+const external = ["esbuild", "archiver", "serve-static"];
+const watchPlugin = {
+  name: "watch-plugin",
+  setup: (build) => {
+    build.onEnd(async (result) => {
       console.log("Compiler rebuild", new Date().toLocaleString());
       compileDeclarations();
-    },
+    });
   },
 };
 
-const buildIndex = esbuild.build.bind(null, {
+const esBuildConfig = {
+  bundle: true,
+  minify: !shouldWatch,
+  platform: "node",
+  target: "ES6",
+  outdir: "dist",
+  format: "cjs",
+  plugins: [watchPlugin],
+};
+
+const bundle = shouldWatch ? esbuild.context : esbuild.build;
+const buildIndex = bundle.bind(null, {
   ...esBuildConfig,
-  external: ["./src/lib/worker.js"],
+  external: external.concat(["./src/lib/worker.js"]),
   entryPoints: [
     "./src/index.ts",
     "./src/server.ts",
@@ -45,18 +45,18 @@ const buildIndex = esbuild.build.bind(null, {
     "./src/plugins/s3/index.ts",
     "./src/plugins/body-parser.ts",
   ],
-  ...watch,
 });
 
-const buildRouterESM = esbuild.build.bind(null, {
+const buildRouterESM = bundle.bind(null, {
   ...esBuildConfig,
   entryPoints: ["./src/lambda/router.ts", "./src/server.ts", "./src/plugins/body-parser.ts"],
-  watch: shouldWatch,
   format: "esm",
   outExtension: { ".js": ".mjs" },
+  external,
 });
 
 const result = await Promise.all([buildIndex(), buildRouterESM()]);
 
-compileDeclarations();
-console.log(result);
+if (shouldWatch) {
+  await Promise.all(result.map((x) => x.watch()));
+}
