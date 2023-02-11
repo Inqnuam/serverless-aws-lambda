@@ -57,6 +57,7 @@ class ServerlessAwsLambda extends Daemon {
     serverless.configSchemaHandler.defineFunctionProperties("aws", {
       properties: {
         virtualEnvs: { type: "object" },
+        online: { type: "boolean" },
       },
     });
 
@@ -100,6 +101,7 @@ class ServerlessAwsLambda extends Daemon {
 
     this.hooks = {
       "aws-lambda:run": this.init.bind(this),
+      "before:package:initialize": this.excludeFunctions.bind(this),
       "before:package:createDeploymentArtifacts": this.init.bind(this, true),
       "before:deploy:function:packageFunction": this.init.bind(this, true),
       "before:invoke:local:invoke": this.invokeLocal.bind(this),
@@ -118,7 +120,14 @@ class ServerlessAwsLambda extends Daemon {
     this.setEsBuildConfig(isPackaging);
     await this.buildAndWatch();
   }
-
+  excludeFunctions() {
+    // @ts-ignore
+    Object.entries(this.serverless.service.functions).forEach(([name, { online }]) => {
+      if (typeof online == "boolean" && online === false) {
+        delete this.serverless.service.functions[name];
+      }
+    });
+  }
   setEsBuildConfig = (isPackaging: boolean) => {
     const entryPoints = this.#lambdas.map((x) => x.esEntryPoint);
 
@@ -128,6 +137,7 @@ class ServerlessAwsLambda extends Daemon {
       minify: isPackaging,
       metafile: true,
       target: "ES6",
+      format: "cjs",
       entryPoints: entryPoints,
       outdir: path.join(cwd, ".aws_lambda"),
       outbase: "src",
@@ -194,6 +204,14 @@ class ServerlessAwsLambda extends Daemon {
         esBuildConfig.resolveExtensions = this.customEsBuildConfig.resolveExtensions;
       }
 
+      if (Array.isArray(this.customEsBuildConfig.mainFields)) {
+        esBuildConfig.mainFields = this.customEsBuildConfig.mainFields;
+      }
+
+      if (Array.isArray(this.customEsBuildConfig.nodePaths)) {
+        esBuildConfig.nodePaths = this.customEsBuildConfig.nodePaths;
+      }
+
       if (typeof this.customEsBuildConfig.ignoreAnnotations == "boolean") {
         esBuildConfig.ignoreAnnotations = this.customEsBuildConfig.ignoreAnnotations;
       }
@@ -235,16 +253,12 @@ class ServerlessAwsLambda extends Daemon {
         esBuildConfig.inject = this.customEsBuildConfig.inject;
       }
 
-      if (typeof this.customEsBuildConfig.format == "string") {
-        esBuildConfig.format = this.customEsBuildConfig.format;
-      }
-
       if (typeof this.customEsBuildConfig.splitting == "boolean") {
         esBuildConfig.splitting = this.customEsBuildConfig.splitting;
       }
 
-      if (typeof this.customEsBuildConfig.bundle == "boolean") {
-        esBuildConfig.bundle = this.customEsBuildConfig.bundle;
+      if (typeof this.customEsBuildConfig.preserveSymlinks == "boolean") {
+        esBuildConfig.preserveSymlinks = this.customEsBuildConfig.preserveSymlinks;
       }
     }
 
@@ -298,7 +312,7 @@ class ServerlessAwsLambda extends Daemon {
           }
         }
         // TODO: convert to promise all
-        for (const l of packageLambdas) {
+        for (const l of packageLambdas.filter((x) => x.online)) {
           const slsDeclaration = this.serverless.service.getFunction(l.name) as Serverless.FunctionDefinitionHandler;
 
           const zipableBundledFilePath = l.esOutputPath.slice(0, -3);
@@ -380,6 +394,7 @@ class ServerlessAwsLambda extends Daemon {
         ddb: [],
         s3: [],
         virtualEnvs: { ...this.defaultVirtualEnvs, ...(slsDeclaration.virtualEnvs ?? {}) },
+        online: typeof slsDeclaration.online == "boolean" ? slsDeclaration.online : true,
         environment: {
           ...this.runtimeConfig.environment,
           ...lambda.environment,
@@ -494,10 +509,10 @@ class ServerlessAwsLambda extends Daemon {
     }
 
     const customConfigArgs = {
-      stop: (cb: (err?: any) => void) => {
+      stop: async (cb: (err?: any) => void) => {
         this.stop(cb);
         if (this.buildContext.stop) {
-          this.buildContext.stop();
+          await this.buildContext.stop();
         }
       },
       lambdas: this.#lambdas,
@@ -600,6 +615,14 @@ class ServerlessAwsLambda extends Daemon {
       customEsBuild.resolveExtensions = customConfig.resolveExtensions;
     }
 
+    if (Array.isArray(customConfig.mainFields)) {
+      customEsBuild.mainFields = customConfig.mainFields;
+    }
+
+    if (Array.isArray(customConfig.nodePaths)) {
+      customEsBuild.nodePaths = customConfig.nodePaths;
+    }
+
     if (typeof customConfig.ignoreAnnotations == "boolean") {
       customEsBuild.ignoreAnnotations = customConfig.ignoreAnnotations;
     }
@@ -635,15 +658,12 @@ class ServerlessAwsLambda extends Daemon {
       customEsBuild.publicPath = customConfig.publicPath;
     }
 
-    if (typeof customConfig.format == "string") {
-      customEsBuild.format = customConfig.format;
-    }
-
     if (typeof customConfig.splitting == "boolean") {
       customEsBuild.splitting = customConfig.splitting;
     }
-    if (typeof customConfig.bundle == "boolean") {
-      customEsBuild.bundle = customConfig.bundle;
+
+    if (typeof customConfig.preserveSymlinks == "boolean") {
+      customEsBuild.preserveSymlinks = customConfig.preserveSymlinks;
     }
 
     if (Array.isArray(customConfig.inject)) {

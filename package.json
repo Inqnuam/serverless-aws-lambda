@@ -1,6 +1,6 @@
 {
   "name": "serverless-aws-lambda",
-  "version": "4.2.9-beta.0",
+  "version": "4.2.9-beta.1",
   "description": "AWS Application Load Balancer and API Gateway - Lambda dev tool for Serverless. Allows Express synthax in handlers. Supports packaging, local invoking and offline real ALB and APG lambda server mocking.",
   "author": "Inqnuam",
   "license": "MIT",
@@ -71,7 +71,7 @@
     "node"
   ],
   "scripts": {
-    "dev": "DEV=true node ./build.mjs ",
+    "dev": "DEV=true node ./build.mjs",
     "build": "node ./build.mjs"
   }
 }

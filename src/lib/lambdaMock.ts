@@ -17,6 +17,7 @@ interface IS3Event {
 export interface ILambdaMock {
   name: string;
   outName: string;
+  online: boolean;
   endpoints: LambdaEndpoint[];
   s3: IS3Event[];
   sns: any[];
@@ -50,6 +51,7 @@ export interface LambdaEndpoint {
 export class LambdaMock extends EventEmitter implements ILambdaMock {
   name: string;
   outName: string;
+  online: boolean;
   endpoints: LambdaEndpoint[];
   s3: any[];
   sns: any[];
@@ -67,6 +69,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   constructor({
     name,
     outName,
+    online,
     endpoints,
     timeout,
     memorySize,
@@ -84,6 +87,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     super();
     this.name = name;
     this.outName = outName;
+    this.online = online;
     this.endpoints = endpoints;
     this.s3 = s3;
     this.sns = sns;

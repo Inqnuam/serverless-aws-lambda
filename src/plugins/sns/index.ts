@@ -1,5 +1,4 @@
-import type { SlsAwsLambdaPlugin } from "../../defineConfig";
-import type { ILambdaMock } from "../../lib/lambdaMock";
+import type { SlsAwsLambdaPlugin, ILambda } from "../../defineConfig";
 import { randomUUID } from "crypto";
 import { parseSnsPublishBody, parseSnsPublishBatchBody, createSnsTopicEvent, getHandlersByTopicArn, genSnsPublishResponse, genSnsPublishBatchResponse } from "./utils";
 
@@ -33,7 +32,7 @@ export const snsPlugin = (): SlsAwsLambdaPlugin => {
                 const body = parseSnsPublishBody(encodedBody);
 
                 const foundHandlers = getHandlersByTopicArn(body, this.lambdas);
-                const deduplicatedHandler: { handler: ILambdaMock; event: any }[] = [];
+                const deduplicatedHandler: { handler: ILambda; event: any }[] = [];
                 if (foundHandlers.length) {
                   const event = createSnsTopicEvent(body, MessageId);
                   foundHandlers.forEach((l) => {
@@ -61,7 +60,7 @@ export const snsPlugin = (): SlsAwsLambdaPlugin => {
 
                 const Successful: any = [];
                 const Failed: any = [];
-                let handlers: { handler: ILambdaMock; event: any }[] = [];
+                let handlers: { handler: ILambda; event: any }[] = [];
 
                 body.Records.forEach((x, index) => {
                   const foundHandlers = getHandlersByTopicArn(x.Sns, this.lambdas);

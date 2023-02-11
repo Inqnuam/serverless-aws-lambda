@@ -12,10 +12,10 @@ export type ILambda = {
     [key: string]: any;
   };
   onInvoke: (callback: (event: any, info?: any) => void) => void;
-} & Omit<ILambdaMock, "_worker">;
+} & Omit<ILambdaMock, "_worker" | "invokeSub">;
 
 export interface ClientConfigParams {
-  stop: (err?: any) => void;
+  stop: (err?: any) => Promise<void>;
   lambdas: ILambda[];
   isDeploying: boolean;
   isPackaging: boolean;

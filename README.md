@@ -98,7 +98,6 @@ To have more control over the plugin you can passe a config file via `configPath
 custom:
   serverless-aws-lambda:
     port: 3000
-    watch: true
     configPath: ./config.default
 ```
 

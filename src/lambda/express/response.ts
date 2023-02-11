@@ -21,6 +21,7 @@ export interface IResponse {
   awsRequestId: string;
   getRemainingTimeInMillis: Function;
   status: (code: number) => this;
+  sendStatus: (code: number) => void;
   send: (content?: string) => void;
   end: (rawContent: any) => void;
   json: (content: [] | { [key: string]: any }) => void;
@@ -155,6 +156,9 @@ export class _Response implements IResponse {
   status(code: number): this {
     this.responseObject.statusCode = code;
     return this;
+  }
+  sendStatus(code: number) {
+    this.status(code).#sendResponse();
   }
   type(contentType: string): this {
     this.responseObject.headers["Content-Type"] = contentType;

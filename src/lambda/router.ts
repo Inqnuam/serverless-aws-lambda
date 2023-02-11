@@ -1,5 +1,5 @@
 import EventEmitter from "events";
-import { _buildUniversalEvent, IRequest, RawResponseContent } from "./express/request";
+import { _buildUniversalEvent, IRequest } from "./express/request";
 import { _Response, IResponse } from "./express/response";
 
 export { IRequest, IResponse };
