@@ -342,7 +342,7 @@ class ServerlessAwsLambda extends Daemon {
   };
 
   async #onRebuild(result: BuildResult) {
-    if (result.errors) {
+    if (result?.errors?.length) {
       log.RED("watch build failed:");
       console.error(result.errors);
     } else {
