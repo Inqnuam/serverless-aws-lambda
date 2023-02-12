@@ -16,6 +16,7 @@ export interface Config {
   esbuild?: Omit<BuildOptions, "entryPoints" | "outExtension" | "outfile" | "bundle" | "splitting" | "stdin" | "format">;
   offline?: OfflineConfig;
   buildCallback?: (result: BuildResult, isRebuild: boolean) => Promise<void> | void;
+  afterDeployCallbacks?: (() => Promise<void> | void)[];
 }
 
 export interface ServerConfig {

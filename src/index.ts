@@ -36,6 +36,7 @@ class ServerlessAwsLambda extends Daemon {
   defaultVirtualEnvs: any;
   nodeVersion = false;
   invokeName?: string;
+  afterDeployCallbacks: (() => void | Promise<void>)[] = [];
   constructor(serverless: any, options: any) {
     super({ debug: process.env.SLS_DEBUG == "*" });
 
@@ -105,6 +106,7 @@ class ServerlessAwsLambda extends Daemon {
       "before:package:createDeploymentArtifacts": this.init.bind(this, true),
       "before:deploy:function:packageFunction": this.init.bind(this, true),
       "before:invoke:local:invoke": this.invokeLocal.bind(this),
+      "after:aws:deploy:finalize:cleanup": this.afterDeploy.bind(this),
     };
   }
 
@@ -113,6 +115,15 @@ class ServerlessAwsLambda extends Daemon {
     await this.init(false);
   }
 
+  async afterDeploy() {
+    for (const cb of this.afterDeployCallbacks) {
+      try {
+        await cb();
+      } catch (error) {
+        console.log(error);
+      }
+    }
+  }
   async init(isPackaging: boolean) {
     this.#setRuntimeEnvs();
     this.#lambdas = this.#getLambdas();
@@ -538,6 +549,10 @@ class ServerlessAwsLambda extends Daemon {
 
     if (typeof exportedObject.buildCallback == "function") {
       this.customBuildCallback = exportedObject.buildCallback;
+    }
+
+    if (Array.isArray(exportedObject.afterDeployCallbacks)) {
+      this.afterDeployCallbacks = exportedObject.afterDeployCallbacks;
     }
 
     if (exportedObject.offline && typeof exportedObject.offline == "object") {
