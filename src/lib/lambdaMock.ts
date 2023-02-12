@@ -4,7 +4,7 @@ import { HttpMethod } from "./handlers";
 import { randomUUID } from "crypto";
 import { EventEmitter } from "events";
 import { log } from "./colorize";
-const workerPath = pathResolve(__dirname, "./lib/worker.cjs");
+const workerPath = pathResolve(__dirname, "./lib/worker.js");
 
 interface IS3Event {
   bucket: string;
