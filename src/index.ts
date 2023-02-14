@@ -30,7 +30,7 @@ class ServerlessAwsLambda extends Daemon {
   commands: any;
   hooks: any;
   esBuildConfig: any;
-  buildContext: any;
+  buildContext: any = {};
   customEsBuildConfig: any;
   customBuildCallback?: Function;
   defaultVirtualEnvs: any;
@@ -280,14 +280,12 @@ class ServerlessAwsLambda extends Daemon {
   };
 
   async buildAndWatch() {
-    const result = await esbuild.context(this.esBuildConfig);
-    this.buildContext = {
-      stop: result.dispose,
-    };
-
-    await result.watch();
-    if (!this.watch) {
-      await result.dispose();
+    if (this.watch) {
+      const ctx = await esbuild.context(this.esBuildConfig);
+      await ctx.watch();
+      this.buildContext.stop = ctx.dispose;
+    } else {
+      await esbuild.build(this.esBuildConfig);
     }
   }
 
