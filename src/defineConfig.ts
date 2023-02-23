@@ -5,6 +5,7 @@ import type { HttpMethod } from "./lib/handlers";
 import type { IncomingMessage, ServerResponse } from "http";
 import type Serverless from "serverless";
 import { log } from "./lib/colorize";
+import { exitEvents } from "./server";
 
 export type ILambda = {
   setEnv: (key: string, value: string) => void;
@@ -12,7 +13,7 @@ export type ILambda = {
     [key: string]: any;
   };
   onInvoke: (callback: (event: any, info?: any) => void) => void;
-} & Omit<ILambdaMock, "_worker" | "invokeSub">;
+} & Omit<ILambdaMock, "_worker" | "invokeSub" | "_isLoaded" | "_isLoading">;
 
 export interface ClientConfigParams {
   stop: (err?: any) => Promise<void>;
@@ -52,25 +53,6 @@ export interface Options {
   };
   plugins?: SlsAwsLambdaPlugin[];
 }
-
-const exitEvents = [
-  "exit",
-  "beforeExit",
-  "uncaughtException",
-  "unhandledRejection",
-  "SIGHUP",
-  "SIGINT",
-  "SIGQUIT",
-  "SIGILL",
-  "SIGTRAP",
-  "SIGABRT",
-  "SIGBUS",
-  "SIGFPE",
-  "SIGUSR1",
-  "SIGSEGV",
-  "SIGUSR2",
-  "SIGTERM",
-];
 
 let exiting = false;
 

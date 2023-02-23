@@ -22,6 +22,7 @@ export interface ILambdaMock {
   s3: IS3Event[];
   sns: any[];
   ddb: any[];
+  kinesis: any[];
   timeout: number;
   memorySize: number;
   environment: { [key: string]: any };
@@ -31,6 +32,7 @@ export interface ILambdaMock {
   esOutputPath: string;
   entryPoint: string;
   _worker?: Worker;
+  _isLoaded: boolean;
   invokeSub: ((event: any) => void)[];
   invoke: (event: any, info?: any) => Promise<any>;
 }
@@ -53,9 +55,10 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   outName: string;
   online: boolean;
   endpoints: LambdaEndpoint[];
-  s3: any[];
+  s3: IS3Event[];
   sns: any[];
   ddb: any[];
+  kinesis: any[];
   timeout: number;
   memorySize: number;
   environment: { [key: string]: any };
@@ -65,6 +68,8 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   esOutputPath: string;
   entryPoint: string;
   _worker?: Worker;
+  _isLoaded: boolean = false;
+  _isLoading: boolean = false;
   invokeSub: ((event: any, info?: any) => void)[];
   constructor({
     name,
@@ -82,6 +87,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     s3,
     sns,
     ddb,
+    kinesis,
     invokeSub,
   }: ILambdaMock) {
     super();
@@ -92,6 +98,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     this.s3 = s3;
     this.sns = sns;
     this.ddb = ddb;
+    this.kinesis = kinesis;
     this.timeout = timeout;
     this.memorySize = memorySize;
     this.environment = environment;
@@ -104,40 +111,63 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   }
 
   async importEventHandler() {
-    const workerData = {
-      name: this.name,
-      timeout: this.timeout,
-      memorySize: this.memorySize,
-      esOutputPath: this.esOutputPath,
-      handlerName: this.handlerName,
-    };
     await new Promise((resolve, reject) => {
       this._worker = new Worker(workerPath, {
         env: this.environment,
         stackSizeMb: this.memorySize,
-        workerData,
+        workerData: {
+          name: this.name,
+          timeout: this.timeout,
+          memorySize: this.memorySize,
+          esOutputPath: this.esOutputPath,
+          handlerName: this.handlerName,
+        },
       } as WorkerOptions);
+
+      this._worker.setMaxListeners(0);
+
+      const errorHandler = (err: any) => {
+        this._isLoaded = false;
+        this._isLoading = false;
+        log.RED("Lambda execution fatal error");
+        console.error(err);
+        this.emit("loaded", false);
+        reject(err);
+      };
 
       this._worker.on("message", (e) => {
         const { channel, data, awsRequestId } = e;
         if (channel == "import") {
+          this._worker!.setMaxListeners(55);
+          this.setMaxListeners(10);
+          this._worker!.removeListener("error", errorHandler);
+          this._isLoaded = true;
+          this._isLoading = false;
+          this.emit("loaded", true);
           resolve(undefined);
         } else {
           this.emit(awsRequestId, channel, data);
         }
       });
-      this._worker.once("error", (err) => {
-        log.RED("Lambda execution fatal error");
-        console.error(err);
-
-        reject(err);
-      });
+      this._worker.on("error", errorHandler);
       this._worker.postMessage({ channel: "import" });
     });
   }
 
   async invoke(event: any, info?: any) {
-    if (!this._worker) {
+    if (this._isLoading) {
+      this.setMaxListeners(0);
+      await new Promise((resolve, reject) => {
+        this.once("loaded", (isLoaded) => {
+          if (isLoaded) {
+            resolve(undefined);
+          } else {
+            reject();
+          }
+        });
+      });
+    } else if (!this._isLoaded) {
+      this._isLoading = true;
       log.BR_BLUE(`❄️ Cold start '${this.outName}'`);
       await this.importEventHandler();
     }
@@ -155,14 +185,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
         awsRequestId,
       });
 
-      this._worker!.once("error", (err) => {
-        this._worker!.removeAllListeners("error");
-        reject(err);
-      });
-      this.on(awsRequestId, (channel, rawData) => {
-        this.removeAllListeners(awsRequestId);
-        this._worker!.removeAllListeners("error");
-
+      this.once(awsRequestId, (channel, rawData) => {
         let data;
         try {
           data = channel == "return" ? rawData : JSON.parse(rawData);

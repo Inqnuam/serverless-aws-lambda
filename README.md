@@ -36,15 +36,31 @@ Start the offline server
 SLS_DEBUG="*" sls aws-lambda -s dev
 ```
 
-It is also possible to passe port and watch options from the CLI with `--port` or `-p` and `--watch` or `-w`.
+It is also possible to passe port and watch options from the CLI with `--port` or `-p`.
 
 Command line values will overwrite serverless.yml custom > serverless-aws-lambda values if they are set.
 
 ### Invoke
 
 Offline server supports ALB and APG endponts.  
-Appropriate `event` object is sent to the handler based on your lambda declaration.  
-However if your declare both `alb` and `http` into a single lambda `events` you have to specify desired server by setting `alb` or `apg` inside your request's:
+Appropriate `event` object is sent to the handler based on your lambda declaration.
+
+```yaml
+functions:
+  myAwsomeLambda:
+    handler: src/handlers/awsomeLambda.default
+    events:
+      - alb:
+          listenerArn: arn:aws:elasticloadbalancing:eu-west-3:170838072631:listener/app/myAlb/bf88e6ec8f3d91df/e653b73728d04626
+          priority: 939
+          conditions:
+            path: "/paradise"
+            method: GET
+```
+
+`myAwsomeLambda` is available at `http://localhost:PORT/paradise`
+
+However if your declare both `alb` and `http` or `httpApi` inside a single lambda `events` with the same `path` you have to specify desired server by setting `alb` or `apg` inside your request's:
 
 - header with `X-Mock-Type`.
 - or in query string with `x_mock_type`.

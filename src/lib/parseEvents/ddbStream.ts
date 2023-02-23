@@ -1,36 +1,3 @@
-export const getDynamoStreamTables = (serverless: any) => {
-  let ddbStreamTables = [];
-  if (serverless.service.resources?.Resources) {
-    ddbStreamTables = Object.entries(serverless.service.resources.Resources)?.reduce((accum, obj: [string, any]) => {
-      const [key, value] = obj;
-
-      if (value.Type == "AWS::DynamoDB::Table") {
-        const { TableName, StreamSpecification } = value.Properties;
-        if (TableName) {
-          accum[key] = {
-            TableName,
-          };
-
-          if (StreamSpecification) {
-            let StreamEnabled = false;
-            if (!("StreamEnabled" in StreamSpecification) || StreamSpecification.StreamEnabled) {
-              StreamEnabled = true;
-            }
-            accum[key]["StreamEnabled"] = StreamEnabled;
-
-            if (StreamSpecification.StreamViewType) {
-              accum[key]["StreamViewType"] = StreamSpecification.StreamViewType;
-            }
-          }
-        }
-      }
-
-      return accum;
-    }, {} as any);
-  }
-  return ddbStreamTables;
-};
-
 const getTableNameFromResources = (ddbStreamTables: any, serverless: any, obj: any) => {
   const [key, value] = Object.entries(obj)?.[0];
 
@@ -47,6 +14,13 @@ const getTableNameFromResources = (ddbStreamTables: any, serverless: any, obj: a
     }
   } else if (key == "Fn::ImportValue" && typeof value == "string") {
     return parseDynamoTableNameFromArn(serverless.service.resources?.Outputs?.[value]?.Export?.Name);
+  } else if (key == "Fn::Join") {
+    const values = value as unknown as any[];
+    const streamName = values[1][values[1].length - 1];
+
+    if (typeof streamName == "string") {
+      return streamName.split("/")[1];
+    }
   }
 };
 const parseDynamoTableNameFromArn = (arn: any) => {

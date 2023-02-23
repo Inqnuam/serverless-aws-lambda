@@ -26,7 +26,9 @@ export interface IResponse {
   end: (rawContent: any) => void;
   json: (content: [] | { [key: string]: any }) => void;
   set: (header: string | { [key: string]: string }, value?: string) => this;
+  setHeader: (header: string | { [key: string]: string }, value?: string) => this;
   get: (headerKey: string) => string;
+  getHeader: (headerKey: string) => string;
   redirect: (...redirectOptions: RedirectOptions) => void;
   location(url: string): this;
   links(links: any): this;

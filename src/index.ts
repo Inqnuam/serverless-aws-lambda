@@ -9,7 +9,7 @@ import type Serverless from "serverless";
 import { Handlers } from "./lib/handlers";
 import { buildOptimizer } from "./lib/esbuild/buildOptimizer";
 import { parseEvents } from "./lib/parseEvents/index";
-
+import { getResources } from "./lib/parseEvents/getResources";
 const cwd = process.cwd();
 const DEFAULT_LAMBDA_TIMEOUT = 6;
 const DEFAULT_LAMBDA_MEMORY_SIZE = 1024;
@@ -379,6 +379,7 @@ class ServerlessAwsLambda extends Daemon {
     if (this.invokeName) {
       functionsNames = functionsNames.filter((x) => x == this.invokeName);
     }
+    const resources = getResources(this.serverless);
     const albs = functionsNames.reduce((accum: any[], funcName: string) => {
       const lambda = funcs[funcName];
 
@@ -402,6 +403,7 @@ class ServerlessAwsLambda extends Daemon {
         sns: [],
         ddb: [],
         s3: [],
+        kinesis: [],
         virtualEnvs: { ...this.defaultVirtualEnvs, ...(slsDeclaration.virtualEnvs ?? {}) },
         online: typeof slsDeclaration.online == "boolean" ? slsDeclaration.online : true,
         environment: {
@@ -437,11 +439,12 @@ class ServerlessAwsLambda extends Daemon {
       }
 
       if (lambda.events.length) {
-        const { endpoints, sns, ddb, s3 } = parseEvents(lambda.events, this.serverless);
+        const { endpoints, sns, ddb, s3, kinesis } = parseEvents(lambda.events, this.serverless, resources);
         lambdaDef.endpoints = endpoints;
         lambdaDef.sns = sns;
         lambdaDef.ddb = ddb;
         lambdaDef.s3 = s3;
+        lambdaDef.kinesis = kinesis;
       }
       // console.log(lambdaDef);
       accum.push(lambdaDef);

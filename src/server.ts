@@ -2,10 +2,27 @@ import { fork } from "child_process";
 import type { ServerConfig } from "./config";
 import type { ChildProcess } from "child_process";
 
-
+const exitEvents = [
+  "exit",
+  "beforeExit",
+  "uncaughtException",
+  "unhandledRejection",
+  "SIGHUP",
+  "SIGINT",
+  "SIGQUIT",
+  "SIGILL",
+  "SIGTRAP",
+  "SIGABRT",
+  "SIGBUS",
+  "SIGFPE",
+  "SIGUSR1",
+  "SIGSEGV",
+  "SIGUSR2",
+  "SIGTERM",
+];
 export class Server {
   #cmd?: ChildProcess;
-  #exitEvents = ["exit", "SIGINT", "SIGUSR1", "SIGUSR2", "uncaughtException", "SIGTERM"];
+  #exitEvents = exitEvents;
   #config: ServerConfig;
   constructor(config?: ServerConfig) {
     this.#config = config ?? {};
@@ -53,4 +70,4 @@ export class Server {
   }
 }
 
-export { ServerConfig };
+export { ServerConfig, exitEvents };

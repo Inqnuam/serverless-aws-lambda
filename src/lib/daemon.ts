@@ -325,17 +325,20 @@ export class Daemon extends Handlers {
   }
 
   async #responseHandler(res: ServerResponse, event: any, lambdaController: ILambdaMock, method: HttpMethod, path: string, mockEvent: LambdaEndpoint) {
-    const hrTimeStart = process.hrtime();
+    if (this.debug) {
+      const hrTimeStart = process.hrtime();
 
-    res.on("close", () => {
-      const endAt = process.hrtime(hrTimeStart);
-      const execTime = `${endAt[0]},${endAt[1]}s`;
-      const executedTime = `⌛️ '${lambdaController.name}' execution time: ${execTime}`;
-      // NOTE: as main and worker process share the same stdout we need a timeout before printing any additionnal info
-      setTimeout(() => {
-        log.YELLOW(executedTime);
-      }, 400);
-    });
+      res.on("close", () => {
+        const endAt = process.hrtime(hrTimeStart);
+        const execTime = `${endAt[0]},${endAt[1]}s`;
+        const executedTime = `⌛️ '${lambdaController.name}' execution time: ${execTime}`;
+        // NOTE: as main and worker process share the same stdout we need a timeout before printing any additionnal info
+        setTimeout(() => {
+          log.YELLOW(executedTime);
+        }, 400);
+      });
+    }
+
     try {
       const date = new Date();
       const awsRequestId = randomUUID();
@@ -483,7 +486,7 @@ export class Daemon extends Handlers {
             resContent = JSON.stringify(responseData);
           }
         } else {
-          log.RED("Invalid response content");
+          log.YELLOW("Invalid response content");
           res.setHeader("Content-Type", "text/html");
           res.statusCode = 502;
           resContent = html500;
