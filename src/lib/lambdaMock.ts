@@ -199,6 +199,9 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
             resolve(data);
             break;
           case "fail":
+            if (data == "_timeout_") {
+              log.RED("Tiemout reached");
+            }
             reject(data);
             break;
           default:

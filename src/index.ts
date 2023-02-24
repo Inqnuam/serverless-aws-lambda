@@ -10,6 +10,8 @@ import { Handlers } from "./lib/handlers";
 import { buildOptimizer } from "./lib/esbuild/buildOptimizer";
 import { parseEvents } from "./lib/parseEvents/index";
 import { getResources } from "./lib/parseEvents/getResources";
+import { parseCustomEsbuild } from "./lib/parseCustomEsbuild";
+import { mergeEsbuildConfig } from "./lib/mergeEsbuildConfig";
 const cwd = process.cwd();
 const DEFAULT_LAMBDA_TIMEOUT = 6;
 const DEFAULT_LAMBDA_MEMORY_SIZE = 1024;
@@ -34,7 +36,7 @@ class ServerlessAwsLambda extends Daemon {
   customEsBuildConfig: any;
   customBuildCallback?: Function;
   defaultVirtualEnvs: any;
-  nodeVersion = false;
+  nodeVersion: number | boolean | string | undefined = false;
   invokeName?: string;
   afterDeployCallbacks: (() => void | Promise<void>)[] = [];
   constructor(serverless: any, options: any) {
@@ -47,8 +49,11 @@ class ServerlessAwsLambda extends Daemon {
     this.isPackaging = this.serverless.processedInput.commands.includes("package");
     // @ts-ignore
     this.isDeploying = this.serverless.processedInput.commands.includes("deploy");
-    // @ts-ignore
+
     this.nodeVersion = this.serverless.service.provider.runtime?.replace(/[^0-9]/g, "");
+    if (!this.nodeVersion) {
+      throw new Error("Please provide NodeJS runtime version inside your serverless.yml > provider > runtime");
+    }
     this.watch = !this.isPackaging && !this.isDeploying;
     if (!this.watch) {
       log.BR_BLUE("Packaging using serverless-aws-lambda...");
@@ -143,139 +148,33 @@ class ServerlessAwsLambda extends Daemon {
     const entryPoints = this.#lambdas.map((x) => x.esEntryPoint);
 
     let esBuildConfig: BuildOptions = {
-      platform: "node",
       sourcemap: !isPackaging,
       minify: isPackaging,
-      metafile: true,
-      target: "ES6",
-      format: "cjs",
       entryPoints: entryPoints,
       outdir: path.join(cwd, ".aws_lambda"),
-      outbase: "src",
+      metafile: true,
       bundle: true,
+      platform: "node",
+      target: "es2018",
+      format: "cjs",
+      outbase: "src",
       plugins: [],
       external: ["esbuild"],
     };
 
-    if (typeof this.nodeVersion == "string") {
-      esBuildConfig.plugins?.push(buildOptimizer({ isLocal: !this.isDeploying && !this.isPackaging, nodeVersion: Number(this.nodeVersion), buildCallback: this.buildCallback }));
+    if (typeof this.nodeVersion == "string" && !isNaN(Number(this.nodeVersion))) {
+      this.nodeVersion = Number(this.nodeVersion);
+      if (Number(process.versions.node.slice(0, 2)) < Number(this.nodeVersion)) {
+        log.RED(`You are running on NodeJS ${process.version} which is lower than '${this.nodeVersion}' found in serverless.yml.`);
+      }
+      esBuildConfig.target = `node${this.nodeVersion}`;
+      esBuildConfig.plugins?.push(buildOptimizer({ isLocal: !this.isDeploying && !this.isPackaging, nodeVersion: this.nodeVersion, buildCallback: this.buildCallback }));
     }
 
     if (this.customEsBuildConfig) {
-      if (Array.isArray(this.customEsBuildConfig.plugins)) {
-        esBuildConfig.plugins!.push(...this.customEsBuildConfig.plugins);
-      }
-
-      if (Array.isArray(this.customEsBuildConfig.external)) {
-        esBuildConfig.external!.push(...this.customEsBuildConfig.external);
-      }
-
-      if (typeof this.customEsBuildConfig.sourcemap == "boolean") {
-        esBuildConfig.sourcemap = this.customEsBuildConfig.sourcemap;
-      }
-
-      if (typeof this.customEsBuildConfig.minify == "boolean") {
-        esBuildConfig.minify = this.customEsBuildConfig.minify;
-      }
-
-      if (typeof this.customEsBuildConfig.outdir == "string") {
-        esBuildConfig.outdir = this.customEsBuildConfig.outdir;
-      }
-
-      if (typeof this.customEsBuildConfig.outbase == "string") {
-        esBuildConfig.outbase = this.customEsBuildConfig.outbase;
-      }
-
-      if (typeof this.customEsBuildConfig.target == "string") {
-        esBuildConfig.target = this.customEsBuildConfig.target;
-      }
-
-      if (typeof this.customEsBuildConfig.tsconfig == "string") {
-        esBuildConfig.tsconfig = this.customEsBuildConfig.tsconfig;
-      }
-
-      if (typeof this.customEsBuildConfig.tsconfigRaw == "string") {
-        // @ts-ignore
-        esBuildConfig.tsconfigRaw = this.customEsBuildConfig.tsconfigRaw;
-      }
-
-      if (typeof this.customEsBuildConfig.legalComments == "string") {
-        esBuildConfig.legalComments = this.customEsBuildConfig.legalComments;
-      }
-
-      if (Array.isArray(this.customEsBuildConfig.pure)) {
-        esBuildConfig.pure = this.customEsBuildConfig.pure;
-      }
-
-      if (Array.isArray(this.customEsBuildConfig.drop)) {
-        esBuildConfig.drop = this.customEsBuildConfig.drop;
-      }
-
-      if (Array.isArray(this.customEsBuildConfig.resolveExtensions)) {
-        esBuildConfig.resolveExtensions = this.customEsBuildConfig.resolveExtensions;
-      }
-
-      if (Array.isArray(this.customEsBuildConfig.mainFields)) {
-        esBuildConfig.mainFields = this.customEsBuildConfig.mainFields;
-      }
-
-      if (Array.isArray(this.customEsBuildConfig.nodePaths)) {
-        esBuildConfig.nodePaths = this.customEsBuildConfig.nodePaths;
-      }
-
-      if (typeof this.customEsBuildConfig.ignoreAnnotations == "boolean") {
-        esBuildConfig.ignoreAnnotations = this.customEsBuildConfig.ignoreAnnotations;
-      }
-      if (typeof this.customEsBuildConfig.treeShaking == "boolean") {
-        esBuildConfig.treeShaking = this.customEsBuildConfig.treeShaking;
-      }
-
-      if (this.customEsBuildConfig.define && typeof this.customEsBuildConfig.define == "object") {
-        esBuildConfig.define = this.customEsBuildConfig.define;
-      }
-
-      if (this.customEsBuildConfig.banner && typeof this.customEsBuildConfig.banner == "object") {
-        esBuildConfig.banner = this.customEsBuildConfig.banner;
-      }
-      if (this.customEsBuildConfig.footer && typeof this.customEsBuildConfig.footer == "object") {
-        esBuildConfig.footer = this.customEsBuildConfig.footer;
-      }
-
-      if (this.customEsBuildConfig.loader && typeof this.customEsBuildConfig.loader == "object") {
-        esBuildConfig.loader = this.customEsBuildConfig.loader;
-      }
-      if (this.customEsBuildConfig.alias && typeof this.customEsBuildConfig.alias == "object") {
-        esBuildConfig.alias = this.customEsBuildConfig.alias;
-      }
-
-      if (typeof this.customEsBuildConfig.assetNames == "string") {
-        esBuildConfig.assetNames = this.customEsBuildConfig.assetNames;
-      }
-
-      if (typeof this.customEsBuildConfig.entryNames == "string") {
-        esBuildConfig.entryNames = this.customEsBuildConfig.entryNames;
-      }
-
-      if (typeof this.customEsBuildConfig.publicPath == "string") {
-        esBuildConfig.publicPath = this.customEsBuildConfig.publicPath;
-      }
-
-      if (Array.isArray(this.customEsBuildConfig.inject)) {
-        esBuildConfig.inject = this.customEsBuildConfig.inject;
-      }
-
-      if (typeof this.customEsBuildConfig.splitting == "boolean") {
-        esBuildConfig.splitting = this.customEsBuildConfig.splitting;
-      }
-
-      if (typeof this.customEsBuildConfig.preserveSymlinks == "boolean") {
-        esBuildConfig.preserveSymlinks = this.customEsBuildConfig.preserveSymlinks;
-      }
+      esBuildConfig = mergeEsbuildConfig(esBuildConfig, this.customEsBuildConfig);
     }
 
-    if (!esBuildConfig.bundle) {
-      delete esBuildConfig.external;
-    }
     this.esBuildConfig = esBuildConfig;
   };
 
@@ -380,7 +279,7 @@ class ServerlessAwsLambda extends Daemon {
       functionsNames = functionsNames.filter((x) => x == this.invokeName);
     }
     const resources = getResources(this.serverless);
-    const albs = functionsNames.reduce((accum: any[], funcName: string) => {
+    const lambdas = functionsNames.reduce((accum: any[], funcName: string) => {
       const lambda = funcs[funcName];
 
       const handlerPath = (lambda as Serverless.FunctionDefinitionHandler).handler;
@@ -451,7 +350,7 @@ class ServerlessAwsLambda extends Daemon {
       return accum;
     }, []);
 
-    return albs;
+    return lambdas;
   }
   #setLambdaEsOutputPaths(outputs: any) {
     const outputNames = Object.keys(outputs)
@@ -510,11 +409,13 @@ class ServerlessAwsLambda extends Daemon {
       return;
     }
 
-    const extPoint = this.pluginConfig.configPath.lastIndexOf(".");
-    const customFilePath = this.pluginConfig.configPath.slice(0, extPoint);
-    const configObjectName = this.pluginConfig.configPath.slice(extPoint + 1);
+    const parsed = path.posix.parse(this.pluginConfig.configPath);
 
-    const exportedFunc = require(path.resolve(cwd, customFilePath));
+    const customFilePath = path.posix.join(parsed.dir, parsed.name);
+    const configObjectName = parsed.ext.slice(1);
+    const configPath = path.resolve(customFilePath);
+
+    const exportedFunc = require(configPath);
 
     if (!exportedFunc) {
       return;
@@ -545,7 +446,7 @@ class ServerlessAwsLambda extends Daemon {
     } else if (typeof exportedFunc == "function") {
       exportedObject = await exportedFunc(customConfigArgs);
     } else {
-      return;
+      throw new Error(`Can not find config at: ${configPath}`);
     }
 
     if (typeof exportedObject.buildCallback == "function") {
@@ -577,117 +478,10 @@ class ServerlessAwsLambda extends Daemon {
     if (!customConfig) {
       return;
     }
-    let customEsBuild: any = {};
-    if (Array.isArray(customConfig.plugins)) {
-      customEsBuild.plugins = customConfig.plugins;
-    }
 
-    if (Array.isArray(customConfig.external)) {
-      customEsBuild.external = customConfig.external;
-    }
-
-    if (typeof customConfig.sourcemap == "boolean") {
-      customEsBuild.sourcemap = customConfig.sourcemap;
-    }
-
-    if (typeof customConfig.minify == "boolean") {
-      customEsBuild.minify = customConfig.minify;
-    }
-
-    if (typeof customConfig.outdir == "string") {
-      customEsBuild.outdir = customConfig.outdir;
-    }
-
-    if (typeof customConfig.outbase == "string") {
-      customEsBuild.outbase = customConfig.outbase;
-    }
-
-    if (typeof customConfig.target == "string") {
-      customEsBuild.target = customConfig.target;
-    }
-
-    if (typeof customConfig.tsconfig == "string") {
-      customEsBuild.tsconfig = customConfig.tsconfig;
-    }
-
-    if (typeof customConfig.tsconfigRaw == "string") {
-      // @ts-ignore
-      customEsBuild.tsconfigRaw = customConfig.tsconfigRaw;
-    }
-
-    if (typeof customConfig.legalComments == "string") {
-      customEsBuild.legalComments = customConfig.legalComments;
-    }
-
-    if (Array.isArray(customConfig.pure)) {
-      customEsBuild.pure = customConfig.pure;
-    }
-
-    if (Array.isArray(customConfig.drop)) {
-      customEsBuild.drop = customConfig.drop;
-    }
-
-    if (Array.isArray(customConfig.resolveExtensions)) {
-      customEsBuild.resolveExtensions = customConfig.resolveExtensions;
-    }
-
-    if (Array.isArray(customConfig.mainFields)) {
-      customEsBuild.mainFields = customConfig.mainFields;
-    }
-
-    if (Array.isArray(customConfig.nodePaths)) {
-      customEsBuild.nodePaths = customConfig.nodePaths;
-    }
-
-    if (typeof customConfig.ignoreAnnotations == "boolean") {
-      customEsBuild.ignoreAnnotations = customConfig.ignoreAnnotations;
-    }
-    if (typeof customConfig.treeShaking == "boolean") {
-      customEsBuild.treeShaking = customConfig.treeShaking;
-    }
-
-    if (customConfig.define && typeof customConfig.define == "object") {
-      customEsBuild.define = customConfig.define;
-    }
-
-    if (customConfig.banner && typeof customConfig.banner == "object") {
-      customEsBuild.banner = customConfig.banner;
-    }
-    if (customConfig.footer && typeof customConfig.footer == "object") {
-      customEsBuild.footer = customConfig.footer;
-    }
-    if (customConfig.loader && typeof customConfig.loader == "object") {
-      customEsBuild.loader = customConfig.loader;
-    }
-    if (customConfig.alias && typeof customConfig.alias == "object") {
-      customEsBuild.alias = customConfig.alias;
-    }
-
-    if (typeof customConfig.assetNames == "string") {
-      customEsBuild.assetNames = customConfig.assetNames;
-    }
-    if (typeof customConfig.entryNames == "string") {
-      customEsBuild.entryNames = customConfig.entryNames;
-    }
-
-    if (typeof customConfig.publicPath == "string") {
-      customEsBuild.publicPath = customConfig.publicPath;
-    }
-
-    if (typeof customConfig.splitting == "boolean") {
-      customEsBuild.splitting = customConfig.splitting;
-    }
-
-    if (typeof customConfig.preserveSymlinks == "boolean") {
-      customEsBuild.preserveSymlinks = customConfig.preserveSymlinks;
-    }
-
-    if (Array.isArray(customConfig.inject)) {
-      customEsBuild.inject = customConfig.inject;
-    }
-
+    const customEsBuild = parseCustomEsbuild(customConfig);
     if (Object.keys(customEsBuild).length) {
-      this.customEsBuildConfig = customConfig;
+      this.customEsBuildConfig = customEsBuild;
     }
   }
 }
