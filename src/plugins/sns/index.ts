@@ -7,6 +7,48 @@ export const snsPlugin = (): SlsAwsLambdaPlugin => {
     name: "sns-plugin",
     offline: {
       request: [
+        // only for internal usage
+        {
+          method: "POST",
+          filter: "/@sns/parsed",
+          callback: function (req, res) {
+            let data = Buffer.alloc(0);
+            const MessageId = randomUUID();
+            const RequestId = req.headers["amz-sdk-invocation-id"] ?? randomUUID();
+
+            req.on("data", (chunk) => {
+              data += chunk;
+            });
+
+            req.on("end", async () => {
+              const body = JSON.parse(data.toString());
+              const foundHandlers = getHandlersByTopicArn(body, this.lambdas);
+              const deduplicatedHandler: { handler: ILambda; event: any }[] = [];
+              if (foundHandlers.length) {
+                const event = createSnsTopicEvent(body, MessageId);
+                foundHandlers.forEach((l) => {
+                  if (!deduplicatedHandler.find((x) => x.handler.name == l.handler.name)) {
+                    deduplicatedHandler.push(l);
+                  }
+                });
+
+                for (const { handler, event: info } of deduplicatedHandler) {
+                  try {
+                    await handler.invoke(event, { kind: "sns", event: info });
+                  } catch (error) {
+                    console.log(error);
+                  }
+                }
+              }
+
+              res.statusCode = 200;
+              res.setHeader("Content-Type", "text/xml");
+
+              const snsResponse = genSnsPublishResponse(MessageId, Array.isArray(RequestId) ? RequestId[0] : RequestId);
+              res.end(snsResponse);
+            });
+          },
+        },
         {
           method: "POST",
           filter: "/@sns",

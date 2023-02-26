@@ -1,6 +1,6 @@
 import type { SlsAwsLambdaPlugin, ILambda } from "../../defineConfig";
-import { access, stat, mkdir, rm, copyFile } from "fs/promises";
-import { createReadStream, createWriteStream } from "fs";
+import { access, stat, mkdir, rm, copyFile, readFile } from "fs/promises";
+import { createReadStream, createWriteStream, writeFileSync } from "fs";
 import { RequestParser } from "./parseRequest";
 import { notFoundKey, copyObjectResponse } from "./s3Responses";
 import { calulcateETag } from "./calulcateETag";
@@ -17,10 +17,25 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
   const storagePath = getLocalStoragePath(options?.localStorageDir);
   const request = new RequestParser(storagePath);
 
+  const persisitencePath = `${storagePath}__items.json`;
+  let items: any = {
+    version: 1,
+    files: {},
+  };
   return {
     name: "s3-local",
-    onInit: function () {
+    onInit: async function () {
       callableLambdas = this.lambdas.filter((x) => x.s3.length);
+
+      try {
+        const persistence = await readFile(persisitencePath, { encoding: "utf-8" });
+        items = JSON.parse(persistence);
+      } catch (error) {}
+    },
+    onExit: function () {
+      try {
+        writeFileSync(persisitencePath, JSON.stringify(items), { encoding: "utf-8" });
+      } catch (error) {}
     },
     offline: {
       request: [
@@ -42,7 +57,7 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
                 "x-amz-id-2": "Jlw7ZDxNF0nnIcNbUG0TpuYia9hBMqI/W8vMDyNTB5oZ/7ARNqYW5/l3VPURZIj0pkKhCOqSazo=",
                 "x-amzn-requestid": requestId,
                 "x-amz-server-side-encryption": "AES256",
-                "Content-Type": "application/octet-stream",
+                "Content-Type": items.files[filePath]?.type ?? "application/octet-stream",
                 "Content-Length": fileStat.size,
                 Date: new Date().toUTCString(),
                 "Last-Modified": new Date(fileStat.mtimeMs).toUTCString(),
@@ -75,7 +90,7 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
                   "x-amz-id-2": "Jlw7ZDxNF0nnIcNbUG0TpuYia9hBMqI/W8vMDyNTB5oZ/7ARNqYW5/l3VPURZIj0pkKhCOqSazo=",
                   "x-amzn-requestid": requestId,
                   "x-amz-server-side-encryption": "AES256",
-                  "Content-Type": "application/octet-stream",
+                  "Content-Type": items.files[filePath]?.type ?? "application/octet-stream",
                   "Content-Length": fileStat.size,
                   "Accept-Ranges": "bytes",
                   Date: new Date().toUTCString(),
@@ -98,7 +113,7 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
           method: "PUT",
           filter: /^\/@s3\/.*/,
           callback: async function (req, res) {
-            const { requestCmd, filePath, bucketName, keyName, requestId, copySource, sourceIPAddress } = request.deserialize(req);
+            const { requestCmd, filePath, bucketName, keyName, requestId, copySource, sourceIPAddress, contentType } = request.deserialize(req);
 
             if (requestCmd == "PutObject") {
               try {
@@ -112,6 +127,13 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
 
               req.on("end", async () => {
                 res.end();
+                if (items.files[filePath]) {
+                  items.files[filePath].type = contentType;
+                } else {
+                  items.files[filePath] = {
+                    type: contentType,
+                  };
+                }
 
                 try {
                   const fileStat = await stat(filePath);
@@ -121,7 +143,7 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
                     filePath,
                   });
 
-                  triggerEvent(callableLambdas, {
+                  await triggerEvent(callableLambdas, {
                     bucket: bucketName,
                     key: keyName,
                     requestId,
@@ -139,6 +161,13 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
               try {
                 await access(copySource);
                 await copyFile(copySource, filePath);
+                if (items.files[filePath]) {
+                  items.files[filePath].type = contentType;
+                } else {
+                  items.files[filePath] = {
+                    type: contentType,
+                  };
+                }
                 const fileStat = await stat(filePath);
 
                 const ETag = calulcateETag({
@@ -163,7 +192,7 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
                     filePath,
                   });
 
-                  triggerEvent(callableLambdas, {
+                  await triggerEvent(callableLambdas, {
                     bucket: bucketName,
                     key: keyName,
                     requestId,
@@ -192,14 +221,6 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
             const { requestCmd, filePath, bucketName, keyName, requestId, sourceIPAddress } = request.deserialize(req);
 
             if (requestCmd == "DeleteObject") {
-              try {
-                const stats = await stat(filePath);
-
-                if (stats.isFile()) {
-                  await rm(filePath);
-                }
-              } catch (error) {}
-
               res.statusCode = 204;
               res.setHeader("x-amzn-requestid", requestId);
               res.setHeader("Server", "AmazonS3");
@@ -207,13 +228,18 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
 
               try {
                 const fileStat = await stat(filePath);
-
+                if (fileStat.isFile()) {
+                  await rm(filePath);
+                  if (items.files[filePath]) {
+                    delete items.files[filePath];
+                  }
+                }
                 const ETag = calulcateETag({
                   fileSizeInBytes: fileStat.size,
                   filePath,
                 });
 
-                triggerEvent(callableLambdas, {
+                await triggerEvent(callableLambdas, {
                   bucket: bucketName,
                   key: keyName,
                   requestId,

@@ -1,4 +1,4 @@
-import { ILambdaMock, LambdaEndpoint } from "./lambdaMock";
+import { ILambdaMock, LambdaEndpoint } from "./runtime/lambdaMock";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "ANY";
 

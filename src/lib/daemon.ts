@@ -2,7 +2,7 @@ import http, { Server, IncomingMessage, ServerResponse } from "http";
 import { AddressInfo } from "net";
 import { networkInterfaces } from "os";
 import { Handlers, HttpMethod } from "./handlers";
-import { ILambdaMock, LambdaMock, LambdaEndpoint } from "./lambdaMock";
+import { ILambdaMock, LambdaMock, LambdaEndpoint } from "./runtime/lambdaMock";
 import { log } from "./colorize";
 import inspector from "inspector";
 import { html404, html500 } from "./htmlStatusMsg";
@@ -199,20 +199,33 @@ export class Daemon extends Handlers {
           res.setHeader("X-Amzn-Trace-Id", `root=1-xxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx;sampled=0`);
 
           if (validBody) {
+            res.setHeader("X-Amz-Executed-Version", "$LATEST");
             try {
+              // TODO: if it works correctly
               const date = new Date();
               const awsRequestId = randomUUID();
-              log.CYAN(`${date.toLocaleDateString()} ${date.toLocaleTimeString()} requestId: ${awsRequestId} | '${foundHandler.name}' ${method}`);
-              const result = await foundHandler.invoke(event);
+              let info;
               res.statusCode = exceptedStatusCode;
+              if (exceptedStatusCode !== 200) {
+                res.end();
+              }
+              if (exceptedStatusCode == 202) {
+                info = { kind: "async" };
+              }
+              log.CYAN(`${date.toLocaleDateString()} ${date.toLocaleTimeString()} requestId: ${awsRequestId} | '${foundHandler.name}' ${method}`);
+              const result = await foundHandler.invoke(event, info);
 
-              res.end(JSON.stringify(result));
-            } catch (error) {
+              if (exceptedStatusCode == 200) {
+                res.end(JSON.stringify(result));
+              }
+            } catch (error: any) {
+              // TODO: check with a real lambda
+              res.setHeader("X-Amz-Function-Error", error.errorType);
               res.statusCode = 502;
               res.end(JSON.stringify(error));
             }
           } else {
-            res.statusCode = 400;
+            res.statusCode = 415;
             res.end(JSON.stringify({ Type: "User" }));
           }
         })

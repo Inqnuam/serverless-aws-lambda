@@ -36,13 +36,13 @@ Start the offline server
 SLS_DEBUG="*" sls aws-lambda -s dev
 ```
 
-It is also possible to passe port and watch options from the CLI with `--port` or `-p`.
+It is also possible to passe port from the CLI with `--port` or `-p`.
 
-Command line values will overwrite serverless.yml custom > serverless-aws-lambda values if they are set.
+This will overwrite serverless.yml custom > serverless-aws-lambda values if they are set.
 
 ### Invoke
 
-Offline server supports ALB and APG endponts.  
+Offline server supports Application Load Balancer and API Gateway endponts.  
 Appropriate `event` object is sent to the handler based on your lambda declaration.
 
 ```yaml

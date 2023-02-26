@@ -5,6 +5,52 @@ const inspector = require("inspector");
 const debuggerIsAttached = inspector.url() != undefined;
 
 let eventHandler;
+const invalidResponse = new Error("Invalid response payload");
+const reachedTimeout = new Error("Timeout");
+const genResponsePayload = (err) => {
+  const responsePayload = {
+    errorType: "string",
+    errorMessage: "",
+    trace: [],
+  };
+
+  if (err instanceof Error) {
+    responsePayload.errorType = err.name;
+    responsePayload.errorMessage = err.message;
+
+    if (typeof err.stack == "string") {
+      responsePayload.trace = err.stack.split("\n");
+    }
+  } else {
+    responsePayload.errorType = typeof err;
+
+    try {
+      responsePayload.errorMessage = err.toString();
+    } catch (error) {}
+  }
+
+  return responsePayload;
+};
+
+const returnError = (awsRequestId, err) => {
+  log.RED("Request failed");
+  const data = genResponsePayload(err);
+  parentPort.postMessage({ channel: "fail", data, awsRequestId });
+};
+
+const returnResponse = (channel, awsRequestId, data) => {
+  try {
+    JSON.stringify(data);
+
+    parentPort.postMessage({
+      channel,
+      data,
+      awsRequestId,
+    });
+  } catch (error) {
+    returnError(awsRequestId, invalidResponse);
+  }
+};
 
 parentPort.on("message", async (e) => {
   const { channel, data, awsRequestId } = e;
@@ -35,7 +81,8 @@ parentPort.on("message", async (e) => {
       if (timeout <= 0) {
         clearInterval(lambdaTimeoutInterval);
         if (!debuggerIsAttached) {
-          parentPort.postMessage({ channel: "fail", data: "_timeout_", awsRequestId });
+          isSent = true;
+          returnError(awsRequestId, reachedTimeout);
         }
       }
     }, 250);
@@ -61,40 +108,25 @@ parentPort.on("message", async (e) => {
           return;
         }
         resIsSent();
-
-        let data = JSON.stringify(lambdaRes);
-
-        parentPort.postMessage({
-          channel: "succeed",
-          data,
-          awsRequestId,
-        });
+        returnResponse("succeed", awsRequestId, lambdaRes);
       },
       fail: (err) => {
         if (isSent) {
           return;
         }
         resIsSent();
-        console.error(err);
-        log.RED("Request failed");
-        parentPort.postMessage({ channel: "fail", data: "Request failed", awsRequestId });
+        returnError(awsRequestId, err);
       },
       done: function (err, lambdaRes) {
         if (isSent) {
           return;
         }
+        resIsSent();
 
         if (err) {
-          this.fail(err);
+          returnError(awsRequestId, err);
         } else {
-          resIsSent();
-          let data = JSON.stringify(lambdaRes);
-
-          parentPort.postMessage({
-            channel: "done",
-            data: data,
-            awsRequestId,
-          });
+          returnResponse("done", awsRequestId, lambdaRes);
         }
       },
       functionVersion: "$LATEST",
@@ -109,24 +141,7 @@ parentPort.on("message", async (e) => {
       getRemainingTimeInMillis,
     };
 
-    const callback = (error, lambdaRes) => {
-      if (isSent) {
-        return;
-      }
-
-      if (error) {
-        context.fail(error);
-      } else {
-        resIsSent();
-        let data = JSON.stringify(lambdaRes);
-
-        parentPort.postMessage({
-          channel: "done",
-          data: data,
-          awsRequestId,
-        });
-      }
-    };
+    const callback = context.done;
 
     // NOTE: this is a workaround for async versus callback lambda different behaviour
     try {
@@ -135,20 +150,19 @@ parentPort.on("message", async (e) => {
       eventResponse
         ?.then?.((data) => {
           clearInterval(lambdaTimeoutInterval);
-          if (!isSent) {
-            resIsSent();
-            parentPort.postMessage({
-              channel: "return",
-              data,
-              awsRequestId,
-            });
+          if (isSent) {
+            return;
           }
+          resIsSent();
+          returnResponse("return", awsRequestId, data);
         })
         ?.catch((err) => {
-          context.fail(err);
+          resIsSent();
+          returnError(awsRequestId, err);
         });
     } catch (err) {
-      context.fail(err);
+      resIsSent();
+      returnError(awsRequestId, err);
     }
   }
 });

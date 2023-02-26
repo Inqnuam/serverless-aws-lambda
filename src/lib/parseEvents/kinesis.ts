@@ -6,7 +6,7 @@ const parseStreamNameFromArnString = (arn: string) => {
   return arn.split("/")[1];
 };
 
-const parseStreamNameFromArn = (arn: any, serverless: any, resources: any) => {
+const parseStreamNameFromArn = (arn: any, Outputs: any, resources: any) => {
   const [key, value] = Object.entries(arn)[0];
 
   if (key == "Fn::GetAtt" || key == "Ref") {
@@ -24,11 +24,11 @@ const parseStreamNameFromArn = (arn: any, serverless: any, resources: any) => {
       return streamName.split("/")[1];
     }
   } else if (key == "Fn::ImportValue" && typeof value == "string") {
-    return serverless.service.resources?.Outputs?.[value]?.Export?.Name;
+    return Outputs?.[value]?.Export?.Name;
   }
 };
 
-export const parseKinesis = (event: any, serverless: any, resources: any) => {
+export const parseKinesis = (event: any, Outputs: any, resources: any) => {
   if (!event || Object.keys(event)[0] !== "stream") {
     return;
   }
@@ -43,6 +43,7 @@ export const parseKinesis = (event: any, serverless: any, resources: any) => {
     if (parsedStreamName) {
       parsedEvent.StreamName = parsedStreamName;
     }
+    return parsedEvent;
   } else if (valType == "object") {
     if (typeof val.arn == "string") {
       const parsedStreamName = parseStreamNameFromArnString(val.arn);
@@ -50,7 +51,7 @@ export const parseKinesis = (event: any, serverless: any, resources: any) => {
         parsedEvent.StreamName = parsedStreamName;
       }
     } else if (val.arn && typeof val.arn == "object") {
-      const parsedStreamName = parseStreamNameFromArn(val.arn, serverless, resources);
+      const parsedStreamName = parseStreamNameFromArn(val.arn, Outputs, resources);
       if (parsedStreamName) {
         parsedEvent.StreamName = parsedStreamName;
       }
@@ -91,8 +92,7 @@ export const parseKinesis = (event: any, serverless: any, resources: any) => {
       if ("tumblingWindowInSeconds" in val) {
         parsedEvent.tumblingWindowInSeconds = val.tumblingWindowInSeconds;
       }
+      return parsedEvent;
     }
   }
-
-  return null;
 };

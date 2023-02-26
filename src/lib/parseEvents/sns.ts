@@ -1,4 +1,34 @@
-export const parseSns = (event: any) => {
+const parseTopicNameFromObject = (resources: any, Outputs: any, obj: any) => {
+  const [key, value] = Object.entries(obj)?.[0];
+
+  if (!key || !value) {
+    return;
+  }
+
+  if (key == "Fn::Join") {
+    const values = value as unknown as any[];
+
+    if (!values.length) {
+      return;
+    }
+    const topicName = values[1][values[1].length - 1];
+
+    if (typeof topicName == "string") {
+      return topicName.split("/")[1];
+    }
+  } else if (key == "Fn::GetAtt" || key == "Ref") {
+    const [resourceName] = value as unknown as any[];
+
+    const resource = resources[resourceName];
+    if (resource) {
+      return resource.TopicName;
+    }
+  } else if (key == "Fn::ImportValue" && typeof value == "string") {
+    return Outputs?.[value]?.Export?.Name;
+  }
+};
+
+export const parseSns = (resources: any, Outputs: any, event: any) => {
   if (!event.sns) {
     return;
   }
@@ -12,12 +42,14 @@ export const parseSns = (event: any) => {
       sns.name = event.sns;
     }
   } else {
-    const { arn, topicName, filterPolicyScope, filterPolicy, displayName } = event.sns;
+    const { arn, topicName, filterPolicyScope, filterPolicy, displayName, redrivePolicy } = event.sns;
 
-    if (arn) {
+    if (typeof arn == "string") {
       const arnComponents = arn.split(":");
       sns.name = arnComponents[arnComponents.length - 1];
       sns.arn = arn;
+    } else if (arn && !Array.isArray(arn) && typeof arn == "object") {
+      sns.name = parseTopicNameFromObject(resources, Outputs, arn);
     }
 
     if (!sns.name && topicName) {
@@ -36,6 +68,12 @@ export const parseSns = (event: any) => {
 
     if (displayName) {
       sns.displayName = displayName;
+    }
+
+    if (redrivePolicy) {
+      const { deadLetterTargetArn, deadLetterTargetRef, deadLetterTargetImport } = redrivePolicy;
+      console.log("redrivePolicy", redrivePolicy);
+      // TODO: parse
     }
   }
   if (Object.keys(sns).length) {

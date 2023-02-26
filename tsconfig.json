@@ -7,7 +7,7 @@
     "esModuleInterop": true,
     "emitDeclarationOnly": true,
     "moduleResolution": "nodenext",
-    "removeComments": true,
+    "removeComments": false,
     "strict": true,
     "declarationDir": "./dist/",
     "rootDir": "./src/"

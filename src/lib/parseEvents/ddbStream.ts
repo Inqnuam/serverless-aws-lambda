@@ -1,4 +1,4 @@
-const getTableNameFromResources = (ddbStreamTables: any, serverless: any, obj: any) => {
+const getTableNameFromResources = (ddbStreamTables: any, Outputs: any, obj: any) => {
   const [key, value] = Object.entries(obj)?.[0];
 
   if (!key || !value) {
@@ -13,9 +13,12 @@ const getTableNameFromResources = (ddbStreamTables: any, serverless: any, obj: a
       return resource.TableName;
     }
   } else if (key == "Fn::ImportValue" && typeof value == "string") {
-    return parseDynamoTableNameFromArn(serverless.service.resources?.Outputs?.[value]?.Export?.Name);
+    return parseDynamoTableNameFromArn(Outputs?.[value]?.Export?.Name);
   } else if (key == "Fn::Join") {
     const values = value as unknown as any[];
+    if (!values.length) {
+      return;
+    }
     const streamName = values[1][values[1].length - 1];
 
     if (typeof streamName == "string") {
@@ -37,11 +40,9 @@ const parseDynamoTableNameFromArn = (arn: any) => {
 const getStreamTableInfoFromTableName = (ddbStreamTables: any, tableName: string) => {
   const foundInfo = Object.values(ddbStreamTables).find((x: any) => x.TableName == tableName);
 
-  if (foundInfo) {
-    return foundInfo;
-  }
+  return foundInfo ?? {};
 };
-export const parseDdbStreamDefinitions = (serverless: any, ddbStreamTables: any, event: any) => {
+export const parseDdbStreamDefinitions = (Outputs: any, ddbStreamTables: any, event: any) => {
   if (!event || Object.keys(event)[0] !== "stream") {
     return;
   }
@@ -62,7 +63,7 @@ export const parseDdbStreamDefinitions = (serverless: any, ddbStreamTables: any,
     if (parsedTableName) {
       parsedEvent.TableName = parsedTableName;
     } else if (val.arn && typeof val.arn == "object") {
-      const parsedTableName = getTableNameFromResources(ddbStreamTables, serverless, val.arn);
+      const parsedTableName = getTableNameFromResources(ddbStreamTables, Outputs, val.arn);
 
       if (parsedTableName) {
         parsedEvent.TableName = parsedTableName;
@@ -80,6 +81,7 @@ export const parseDdbStreamDefinitions = (serverless: any, ddbStreamTables: any,
       }
 
       if (val.destinations?.onFailure) {
+        // TODO: parse destination
         parsedEvent.onFailure = val.destinations.onFailure;
       }
     }
@@ -88,6 +90,7 @@ export const parseDdbStreamDefinitions = (serverless: any, ddbStreamTables: any,
   if (parsedEvent.TableName) {
     const streamInfo = getStreamTableInfoFromTableName(ddbStreamTables, parsedEvent.TableName);
 
+    // @ts-ignore
     parsedEvent = { ...parsedEvent, ...streamInfo };
 
     if (!("StreamEnabled" in parsedEvent)) {

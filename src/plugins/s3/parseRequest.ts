@@ -9,12 +9,11 @@ export class RequestParser {
 
   deserialize(req: IncomingMessage) {
     const { url, headers, socket } = req;
-
     const requestId = (headers["amz-sdk-invocation-id"] as string) ?? randomUUID();
     const parsedURL = new URL(url as string, "http://localhost:3000");
     const sourceIPAddress = socket.remoteAddress?.split(":")?.[3] ?? "127.0.0.1";
     const requestCmd = parsedURL.searchParams.get("x-id");
-
+    const contentType = (headers["content-type"] as string) ?? "application/octet-stream";
     let filePath = decodeURIComponent(parsedURL.pathname.replace("/@s3/", ""));
 
     const fileComponents = filePath.split("/");
@@ -31,6 +30,7 @@ export class RequestParser {
       requestId,
       sourceIPAddress,
       copySource,
+      contentType,
     };
   }
 }

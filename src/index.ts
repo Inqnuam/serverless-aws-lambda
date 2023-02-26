@@ -1,6 +1,6 @@
 import path from "path";
 import { Daemon } from "./lib/daemon";
-import { ILambdaMock } from "./lib/lambdaMock";
+import { ILambdaMock } from "./lib/runtime/lambdaMock";
 import { log } from "./lib/colorize";
 import { zip } from "./lib/zip";
 import esbuild from "esbuild";
@@ -8,10 +8,10 @@ import type { BuildOptions, BuildResult } from "esbuild";
 import type Serverless from "serverless";
 import { Handlers } from "./lib/handlers";
 import { buildOptimizer } from "./lib/esbuild/buildOptimizer";
-import { parseEvents } from "./lib/parseEvents/index";
+import { parseEvents, parseDestination } from "./lib/parseEvents/index";
 import { getResources } from "./lib/parseEvents/getResources";
-import { parseCustomEsbuild } from "./lib/parseCustomEsbuild";
-import { mergeEsbuildConfig } from "./lib/mergeEsbuildConfig";
+import { parseCustomEsbuild } from "./lib/esbuild/parseCustomEsbuild";
+import { mergeEsbuildConfig } from "./lib/esbuild/mergeEsbuildConfig";
 const cwd = process.cwd();
 const DEFAULT_LAMBDA_TIMEOUT = 6;
 const DEFAULT_LAMBDA_MEMORY_SIZE = 1024;
@@ -279,6 +279,8 @@ class ServerlessAwsLambda extends Daemon {
       functionsNames = functionsNames.filter((x) => x == this.invokeName);
     }
     const resources = getResources(this.serverless);
+    // @ts-ignore
+    const Outputs = this.serverless.service.resources?.Outputs;
     const lambdas = functionsNames.reduce((accum: any[], funcName: string) => {
       const lambda = funcs[funcName];
 
@@ -306,6 +308,10 @@ class ServerlessAwsLambda extends Daemon {
         virtualEnvs: { ...this.defaultVirtualEnvs, ...(slsDeclaration.virtualEnvs ?? {}) },
         online: typeof slsDeclaration.online == "boolean" ? slsDeclaration.online : true,
         environment: {
+          AWS_EXECUTION_ENV: `AWS_Lambda_nodejs${this.nodeVersion}.x`,
+          AWS_LAMBDA_FUNCTION_VERSION: "$LATEST",
+          AWS_LAMBDA_FUNCTION_NAME: funcName,
+          _HANDLER: path.basename(handlerPath),
           ...this.runtimeConfig.environment,
           ...lambda.environment,
           ...isLocalEnv,
@@ -326,6 +332,21 @@ class ServerlessAwsLambda extends Daemon {
         },
       };
 
+      // @ts-ignore
+      lambdaDef.onError = parseDestination(lambda.onError);
+
+      if (lambdaDef.onError?.kind == "lambda") {
+        log.YELLOW("Dead-Letter queue could be only a SNS or SQS service");
+        delete lambdaDef.onError;
+      }
+      //@ts-ignore
+      if (lambda.destinations && typeof lambda.destinations == "object") {
+        //@ts-ignore
+        lambdaDef.onFailure = parseDestination(lambda.destinations.onFailure);
+        //@ts-ignore
+        lambdaDef.onSuccess = parseDestination(lambda.destinations.onSuccess);
+      }
+
       lambdaDef.onInvoke = (callback: (event: any, info?: any) => void) => {
         lambdaDef.invokeSub.push(callback);
       };
@@ -335,17 +356,20 @@ class ServerlessAwsLambda extends Daemon {
       }
       if (region) {
         lambdaDef.environment.AWS_REGION = region;
+        lambdaDef.environment.AWS_DEFAULT_REGION = region;
       }
 
+      lambdaDef.environment.AWS_LAMBDA_FUNCTION_MEMORY_SIZE = lambdaDef.memorySize;
+
       if (lambda.events.length) {
-        const { endpoints, sns, ddb, s3, kinesis } = parseEvents(lambda.events, this.serverless, resources);
+        const { endpoints, sns, ddb, s3, kinesis } = parseEvents(lambda.events, Outputs, resources);
         lambdaDef.endpoints = endpoints;
         lambdaDef.sns = sns;
         lambdaDef.ddb = ddb;
         lambdaDef.s3 = s3;
         lambdaDef.kinesis = kinesis;
       }
-      // console.log(lambdaDef);
+      console.log(lambdaDef);
       accum.push(lambdaDef);
       return accum;
     }, []);

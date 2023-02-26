@@ -1,6 +1,6 @@
 import type { PluginBuild, BuildResult } from "esbuild";
 import type { Config, OfflineConfig } from "./config";
-import type { ILambdaMock } from "./lib/lambdaMock";
+import type { ILambdaMock } from "./lib/runtime/lambdaMock";
 import type { HttpMethod } from "./lib/handlers";
 import type { IncomingMessage, ServerResponse } from "http";
 import type Serverless from "serverless";
@@ -8,12 +8,18 @@ import { log } from "./lib/colorize";
 import { exitEvents } from "./server";
 
 export type ILambda = {
-  setEnv: (key: string, value: string) => void;
+  /**
+   * Set environment varible.
+   */
+  setEnv: (key: string, value: string | null) => void;
   virtualEnvs?: {
     [key: string]: any;
   };
+  /**
+   * Be notified when this lambda is invoked.
+   */
   onInvoke: (callback: (event: any, info?: any) => void) => void;
-} & Omit<ILambdaMock, "_worker" | "invokeSub" | "_isLoaded" | "_isLoading">;
+} & Omit<ILambdaMock, "invokeSub">;
 
 export interface ClientConfigParams {
   stop: (err?: any) => Promise<void>;
@@ -33,11 +39,17 @@ export interface SlsAwsLambdaPlugin {
   name: string;
   buildCallback?: (this: ClientConfigParams, result: BuildResult, isRebuild: boolean) => Promise<void> | void;
   onInit?: (this: ClientConfigParams) => Promise<void> | void;
-  onExit?: (this: ClientConfigParams, code: string | number) => Promise<void> | void;
+  onExit?: (this: ClientConfigParams, code: string | number) => void;
   afterDeploy?: (this: ClientConfigParams) => Promise<void> | void;
   offline?: {
     onReady?: (this: ClientConfigParams, port: number) => Promise<void> | void;
+    /**
+     * Add new requests to the offline server.
+     */
     request?: {
+      /**
+       * @default "ANY"
+       */
       method?: HttpMethod | HttpMethod[];
       filter: string | RegExp;
       callback: (this: ClientConfigParams, req: IncomingMessage, res: ServerResponse) => Promise<void> | void;

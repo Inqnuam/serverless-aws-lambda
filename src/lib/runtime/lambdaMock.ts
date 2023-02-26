@@ -1,41 +1,106 @@
 import { Worker, WorkerOptions } from "worker_threads";
 import { resolve as pathResolve } from "path";
-import { HttpMethod } from "./handlers";
+import { HttpMethod } from "../handlers";
 import { randomUUID } from "crypto";
 import { EventEmitter } from "events";
-import { log } from "./colorize";
+import { log } from "../colorize";
+import { callErrorDest, callSuccessDest } from "./callDestinations";
 const workerPath = pathResolve(__dirname, "./lib/worker.js");
+// https://aws.amazon.com/blogs/architecture/understanding-the-different-ways-to-invoke-lambda-functions/
+const asyncEvents = ["async", "ddb", "kinesis", "s3", "sns", "sqs"];
 
-interface IS3Event {
+const isAsync = (info: any) => {
+  if (typeof info?.kind == "string") {
+    return asyncEvents.includes(info.kind) || info.async;
+  }
+
+  return false;
+};
+
+export interface IS3Event {
   bucket: string;
   type: [string, string];
   rules: any[];
 }
-/**
- * @internal
- */
-export interface ILambdaMock {
+
+export interface ISnsEvent {
   name: string;
+  arn?: string;
+  topicName?: string;
+  displayName?: string;
+  filterScope?: "MessageAttributes" | "MessageBody";
+  filter?: any;
+  redrivePolicy?: {
+    kind: string;
+    name: string;
+  };
+}
+export interface IDdbEvent {
+  TableName: string;
+  StreamEnabled: boolean;
+  StreamViewType?: string;
+  batchSize?: number;
+  functionResponseType?: string;
+  filterPatterns?: any;
+  onFailure?: IDestination;
+}
+export interface IDestination {
+  kind: "lambda" | "sns" | "sqs";
+  name: string;
+}
+
+export interface ILambdaMock {
+  /**
+   * Function name declared in serverless.yml.
+   */
+  name: string;
+  /**
+   * Function name which will be published as in AWS.
+   */
   outName: string;
+  /**
+   * Deploy Lambda or not to AWS.
+   */
   online: boolean;
+  /**
+   * API Gateway and Application Load balancer events.
+   */
   endpoints: LambdaEndpoint[];
   s3: IS3Event[];
-  sns: any[];
-  ddb: any[];
+  sns: ISnsEvent[];
+  ddb: IDdbEvent[];
   kinesis: any[];
   timeout: number;
   memorySize: number;
   environment: { [key: string]: any };
+  /**
+   * function handler as declared in serverless.yml.
+   */
   handlerPath: string;
+  /**
+   * exported function name
+   */
   handlerName: string;
+  /**
+   * esbuild entry point absolute path.
+   */
   esEntryPoint: string;
+
   esOutputPath: string;
   entryPoint: string;
-  _worker?: Worker;
-  _isLoaded: boolean;
-  invokeSub: ((event: any) => void)[];
+  invokeSub: InvokeSub[];
+  /**
+   * Invoke this lambda
+   * always use with "await"
+   */
   invoke: (event: any, info?: any) => Promise<any>;
+  onError?: IDestination;
+  onSuccess?: IDestination;
+  onFailure?: IDestination;
 }
+
+type InvokeSub = (event: any, info?: any) => void;
+
 /**
  * @internal
  */
@@ -56,8 +121,8 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   online: boolean;
   endpoints: LambdaEndpoint[];
   s3: IS3Event[];
-  sns: any[];
-  ddb: any[];
+  sns: ISnsEvent[];
+  ddb: IDdbEvent[];
   kinesis: any[];
   timeout: number;
   memorySize: number;
@@ -67,10 +132,13 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   esEntryPoint: string;
   esOutputPath: string;
   entryPoint: string;
+  invokeSub: InvokeSub[];
+  onError?: IDestination;
+  onSuccess?: IDestination;
+  onFailure?: IDestination;
   _worker?: Worker;
   _isLoaded: boolean = false;
   _isLoading: boolean = false;
-  invokeSub: ((event: any, info?: any) => void)[];
   constructor({
     name,
     outName,
@@ -89,6 +157,9 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     ddb,
     kinesis,
     invokeSub,
+    onError,
+    onSuccess,
+    onFailure,
   }: ILambdaMock) {
     super();
     this.name = name;
@@ -108,6 +179,9 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     this.esOutputPath = esOutputPath;
     this.entryPoint = entryPoint;
     this.invokeSub = invokeSub;
+    this.onError = onError;
+    this.onSuccess = onSuccess;
+    this.onFailure = onFailure;
   }
 
   async importEventHandler() {
@@ -153,7 +227,45 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
       this._worker.postMessage({ channel: "import" });
     });
   }
+  handleErrorDestination(event: any, info: any, error: any, awsRequestId: string) {
+    if (!this.onError || !this.onFailure) {
+      console.error(error);
+    }
 
+    if (!isAsync(info)) {
+      return;
+    }
+
+    const errParams = {
+      LOCAL_PORT: this.environment.LOCAL_PORT,
+      event,
+      payload: error,
+      requestId: awsRequestId,
+      lambdaName: this.outName,
+    };
+    if (this.onError) {
+      callErrorDest({ ...errParams, destination: this.onError });
+    }
+
+    if (this.onFailure) {
+      callErrorDest({ ...errParams, destination: this.onFailure });
+    }
+  }
+
+  handleSuccessDestination(event: any, info: any, response: any, awsRequestId: string) {
+    if (!this.onSuccess || !isAsync(info)) {
+      return;
+    }
+
+    callSuccessDest({
+      destination: this.onSuccess,
+      LOCAL_PORT: this.environment.LOCAL_PORT,
+      event,
+      payload: response,
+      requestId: awsRequestId,
+      lambdaName: this.outName,
+    });
+  }
   async invoke(event: any, info?: any) {
     if (this._isLoading) {
       this.setMaxListeners(0);
@@ -185,23 +297,16 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
         awsRequestId,
       });
 
-      this.once(awsRequestId, (channel, rawData) => {
-        let data;
-        try {
-          data = channel == "return" ? rawData : JSON.parse(rawData);
-        } catch (error) {
-          data = rawData;
-        }
+      this.once(awsRequestId, (channel: string, data: any) => {
         switch (channel) {
           case "return":
           case "succeed":
           case "done":
+            this.handleSuccessDestination(event, info, data, awsRequestId);
             resolve(data);
             break;
           case "fail":
-            if (data == "_timeout_") {
-              log.RED("Tiemout reached");
-            }
+            this.handleErrorDestination(event, info, data, awsRequestId);
             reject(data);
             break;
           default:

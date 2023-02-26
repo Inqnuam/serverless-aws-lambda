@@ -1,7 +1,7 @@
 export const getResources = (serverless: any) => {
-  let ddbStreamTables = { ddb: {}, kinesis: {} };
+  let resources = { ddb: {}, kinesis: {}, sns: {} };
   if (serverless.service.resources?.Resources) {
-    ddbStreamTables = Object.entries(serverless.service.resources.Resources)?.reduce(
+    resources = Object.entries(serverless.service.resources.Resources)?.reduce(
       (accum, obj: [string, any]) => {
         const [key, value] = obj;
 
@@ -33,12 +33,17 @@ export const getResources = (serverless: any) => {
             ShardCount,
             StreamModeDetails,
           };
+        } else if (value.Type == "AWS::SNS::Topic") {
+          const { TopicName } = value.Properties;
+          accum.sns[key] = {
+            TopicName,
+          };
         }
 
         return accum;
       },
-      { ddb: {}, kinesis: {} } as any
+      { ddb: {}, kinesis: {}, sns: {} } as any
     );
   }
-  return ddbStreamTables;
+  return resources;
 };
