@@ -1,21 +1,10 @@
 import { Worker, WorkerOptions } from "worker_threads";
-import { resolve as pathResolve } from "path";
-import { HttpMethod } from "../handlers";
+import path from "path";
+import { HttpMethod } from "../server/handlers";
 import { randomUUID } from "crypto";
 import { EventEmitter } from "events";
-import { log } from "../colorize";
+import { log } from "../utils/colorize";
 import { callErrorDest, callSuccessDest } from "./callDestinations";
-const workerPath = pathResolve(__dirname, "./lib/worker.js");
-// https://aws.amazon.com/blogs/architecture/understanding-the-different-ways-to-invoke-lambda-functions/
-const asyncEvents = ["async", "ddb", "kinesis", "s3", "sns", "sqs"];
-
-const isAsync = (info: any) => {
-  if (typeof info?.kind == "string") {
-    return asyncEvents.includes(info.kind) || info.async;
-  }
-
-  return false;
-};
 
 export interface IS3Event {
   bucket: string;
@@ -93,7 +82,7 @@ export interface ILambdaMock {
    * Invoke this lambda
    * always use with "await"
    */
-  invoke: (event: any, info?: any) => Promise<any>;
+  invoke: (event: any, info?: any, clientContext?: any) => Promise<any>;
   onError?: IDestination;
   onSuccess?: IDestination;
   onFailure?: IDestination;
@@ -115,6 +104,19 @@ export interface LambdaEndpoint {
 /**
  * @internal
  */
+
+const workerPath = path.resolve(__dirname, "./lib/runtime/worker.js");
+// https://aws.amazon.com/blogs/architecture/understanding-the-different-ways-to-invoke-lambda-functions/
+const asyncEvents = ["async", "ddb", "kinesis", "s3", "sns", "sqs"];
+
+const isAsync = (info: any) => {
+  if (typeof info?.kind == "string") {
+    return asyncEvents.includes(info.kind) || info.async;
+  }
+
+  return false;
+};
+
 export class LambdaMock extends EventEmitter implements ILambdaMock {
   name: string;
   outName: string;
@@ -266,7 +268,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
       lambdaName: this.outName,
     });
   }
-  async invoke(event: any, info?: any) {
+  async invoke(event: any, info?: any, clientContext?: any) {
     if (this._isLoading) {
       this.setMaxListeners(0);
       await new Promise((resolve, reject) => {
@@ -293,7 +295,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
 
       this._worker!.postMessage({
         channel: "exec",
-        data: { event },
+        data: { event, clientContext },
         awsRequestId,
       });
 

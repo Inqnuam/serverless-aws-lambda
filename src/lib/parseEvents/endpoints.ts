@@ -1,4 +1,4 @@
-import { HttpMethod } from "../handlers";
+import { HttpMethod } from "../server/handlers";
 import { LambdaEndpoint } from "../runtime/lambdaMock";
 
 export const parseEndpoints = (event: any): LambdaEndpoint | null => {

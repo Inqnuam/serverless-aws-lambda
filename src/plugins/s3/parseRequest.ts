@@ -14,6 +14,7 @@ export class RequestParser {
     const sourceIPAddress = socket.remoteAddress?.split(":")?.[3] ?? "127.0.0.1";
     const requestCmd = parsedURL.searchParams.get("x-id");
     const contentType = (headers["content-type"] as string) ?? "application/octet-stream";
+    const cacheControl = headers["cache-control" as string] ?? "no-cache";
     let filePath = decodeURIComponent(parsedURL.pathname.replace("/@s3/", ""));
 
     const fileComponents = filePath.split("/");
@@ -31,6 +32,7 @@ export class RequestParser {
       sourceIPAddress,
       copySource,
       contentType,
+      cacheControl,
     };
   }
 }

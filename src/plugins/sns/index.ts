@@ -7,8 +7,8 @@ export const snsPlugin = (): SlsAwsLambdaPlugin => {
     name: "sns-plugin",
     offline: {
       request: [
-        // only for internal usage
         {
+          // only for internal usage
           method: "POST",
           filter: "/@sns/parsed",
           callback: function (req, res) {
@@ -33,6 +33,9 @@ export const snsPlugin = (): SlsAwsLambdaPlugin => {
                 });
 
                 for (const { handler, event: info } of deduplicatedHandler) {
+                  if (info.displayName) {
+                    console.log(`\x1b[35mSNS >> ${info.displayName}\x1b[0m`);
+                  }
                   try {
                     await handler.invoke(event, { kind: "sns", event: info });
                   } catch (error) {
@@ -84,6 +87,9 @@ export const snsPlugin = (): SlsAwsLambdaPlugin => {
                   });
 
                   for (const { handler, event: info } of deduplicatedHandler) {
+                    if (info.displayName) {
+                      console.log(`\x1b[35mSNS: ${info.name} | ${info.displayName}\x1b[0m`);
+                    }
                     try {
                       await handler.invoke(event, { kind: "sns", event: info });
                     } catch (error) {

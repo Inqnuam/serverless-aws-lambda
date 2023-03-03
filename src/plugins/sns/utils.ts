@@ -1,4 +1,4 @@
-import { log } from "../../lib/colorize";
+import { log } from "../../lib/utils/colorize";
 import type { ILambda } from "../../defineConfig";
 import { randomUUID } from "crypto";
 
@@ -56,7 +56,7 @@ export const parseSnsPublishBatchBody = (encodedBody: string[]) => {
       const [k, v] = s.split("=");
 
       if (k.startsWith("PublishBatchRequestEntries")) {
-        const [_, __, memberNumber, entryType, aux, entryNumber, aux2, aux3] = k.split(".");
+        const [, , memberNumber, entryType, aux, entryNumber, aux2, aux3] = k.split(".");
 
         const foundMember = memberMap.get(memberNumber);
         if (foundMember) {

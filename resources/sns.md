@@ -136,3 +136,5 @@ export default async (snsEvent) => {
         - dog
         - cat
 ```
+
+\+ `Fn::GetAtt`, `Ref`, `Fn::Join`, `Fn::ImportValue` variants.

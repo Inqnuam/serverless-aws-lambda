@@ -1,10 +1,13 @@
-import type { IS3Event, IDestination } from "../runtime/lambdaMock";
+import type { IDestination } from "../runtime/lambdaMock";
 import { LambdaEndpoint } from "../runtime/lambdaMock";
 import { parseEndpoints } from "./endpoints";
 import { parseSns } from "./sns";
 import { parseDdbStreamDefinitions } from "./ddbStream";
 import { parseS3 } from "./s3";
 import { parseKinesis } from "./kinesis";
+
+const supportedServices: IDestination["kind"][] = ["lambda", "sns", "sqs"];
+type arn = [string, string, IDestination["kind"], string, string, string, string];
 
 export const parseEvents = (events: any[], Outputs: any, resources: any) => {
   const endpoints: LambdaEndpoint[] = [];
@@ -14,10 +17,10 @@ export const parseEvents = (events: any[], Outputs: any, resources: any) => {
   const kinesis: any[] = [];
   for (const event of events) {
     const slsEvent = parseEndpoints(event);
-    const snsEvent = parseSns(Outputs, resources.sns, event);
-    const ddbStream = parseDdbStreamDefinitions(Outputs, resources.ddb, event);
+    const snsEvent = parseSns(Outputs, resources, event);
+    const ddbStream = parseDdbStreamDefinitions(Outputs, resources, event);
     const s3Event = parseS3(event);
-    const kinesisStream = parseKinesis(event, Outputs, resources.kinesis);
+    const kinesisStream = parseKinesis(event, Outputs, resources);
     if (slsEvent) {
       endpoints.push(slsEvent);
     }
@@ -40,11 +43,8 @@ export const parseEvents = (events: any[], Outputs: any, resources: any) => {
   return { ddb, endpoints, s3, sns, kinesis };
 };
 
-const supportedServices: IDestination["kind"][] = ["lambda", "sns", "sqs"];
-type arn = [string, string, IDestination["kind"], string, string, string, string];
-
-export const parseDestination = (destination: any): IDestination | undefined => {
-  if (!destination) {
+export const parseDestination = (destination: any, Outputs: any, resources: any): IDestination | undefined => {
+  if (!destination || (destination.type && !supportedServices.includes(destination.type))) {
     return;
   }
   if (typeof destination == "string") {
@@ -64,6 +64,44 @@ export const parseDestination = (destination: any): IDestination | undefined => 
       };
     }
   } else {
-    // TODO: parse destination object
+    let dest: any = {};
+
+    if (typeof destination.arn == "string") {
+      const [, , kind, region, accountId, name, aux] = destination.arn.split(":") as arn;
+      dest.name = name;
+
+      if (supportedServices.includes(kind)) {
+        dest.kind = kind;
+      }
+    } else if (supportedServices.includes(destination.type) && destination.arn) {
+      dest.kind = destination.type;
+
+      const [key, value] = Object.entries(destination.arn)?.[0];
+
+      if (!key || !value) {
+        return;
+      }
+
+      if (key == "Fn::GetAtt" || key == "Ref") {
+        const [resourceName] = value as unknown as any[];
+
+        const resource = resources?.[dest.kind]?.[resourceName];
+        if (resource) {
+          const resourceName = resource[dest.kind == "sns" ? "TopicName" : "QueueName"];
+          if (typeof resourceName == "string") {
+            dest.name = resourceName;
+          }
+        }
+      } else if (key == "Fn::ImportValue" && typeof value == "string") {
+        const exportedName = Outputs?.[value]?.Export?.Name;
+        if (typeof exportedName == "string") {
+          dest.name = exportedName;
+        }
+      }
+    }
+
+    if (dest.kind && dest.name) {
+      return dest;
+    }
   }
 };

@@ -1,4 +1,4 @@
-import type { RouteController, IRequest } from "../lambda/router";
+import type { RouteController, IRequest } from "./router";
 
 const parse = (event: IRequest, spotText: boolean) => {
   const files: any[] = [];

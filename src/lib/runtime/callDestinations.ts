@@ -15,6 +15,7 @@ interface ISnsPayloadParams {
   payload: any;
   requestId: string;
   success: boolean;
+  lambdaName: string;
 }
 
 type IGenResponse = Omit<ICallDestination, "LOCAL_PORT"> & { success: boolean };
@@ -51,7 +52,7 @@ const genLambdaResponsePayload = ({ event, payload, requestId, lambdaName, succe
     timestamp: "2023-02-25T13:25:04.688Z",
     requestContext: {
       requestId,
-      functionArn: `arn:aws:lambda:eu-west-3:370838172639:function:${lambdaName}:$LATEST`,
+      functionArn: `arn:aws:lambda:eu-west-3:000000000000:function:${lambdaName}:$LATEST`,
       condition: success ? "Success" : "RetriesExhausted",
       approximateInvokeCount: 1,
     },
@@ -70,23 +71,33 @@ const genLambdaResponsePayload = ({ event, payload, requestId, lambdaName, succe
   return JSON.stringify(content);
 };
 
-const genSnsParsedBody = ({ topicName, event, payload, requestId, success }: ISnsPayloadParams) => {
+const genSnsParsedBody = ({ topicName, event, payload, requestId, success, lambdaName }: ISnsPayloadParams) => {
   let Message = "";
 
-  if (typeof event == "string") {
-    Message = event;
+  if (success) {
+    Message = genLambdaResponsePayload({ event, payload, requestId, success, lambdaName });
   } else {
-    try {
-      Message = JSON.stringify(event);
-    } catch (error) {}
+    if (typeof event == "string") {
+      Message = event;
+    } else {
+      try {
+        Message = JSON.stringify(event);
+      } catch (error) {
+        console.log(error);
+      }
+    }
   }
 
-  const body = {
-    TopicArn: `arn:aws:sns:eu-west-3:970838172639:${topicName}`,
+  const body: any = {
+    TopicArn: `arn:aws:sns:eu-west-3:000000000000:${topicName}`,
     Message,
     Action: "Publish",
     Version: "2010-03-31",
-    MessageAttributes: {
+    MessageAttributes: {},
+  };
+
+  if (!success) {
+    body.MessageAttributes = {
       RequestID: {
         Type: "String",
         Value: requestId,
@@ -99,18 +110,15 @@ const genSnsParsedBody = ({ topicName, event, payload, requestId, success }: ISn
         Type: "String",
         Value: payload.errorMessage,
       },
-    },
-  };
-
-  // TODO: check if success/fail then put MessageAttributes
-
+    };
+  }
   return JSON.stringify(body);
 };
 
 const genResponse = ({ destination, event, payload, requestId, lambdaName, success }: IGenResponse) => {
   switch (destination.kind) {
     case "sns":
-      return genSnsParsedBody({ topicName: destination.name, event, payload, requestId, success });
+      return genSnsParsedBody({ topicName: destination.name, event, payload, requestId, success, lambdaName });
     case "lambda":
       return genLambdaResponsePayload({ event, payload, requestId, lambdaName, success });
     default:

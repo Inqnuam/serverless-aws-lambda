@@ -1,6 +1,6 @@
 ## Description
 
-[defineConfig](../src/defineConfig.ts) is a fully typed function provides an interface where you can:
+[defineConfig](../src/defineConfig.ts) is a fully typed function which provides an interface where you can:
 
 - customize [esbuild](esbuild.md)
 - configure offline server (static path, port, custom routes)
@@ -9,6 +9,8 @@
 - add plugins to serverless-aws-lambda.
 
 ### Usage
+
+To get Type definitions please set `"moduleResolution": "NodeNext"` inside your `tsconfig.json`.
 
 ```js
 // config.js
@@ -43,7 +45,7 @@ module.exports = defineConfig({
         // do something
       },
       offline: {
-        onReady: function (port) {
+        onReady: function (port, ip) {
           console.log("Offline port", port)
         },
         request: [

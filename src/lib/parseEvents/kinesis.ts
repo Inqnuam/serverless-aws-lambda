@@ -1,3 +1,6 @@
+import { log } from "../utils/colorize";
+import { parseDestination } from "./index";
+
 const parseStreamNameFromArnString = (arn: string) => {
   if (arn.split(":")[2] != "kinesis") {
     return;
@@ -12,12 +15,15 @@ const parseStreamNameFromArn = (arn: any, Outputs: any, resources: any) => {
   if (key == "Fn::GetAtt" || key == "Ref") {
     const [resourceName] = value as unknown as any[];
 
-    const resource = resources[resourceName];
+    const resource = resources?.[resourceName];
     if (resource) {
       return resource.Name;
     }
   } else if (key == "Fn::Join") {
     const values = value as unknown as any[];
+    if (!values.length) {
+      return;
+    }
     const streamName = values[1][values[1].length - 1];
 
     if (typeof streamName == "string") {
@@ -29,7 +35,7 @@ const parseStreamNameFromArn = (arn: any, Outputs: any, resources: any) => {
 };
 
 export const parseKinesis = (event: any, Outputs: any, resources: any) => {
-  if (!event || Object.keys(event)[0] !== "stream") {
+  if (!event || Object.keys(event)[0] !== "stream" || (event.stream.type && event.stream.type != "kinesis")) {
     return;
   }
 
@@ -51,7 +57,7 @@ export const parseKinesis = (event: any, Outputs: any, resources: any) => {
         parsedEvent.StreamName = parsedStreamName;
       }
     } else if (val.arn && typeof val.arn == "object") {
-      const parsedStreamName = parseStreamNameFromArn(val.arn, Outputs, resources);
+      const parsedStreamName = parseStreamNameFromArn(val.arn, Outputs, resources.kinesis);
       if (parsedStreamName) {
         parsedEvent.StreamName = parsedStreamName;
       }
@@ -91,6 +97,17 @@ export const parseKinesis = (event: any, Outputs: any, resources: any) => {
 
       if ("tumblingWindowInSeconds" in val) {
         parsedEvent.tumblingWindowInSeconds = val.tumblingWindowInSeconds;
+      }
+
+      if (val.destinations?.onFailure) {
+        const failDest = parseDestination(val.destinations.onFailure, Outputs, resources);
+        if (failDest) {
+          if (failDest.kind == "lambda") {
+            log.YELLOW("Kinesis stream onFailure destination could only be a SNS or SQS service");
+          } else {
+            parsedEvent.onFailure = failDest;
+          }
+        }
       }
       return parsedEvent;
     }

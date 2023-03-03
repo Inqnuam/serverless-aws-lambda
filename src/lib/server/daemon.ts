@@ -2,12 +2,13 @@ import http, { Server, IncomingMessage, ServerResponse } from "http";
 import { AddressInfo } from "net";
 import { networkInterfaces } from "os";
 import { Handlers, HttpMethod } from "./handlers";
-import { ILambdaMock, LambdaMock, LambdaEndpoint } from "./runtime/lambdaMock";
-import { log } from "./colorize";
+import { ILambdaMock, LambdaMock, LambdaEndpoint } from "../runtime/lambdaMock";
+import { log } from "../utils/colorize";
 import inspector from "inspector";
-import { html404, html500 } from "./htmlStatusMsg";
+import { html404, html500 } from "../utils/htmlStatusMsg";
 import serveStatic from "serve-static";
 import { randomUUID } from "crypto";
+import { invokeRequests } from "../../plugins/invoke/index";
 
 const accountId = Buffer.from(randomUUID()).toString("hex").slice(0, 16);
 const apiId = Buffer.from(randomUUID()).toString("ascii").slice(0, 10);
@@ -114,12 +115,12 @@ export class Daemon extends Handlers {
   #server: Server;
   runtimeConfig: any = {};
   #serve: any;
-  customOfflineRequests?: {
+  customOfflineRequests: {
     method?: string | string[];
     filter: RegExp | string;
     callback: (req: any, res: any) => {};
-  }[];
-  onReady?: (port: number) => Promise<void> | void;
+  }[] = [invokeRequests];
+  onReady?: (port: number, ip: string) => Promise<void> | void;
   stop(cb: (err?: any) => void) {
     this.#server.close(cb);
   }
@@ -139,109 +140,30 @@ export class Daemon extends Handlers {
       throw Error("port should be a number");
     }
     this.#server.listen(port, async () => {
-      const { port: listeningPort } = this.#server.address() as AddressInfo;
+      const { port: listeningPort, address } = this.#server.address() as AddressInfo;
+
       Handlers.PORT = listeningPort;
+      if (localIp) {
+        Handlers.ip = localIp;
+      }
       if (typeof callback == "function") {
         callback(listeningPort, localIp);
       } else {
-        let output = `✅ AWS Lambda offline server is listening on http://localhost:${listeningPort}`;
-
-        if (localIp) {
-          output += ` | http://${localIp}:${listeningPort}`;
-        }
-
+        let output = `✅ AWS Lambda offline server is listening on http://localhost:${listeningPort} | http://${Handlers.ip}:${listeningPort}`;
         log.GREEN(output);
       }
       try {
-        await this.onReady?.(listeningPort);
+        await this.onReady?.(listeningPort, Handlers.ip);
       } catch (error) {
         console.error(error);
       }
-      process.send?.({ port: listeningPort });
+      process.send?.({ port: listeningPort, ip: Handlers.ip });
     });
   }
 
-  #handleCustomInvoke(req: IncomingMessage, res: ServerResponse, parsedURL: URL) {
-    const { url, method, headers } = req;
-
-    const foundHandler = this.getHandlerByName(parsedURL.pathname);
-
-    const invokeType = headers["x-amz-invocation-type"];
-    const exceptedStatusCode = invokeType == "DryRun" ? 204 : invokeType == "Event" ? 202 : 200;
-
-    if (foundHandler) {
-      let event = "";
-      let body: any = Buffer.alloc(0);
-
-      req
-        .on("data", (chunk) => {
-          body += chunk;
-        })
-        .on("end", async () => {
-          body = body.toString();
-
-          let validBody = false;
-          try {
-            body = JSON.parse(body);
-            validBody = true;
-          } catch (error) {
-            if (body && body.length) {
-              validBody = false;
-            } else {
-              body = {};
-              validBody = true;
-            }
-          }
-          event = body;
-
-          res.setHeader("Content-Type", "application/json");
-          res.setHeader("x-amzn-RequestId", Buffer.from(randomUUID()).toString("base64"));
-          res.setHeader("X-Amzn-Trace-Id", `root=1-xxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx;sampled=0`);
-
-          if (validBody) {
-            res.setHeader("X-Amz-Executed-Version", "$LATEST");
-            try {
-              // TODO: if it works correctly
-              const date = new Date();
-              const awsRequestId = randomUUID();
-              let info;
-              res.statusCode = exceptedStatusCode;
-              if (exceptedStatusCode !== 200) {
-                res.end();
-              }
-              if (exceptedStatusCode == 202) {
-                info = { kind: "async" };
-              }
-              log.CYAN(`${date.toLocaleDateString()} ${date.toLocaleTimeString()} requestId: ${awsRequestId} | '${foundHandler.name}' ${method}`);
-              const result = await foundHandler.invoke(event, info);
-
-              if (exceptedStatusCode == 200) {
-                res.end(JSON.stringify(result));
-              }
-            } catch (error: any) {
-              // TODO: check with a real lambda
-              res.setHeader("X-Amz-Function-Error", error.errorType);
-              res.statusCode = 502;
-              res.end(JSON.stringify(error));
-            }
-          } else {
-            res.statusCode = 415;
-            res.end(JSON.stringify({ Type: "User" }));
-          }
-        })
-        .on("error", (err) => {
-          res.statusCode = 502;
-          res.end(JSON.stringify(err));
-        });
-    } else {
-      res.statusCode = 404;
-      res.end("Lambda not found");
-    }
-  }
   #findCustomOfflineRequest(method: string, pathname: string) {
-    if (!this.customOfflineRequests) {
-      return;
-    }
+    // TODO: check if everuthing is still correct
+    pathname = pathname.endsWith("/") ? pathname : `${pathname}/`;
     const foundCustomCallback = this.customOfflineRequests.find((x) => {
       let validPath = false;
       let validMethod = true;
@@ -268,7 +190,7 @@ export class Daemon extends Handlers {
       return foundCustomCallback.callback;
     }
   }
-  #requestListener(req: IncomingMessage, res: ServerResponse) {
+  async #requestListener(req: IncomingMessage, res: ServerResponse) {
     const { url, method, headers } = req;
     const parsedURL = new URL(url as string, "http://localhost:3003");
 
@@ -276,10 +198,11 @@ export class Daemon extends Handlers {
 
     if (customCallback) {
       //SECTION: Route provided by client in config file and/or by plugins
-      customCallback(req, res);
-    } else if (parsedURL.pathname.startsWith("/2015-03-31") || parsedURL.pathname.startsWith("/@invoke/")) {
-      //SECTION: function invoke from aws-sdk lambda client or from /@invoke/
-      this.#handleCustomInvoke(req, res, parsedURL);
+      try {
+        await customCallback(req, res);
+      } catch (error) {
+        res.end("Internal Server Error");
+      }
     } else {
       //SECTION: ALB and APG server
       let body = Buffer.alloc(0);

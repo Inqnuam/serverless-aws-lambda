@@ -1,10 +1,10 @@
 import type { PluginBuild, BuildResult } from "esbuild";
 import type { Config, OfflineConfig } from "./config";
 import type { ILambdaMock } from "./lib/runtime/lambdaMock";
-import type { HttpMethod } from "./lib/handlers";
+import type { HttpMethod } from "./lib/server/handlers";
 import type { IncomingMessage, ServerResponse } from "http";
 import type Serverless from "serverless";
-import { log } from "./lib/colorize";
+import { log } from "./lib/utils/colorize";
 import { exitEvents } from "./server";
 
 export type ILambda = {
@@ -42,7 +42,7 @@ export interface SlsAwsLambdaPlugin {
   onExit?: (this: ClientConfigParams, code: string | number) => void;
   afterDeploy?: (this: ClientConfigParams) => Promise<void> | void;
   offline?: {
-    onReady?: (this: ClientConfigParams, port: number) => Promise<void> | void;
+    onReady?: (this: ClientConfigParams, port: number, ip: string) => Promise<void> | void;
     /**
      * Add new requests to the offline server.
      */
@@ -137,11 +137,11 @@ function defineConfig(options: Options) {
       config,
     };
     if (options.plugins) {
-      config.offline!.onReady = async (port) => {
+      config.offline!.onReady = async (port, ip) => {
         for (const plugin of options.plugins!) {
           if (plugin.offline?.onReady) {
             try {
-              await plugin.offline.onReady!.call(self, port);
+              await plugin.offline.onReady!.call(self, port, ip);
             } catch (error) {
               log.RED(plugin.name);
               console.error(error);

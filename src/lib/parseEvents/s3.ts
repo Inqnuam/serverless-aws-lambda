@@ -1,4 +1,4 @@
-import { log } from "../colorize";
+import { log } from "../utils/colorize";
 
 export const parseS3 = (event: any) => {
   if (!event || !event.s3) {

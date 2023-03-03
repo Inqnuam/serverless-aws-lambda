@@ -1,10 +1,10 @@
 import type { BuildOptions, BuildResult } from "esbuild";
 import { IncomingMessage, ServerResponse } from "http";
-import type { HttpMethod } from "./lib/handlers";
+import type { HttpMethod } from "./lib/server/handlers";
 export interface OfflineConfig {
   staticPath?: string;
   port?: number;
-  onReady?: (port: number) => Promise<void> | void;
+  onReady?: (port: number, ip: string) => Promise<void> | void;
   request?: {
     method?: HttpMethod | HttpMethod[];
     filter: string | RegExp;

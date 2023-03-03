@@ -105,7 +105,7 @@ const server = new Server({
   },
 });
 
-const { port } = await server.start();
+const { port, ip } = await server.start();
 
 // do something
 // then

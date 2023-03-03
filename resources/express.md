@@ -1,5 +1,7 @@
 `serverless-aws-lambda` provied `Router` may be used to write a Lambda with ExpressJs compatible syntax, which supports ALB and API Gateway events (including multiValueQueryStringParameters and multiValueHeaders)
 
+To get Type definitions please set `"moduleResolution": "NodeNext"` inside your `tsconfig.json`.
+
 ```js
 // src/controllers/playersController.ts
 import type { RouteController } from "serverless-aws-lambda/router";

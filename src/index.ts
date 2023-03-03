@@ -1,12 +1,12 @@
 import path from "path";
-import { Daemon } from "./lib/daemon";
+import { Daemon } from "./lib/server/daemon";
 import { ILambdaMock } from "./lib/runtime/lambdaMock";
-import { log } from "./lib/colorize";
-import { zip } from "./lib/zip";
+import { log } from "./lib/utils/colorize";
+import { zip } from "./lib/utils/zip";
 import esbuild from "esbuild";
 import type { BuildOptions, BuildResult } from "esbuild";
 import type Serverless from "serverless";
-import { Handlers } from "./lib/handlers";
+import { Handlers } from "./lib/server/handlers";
 import { buildOptimizer } from "./lib/esbuild/buildOptimizer";
 import { parseEvents, parseDestination } from "./lib/parseEvents/index";
 import { getResources } from "./lib/parseEvents/getResources";
@@ -317,7 +317,7 @@ class ServerlessAwsLambda extends Daemon {
           ...isLocalEnv,
         },
         invoke: async (event: any, info?: any) => {
-          const foundLambda = this.getHandlerByName(`/@invoke/${funcName}`);
+          const foundLambda = Handlers.getHandlerByName(`/@invoke/${funcName}`);
           if (foundLambda) {
             const res = await foundLambda.invoke(event, info);
             return res;
@@ -333,18 +333,18 @@ class ServerlessAwsLambda extends Daemon {
       };
 
       // @ts-ignore
-      lambdaDef.onError = parseDestination(lambda.onError);
+      lambdaDef.onError = parseDestination(lambda.onError, Outputs, resources);
 
       if (lambdaDef.onError?.kind == "lambda") {
-        log.YELLOW("Dead-Letter queue could be only a SNS or SQS service");
+        log.YELLOW("Dead-Letter queue could only be a SNS or SQS service");
         delete lambdaDef.onError;
       }
       //@ts-ignore
       if (lambda.destinations && typeof lambda.destinations == "object") {
         //@ts-ignore
-        lambdaDef.onFailure = parseDestination(lambda.destinations.onFailure);
+        lambdaDef.onFailure = parseDestination(lambda.destinations.onFailure, Outputs, resources);
         //@ts-ignore
-        lambdaDef.onSuccess = parseDestination(lambda.destinations.onSuccess);
+        lambdaDef.onSuccess = parseDestination(lambda.destinations.onSuccess, Outputs, resources);
       }
 
       lambdaDef.onInvoke = (callback: (event: any, info?: any) => void) => {
@@ -369,7 +369,7 @@ class ServerlessAwsLambda extends Daemon {
         lambdaDef.s3 = s3;
         lambdaDef.kinesis = kinesis;
       }
-      console.log(lambdaDef);
+      // console.log(lambdaDef);
       accum.push(lambdaDef);
       return accum;
     }, []);
@@ -483,7 +483,7 @@ class ServerlessAwsLambda extends Daemon {
 
     if (exportedObject.offline && typeof exportedObject.offline == "object") {
       if (Array.isArray(exportedObject.offline.request)) {
-        this.customOfflineRequests = exportedObject.offline.request;
+        this.customOfflineRequests.push(...exportedObject.offline.request);
       }
 
       if (typeof exportedObject.offline.staticPath == "string") {

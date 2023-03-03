@@ -1,3 +1,6 @@
+import { log } from "../utils/colorize";
+import { parseDestination } from "./index";
+
 const getTableNameFromResources = (ddbStreamTables: any, Outputs: any, obj: any) => {
   const [key, value] = Object.entries(obj)?.[0];
 
@@ -8,7 +11,7 @@ const getTableNameFromResources = (ddbStreamTables: any, Outputs: any, obj: any)
   if (key == "Fn::GetAtt" || key == "Ref") {
     const [resourceName] = value as unknown as any[];
 
-    const resource = ddbStreamTables[resourceName];
+    const resource = ddbStreamTables?.[resourceName];
     if (resource) {
       return resource.TableName;
     }
@@ -42,8 +45,8 @@ const getStreamTableInfoFromTableName = (ddbStreamTables: any, tableName: string
 
   return foundInfo ?? {};
 };
-export const parseDdbStreamDefinitions = (Outputs: any, ddbStreamTables: any, event: any) => {
-  if (!event || Object.keys(event)[0] !== "stream") {
+export const parseDdbStreamDefinitions = (Outputs: any, resources: any, event: any) => {
+  if (!event || Object.keys(event)[0] !== "stream" || (event.stream.type && event.stream.type != "dynamodb")) {
     return;
   }
 
@@ -63,7 +66,7 @@ export const parseDdbStreamDefinitions = (Outputs: any, ddbStreamTables: any, ev
     if (parsedTableName) {
       parsedEvent.TableName = parsedTableName;
     } else if (val.arn && typeof val.arn == "object") {
-      const parsedTableName = getTableNameFromResources(ddbStreamTables, Outputs, val.arn);
+      const parsedTableName = getTableNameFromResources(resources.ddb, Outputs, val.arn);
 
       if (parsedTableName) {
         parsedEvent.TableName = parsedTableName;
@@ -81,14 +84,20 @@ export const parseDdbStreamDefinitions = (Outputs: any, ddbStreamTables: any, ev
       }
 
       if (val.destinations?.onFailure) {
-        // TODO: parse destination
-        parsedEvent.onFailure = val.destinations.onFailure;
+        const failDest = parseDestination(val.destinations.onFailure, Outputs, resources);
+        if (failDest) {
+          if (failDest.kind == "lambda") {
+            log.YELLOW("DynamoDB onFailure destination could only be a SNS or SQS service");
+          } else {
+            parsedEvent.onFailure = failDest;
+          }
+        }
       }
     }
   }
 
   if (parsedEvent.TableName) {
-    const streamInfo = getStreamTableInfoFromTableName(ddbStreamTables, parsedEvent.TableName);
+    const streamInfo = getStreamTableInfoFromTableName(resources.ddb, parsedEvent.TableName);
 
     // @ts-ignore
     parsedEvent = { ...parsedEvent, ...streamInfo };

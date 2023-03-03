@@ -1,20 +1,34 @@
 const { parentPort, workerData } = require("worker_threads");
-const { log } = require("./colorize");
+import { log } from "../utils/colorize";
 const inspector = require("inspector");
 
 const debuggerIsAttached = inspector.url() != undefined;
 
-let eventHandler;
+let eventHandler: Function;
 const invalidResponse = new Error("Invalid response payload");
-const reachedTimeout = new Error("Timeout");
-const genResponsePayload = (err) => {
-  const responsePayload = {
+
+class Timeout extends Error {
+  constructor(timeout: number, awsRequestId: string) {
+    super(`${new Date().toISOString()} ${awsRequestId} Task timed out after ${timeout} seconds`);
+  }
+}
+interface LambdaErrorResponse {
+  errorType?: string;
+  errorMessage: string;
+  trace?: string[];
+}
+const genResponsePayload = (err: any) => {
+  const responsePayload: LambdaErrorResponse = {
     errorType: "string",
     errorMessage: "",
     trace: [],
   };
 
-  if (err instanceof Error) {
+  if (err instanceof Timeout) {
+    responsePayload.errorMessage = err.message;
+    responsePayload.errorType = "Unhandled";
+    delete responsePayload.trace;
+  } else if (err instanceof Error) {
     responsePayload.errorType = err.name;
     responsePayload.errorMessage = err.message;
 
@@ -32,13 +46,13 @@ const genResponsePayload = (err) => {
   return responsePayload;
 };
 
-const returnError = (awsRequestId, err) => {
+const returnError = (awsRequestId: string, err: any) => {
   log.RED("Request failed");
   const data = genResponsePayload(err);
   parentPort.postMessage({ channel: "fail", data, awsRequestId });
 };
 
-const returnResponse = (channel, awsRequestId, data) => {
+const returnResponse = (channel: string, awsRequestId: string, data: any) => {
   try {
     JSON.stringify(data);
 
@@ -52,7 +66,7 @@ const returnResponse = (channel, awsRequestId, data) => {
   }
 };
 
-parentPort.on("message", async (e) => {
+parentPort.on("message", async (e: any) => {
   const { channel, data, awsRequestId } = e;
 
   if (channel == "import") {
@@ -70,7 +84,7 @@ parentPort.on("message", async (e) => {
 
     parentPort.postMessage({ channel: "import" });
   } else if (channel == "exec") {
-    const { event } = data;
+    const { event, clientContext } = data;
 
     let isSent = false;
     let timeout = workerData.timeout * 1000;
@@ -82,7 +96,7 @@ parentPort.on("message", async (e) => {
         clearInterval(lambdaTimeoutInterval);
         if (!debuggerIsAttached) {
           isSent = true;
-          returnError(awsRequestId, reachedTimeout);
+          returnError(awsRequestId, new Timeout(workerData.timeout, awsRequestId));
         }
       }
     }, 250);
@@ -103,21 +117,21 @@ parentPort.on("message", async (e) => {
       set callbackWaitsForEmptyEventLoop(val) {
         callbackWaitsForEmptyEventLoop = val;
       },
-      succeed: (lambdaRes) => {
+      succeed: (lambdaRes: any) => {
         if (isSent) {
           return;
         }
         resIsSent();
         returnResponse("succeed", awsRequestId, lambdaRes);
       },
-      fail: (err) => {
+      fail: (err: any) => {
         if (isSent) {
           return;
         }
         resIsSent();
         returnError(awsRequestId, err);
       },
-      done: function (err, lambdaRes) {
+      done: function (err: any, lambdaRes: any) {
         if (isSent) {
           return;
         }
@@ -134,7 +148,7 @@ parentPort.on("message", async (e) => {
       memoryLimitInMB: workerData.memorySize,
       logGroupName: `/aws/lambda/${workerData.name}`,
       logStreamName: `${new Date().toLocaleDateString()}[$LATEST]${awsRequestId.replace(/-/g, "")}`,
-      clientContext: undefined,
+      clientContext,
       identity: undefined,
       invokedFunctionArn: `arn:aws:lambda:eu-west-1:00000000000:function:${workerData.name}`,
       awsRequestId,
@@ -148,7 +162,7 @@ parentPort.on("message", async (e) => {
       const eventResponse = eventHandler(event, context, callback);
 
       eventResponse
-        ?.then?.((data) => {
+        ?.then?.((data: any) => {
           clearInterval(lambdaTimeoutInterval);
           if (isSent) {
             return;
@@ -156,10 +170,15 @@ parentPort.on("message", async (e) => {
           resIsSent();
           returnResponse("return", awsRequestId, data);
         })
-        ?.catch((err) => {
+        ?.catch((err: any) => {
           resIsSent();
           returnError(awsRequestId, err);
         });
+
+      if (typeof eventResponse.then !== "function" && !isSent) {
+        resIsSent();
+        returnResponse("return", awsRequestId, null);
+      }
     } catch (err) {
       resIsSent();
       returnError(awsRequestId, err);

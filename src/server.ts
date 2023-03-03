@@ -57,9 +57,9 @@ export class Server {
     });
 
     return new Promise((resolve, reject) => {
-      this.#cmd!.on("message", ({ port }: { port: string }) => {
+      this.#cmd!.on("message", ({ port, ip }: { port: string; ip: string }) => {
         if (port) {
-          resolve({ port });
+          resolve({ port, ip });
         }
       });
     });

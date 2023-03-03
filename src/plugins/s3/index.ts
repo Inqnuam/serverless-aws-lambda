@@ -57,8 +57,9 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
                 "x-amz-id-2": "Jlw7ZDxNF0nnIcNbUG0TpuYia9hBMqI/W8vMDyNTB5oZ/7ARNqYW5/l3VPURZIj0pkKhCOqSazo=",
                 "x-amzn-requestid": requestId,
                 "x-amz-server-side-encryption": "AES256",
-                "Content-Type": items.files[filePath]?.type ?? "application/octet-stream",
+                "Content-Type": items.files[filePath]?.type,
                 "Content-Length": fileStat.size,
+                "Cache-Control": items.files[filePath].cacheControl,
                 Date: new Date().toUTCString(),
                 "Last-Modified": new Date(fileStat.mtimeMs).toUTCString(),
                 ETag: `"${ETag}"`,
@@ -90,8 +91,9 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
                   "x-amz-id-2": "Jlw7ZDxNF0nnIcNbUG0TpuYia9hBMqI/W8vMDyNTB5oZ/7ARNqYW5/l3VPURZIj0pkKhCOqSazo=",
                   "x-amzn-requestid": requestId,
                   "x-amz-server-side-encryption": "AES256",
-                  "Content-Type": items.files[filePath]?.type ?? "application/octet-stream",
+                  "Content-Type": items.files[filePath]?.type,
                   "Content-Length": fileStat.size,
+                  "Cache-Control": items.files[filePath].cacheControl,
                   "Accept-Ranges": "bytes",
                   Date: new Date().toUTCString(),
                   "Last-Modified": new Date(fileStat.mtimeMs).toUTCString(),
@@ -113,7 +115,7 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
           method: "PUT",
           filter: /^\/@s3\/.*/,
           callback: async function (req, res) {
-            const { requestCmd, filePath, bucketName, keyName, requestId, copySource, sourceIPAddress, contentType } = request.deserialize(req);
+            const { requestCmd, filePath, bucketName, keyName, requestId, copySource, sourceIPAddress, contentType, cacheControl } = request.deserialize(req);
 
             if (requestCmd == "PutObject") {
               try {
@@ -129,9 +131,11 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
                 res.end();
                 if (items.files[filePath]) {
                   items.files[filePath].type = contentType;
+                  items.files[filePath].cacheControl = cacheControl;
                 } else {
                   items.files[filePath] = {
                     type: contentType,
+                    cacheControl,
                   };
                 }
 
@@ -163,9 +167,11 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
                 await copyFile(copySource, filePath);
                 if (items.files[filePath]) {
                   items.files[filePath].type = contentType;
+                  items.files[filePath].cacheControl = cacheControl;
                 } else {
                   items.files[filePath] = {
                     type: contentType,
+                    cacheControl,
                   };
                 }
                 const fileStat = await stat(filePath);

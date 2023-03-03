@@ -1,3 +1,7 @@
+import { log } from "../utils/colorize";
+
+const onlySqsAllowed = "SNS redrivePolicy destination could only be a SQS service";
+
 const parseTopicNameFromObject = (resources: any, Outputs: any, obj: any) => {
   const [key, value] = Object.entries(obj)?.[0];
 
@@ -19,7 +23,7 @@ const parseTopicNameFromObject = (resources: any, Outputs: any, obj: any) => {
   } else if (key == "Fn::GetAtt" || key == "Ref") {
     const [resourceName] = value as unknown as any[];
 
-    const resource = resources[resourceName];
+    const resource = resources?.[resourceName];
     if (resource) {
       return resource.TopicName;
     }
@@ -28,7 +32,7 @@ const parseTopicNameFromObject = (resources: any, Outputs: any, obj: any) => {
   }
 };
 
-export const parseSns = (resources: any, Outputs: any, event: any) => {
+export const parseSns = (Outputs: any, resources: any, event: any) => {
   if (!event.sns) {
     return;
   }
@@ -46,10 +50,12 @@ export const parseSns = (resources: any, Outputs: any, event: any) => {
 
     if (typeof arn == "string") {
       const arnComponents = arn.split(":");
-      sns.name = arnComponents[arnComponents.length - 1];
-      sns.arn = arn;
+      if (arnComponents.length) {
+        sns.name = arnComponents[arnComponents.length - 1];
+        sns.arn = arn;
+      }
     } else if (arn && !Array.isArray(arn) && typeof arn == "object") {
-      sns.name = parseTopicNameFromObject(resources, Outputs, arn);
+      sns.name = parseTopicNameFromObject(resources?.sns, Outputs, arn);
     }
 
     if (!sns.name && topicName) {
@@ -72,11 +78,36 @@ export const parseSns = (resources: any, Outputs: any, event: any) => {
 
     if (redrivePolicy) {
       const { deadLetterTargetArn, deadLetterTargetRef, deadLetterTargetImport } = redrivePolicy;
-      console.log("redrivePolicy", redrivePolicy);
-      // TODO: parse
+
+      if (typeof deadLetterTargetArn == "string") {
+        const [, , kind, region, accountId, dlq] = deadLetterTargetArn.split(":");
+        if (kind == "sqs") {
+          sns.redrivePolicy = dlq;
+        } else {
+          log.YELLOW(onlySqsAllowed);
+        }
+      } else if (typeof deadLetterTargetRef == "string") {
+        if (resources?.sqs?.[deadLetterTargetRef]) {
+          const targetRef = resources.sqs[deadLetterTargetRef].QueueName;
+
+          if (targetRef) {
+            sns.redrivePolicy = targetRef;
+          } else {
+            log.YELLOW(`Can not find SNS redrivePolicy for SQS: ${deadLetterTargetRef}`);
+          }
+        }
+      } else if (deadLetterTargetImport && typeof deadLetterTargetImport.arn == "string") {
+        const [, , kind, region, accountId, dlq] = deadLetterTargetImport.arn.split(":");
+
+        if (kind == "sqs") {
+          sns.redrivePolicy = dlq;
+        } else {
+          log.YELLOW(onlySqsAllowed);
+        }
+      }
     }
   }
-  if (Object.keys(sns).length) {
+  if (sns.name) {
     return sns;
   }
 };

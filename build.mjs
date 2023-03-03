@@ -14,8 +14,9 @@ const external = ["esbuild", "archiver", "serve-static"];
 const watchPlugin = {
   name: "watch-plugin",
   setup: (build) => {
+    const format = build.initialOptions.format;
     build.onEnd(async (result) => {
-      console.log("Compiler rebuild", new Date().toLocaleString());
+      console.log("Build", format, new Date().toLocaleString());
       compileDeclarations();
     });
   },
@@ -29,30 +30,29 @@ const esBuildConfig = {
   outdir: "dist",
   format: "cjs",
   plugins: [watchPlugin],
+  external,
 };
 
 const bundle = shouldWatch ? esbuild.context : esbuild.build;
 const buildIndex = bundle.bind(null, {
   ...esBuildConfig,
-  external: external.concat(["./src/lib/worker.js"]),
   entryPoints: [
     "./src/index.ts",
     "./src/server.ts",
     "./src/defineConfig.ts",
-    "./src/lib/worker.js",
+    "./src/lib/runtime/worker.ts",
     "./src/lambda/router.ts",
     "./src/plugins/sns/index.ts",
     "./src/plugins/s3/index.ts",
-    "./src/plugins/body-parser.ts",
+    "./src/lambda/body-parser.ts",
   ],
 });
 
 const buildRouterESM = bundle.bind(null, {
   ...esBuildConfig,
-  entryPoints: ["./src/lambda/router.ts", "./src/server.ts", "./src/plugins/body-parser.ts"],
+  entryPoints: ["./src/lambda/router.ts", "./src/server.ts", "./src/lambda/body-parser.ts"],
   format: "esm",
   outExtension: { ".js": ".mjs" },
-  external,
 });
 
 const result = await Promise.all([buildIndex(), buildRouterESM()]);

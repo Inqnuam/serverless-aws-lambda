@@ -1,84 +1,34 @@
-import { ILambdaMock, LambdaEndpoint } from "./runtime/lambdaMock";
+import { ILambdaMock, LambdaEndpoint } from "../runtime/lambdaMock";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "ANY";
 
 export class Handlers {
-  #handlers: ILambdaMock[] = [];
+  static handlers: ILambdaMock[] = [];
   static PORT = 0;
+  static ip: string = "127.0.0.1";
   debug = false;
   constructor(config: any) {
     this.debug = config.debug;
   }
 
-  getHandlersByTopicArn(body: any) {
-    const arnComponent = body.TopicArn.split(":");
+  static parseNameFromUrl(lambdaName: string) {
+    const components = lambdaName.split("/");
 
-    const name = arnComponent[arnComponent.length - 1];
+    let name = components[1] == "@invoke" ? components[2] : components[3];
+    name = decodeURIComponent(name);
+    if (name.includes(":function")) {
+      const arnComponent = name.split(":");
+      name = arnComponent[arnComponent.length - 1];
+    }
 
-    const foundHandlers = this.#handlers.filter((x) => {
-      const foundEvents = x.sns.filter((foundEvent) => {
-        if (foundEvent.name !== name) {
-          return false;
-        }
-
-        if (!foundEvent) {
-          return false;
-        }
-
-        if (!foundEvent.filter) {
-          return true;
-        }
-
-        const filterKeys = Object.keys(foundEvent.filter);
-
-        let filterContext: any = {};
-
-        if (foundEvent.filterScope == "MessageAttributes") {
-          if (!body.MessageAttributes) {
-            return false;
-          }
-
-          for (const [k, v] of Object.entries(body.MessageAttributes)) {
-            filterContext[k] = (v as any).Value;
-          }
-        } else if (foundEvent.filterScope == "MessageBody") {
-          if (body.MessageStructure != "json" || !body.Message) {
-            return false;
-          }
-          try {
-            filterContext = JSON.parse(body.Message);
-          } catch (error) {}
-        }
-
-        if (!filterKeys.every((x) => x in filterContext)) {
-          return false;
-        }
-
-        let hasRequiredKey = false;
-
-        for (const k of filterKeys) {
-          if (foundEvent.filter[k].some((x: string) => x == filterContext[k])) {
-            hasRequiredKey = true;
-            break;
-          }
-        }
-
-        return hasRequiredKey;
-      });
-
-      return foundEvents.length ? true : false;
-    });
-
-    return foundHandlers;
+    return name;
   }
-  getHandlerByName(lambdaName?: string | null) {
+  static getHandlerByName(lambdaName?: string | null) {
     if (!lambdaName) {
       return;
     }
-    const components = lambdaName.split("/");
-
-    const name = components[1] == "@invoke" ? components[2] : components[3];
-    return this.#handlers.find((x) => x.name == name || x.outName == name);
+    const name = Handlers.parseNameFromUrl(lambdaName);
+    return Handlers.handlers.find((x) => x.name == name || x.outName == name);
   }
   getHandler(method: HttpMethod, path: string, kind?: string | null) {
     const hasNotWilcard = !path.includes("*");
@@ -86,7 +36,7 @@ export class Handlers {
 
     let foundLambda: { event: LambdaEndpoint; handler: ILambdaMock } | undefined;
 
-    const foundHandler = this.#handlers.find((x) => {
+    const foundHandler = Handlers.handlers.find((x) => {
       return x.endpoints
         .filter((e) => (kind ? e.kind == kind.toLowerCase() : e))
         .find((w) => {
@@ -115,7 +65,7 @@ export class Handlers {
       return foundLambda;
     } else {
       // Use Regex to find lambda controller
-      const foundHandler = this.#handlers.find((x) =>
+      const foundHandler = Handlers.handlers.find((x) =>
         x.endpoints
           .filter((e) => (kind ? e.kind == kind : e))
           .find((w) => {
@@ -147,10 +97,10 @@ export class Handlers {
   }
 
   addHandler(lambdaController: ILambdaMock) {
-    const foundIndex = this.#handlers.findIndex((x) => x.name == lambdaController.name && x.esOutputPath == lambdaController.esOutputPath);
+    const foundIndex = Handlers.handlers.findIndex((x) => x.name == lambdaController.name && x.esOutputPath == lambdaController.esOutputPath);
 
     if (foundIndex == -1) {
-      this.#handlers.push(lambdaController);
+      Handlers.handlers.push(lambdaController);
       if (this.debug) {
         if (lambdaController.endpoints.length) {
           lambdaController.endpoints.forEach((x) => {
@@ -163,7 +113,7 @@ export class Handlers {
         }
       }
     } else {
-      this.#handlers[foundIndex] = lambdaController;
+      Handlers.handlers[foundIndex] = lambdaController;
     }
   }
 
