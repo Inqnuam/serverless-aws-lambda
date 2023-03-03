@@ -102,7 +102,18 @@ client
 
 ### Environment variable
 
-Lambdas are executed in worker threads. Only variables declared in your `serverless.yml` are injected into `process.env` except `IS_LOCAL`, `LOCAL_PORT` and `NODE_ENV`
+Lambdas are executed in worker threads. Only variables declared in your `serverless.yml` are injected into `process.env` except `IS_LOCAL`, `LOCAL_PORT` and `NODE_ENV`.
+
+### Disable functions
+
+Adding the param `online: false` will omit the deployement of your Lambda.
+
+```yaml
+functions:
+  myAwsomeLambda:
+    handler: src/handlers/awsomeLambda.default
+    online: false
+```
 
 ---
 
