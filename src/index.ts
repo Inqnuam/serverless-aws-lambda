@@ -50,9 +50,12 @@ class ServerlessAwsLambda extends Daemon {
     // @ts-ignore
     this.isDeploying = this.serverless.processedInput.commands.includes("deploy");
 
-    this.nodeVersion = this.serverless.service.provider.runtime?.replace(/[^0-9]/g, "");
-    if (!this.nodeVersion) {
-      throw new Error("Please provide NodeJS runtime version inside your serverless.yml > provider > runtime");
+    if (!this.serverless.service.provider.runtime) {
+      throw new Error("Please provide 'runtime' inside your serverless.yml > provider > runtime");
+    } else if (this.serverless.service.provider.runtime.startsWith("node")) {
+      this.nodeVersion = this.serverless.service.provider.runtime?.replace(/[^0-9]/g, "");
+    } else {
+      this.nodeVersion = "14";
     }
     this.watch = !this.isPackaging && !this.isDeploying;
     if (!this.watch) {
@@ -64,6 +67,7 @@ class ServerlessAwsLambda extends Daemon {
       properties: {
         virtualEnvs: { type: "object" },
         online: { type: "boolean" },
+        files: { type: "array" },
       },
     });
 
@@ -223,8 +227,14 @@ class ServerlessAwsLambda extends Daemon {
         for (const l of packageLambdas.filter((x) => x.online)) {
           const slsDeclaration = this.serverless.service.getFunction(l.name) as Serverless.FunctionDefinitionHandler;
 
+          if (typeof slsDeclaration.package?.artifact == "string") {
+            continue;
+          }
+
+          // @ts-ignore
+          const filesToInclude = slsDeclaration.files;
           const zipableBundledFilePath = l.esOutputPath.slice(0, -3);
-          const zipOutputPath = await zip(zipableBundledFilePath, l.outName);
+          const zipOutputPath = await zip(zipableBundledFilePath, l.outName, filesToInclude);
 
           // @ts-ignore
           slsDeclaration.package = { ...slsDeclaration.package, disable: true, artifact: zipOutputPath };
@@ -278,16 +288,23 @@ class ServerlessAwsLambda extends Daemon {
     if (this.invokeName) {
       functionsNames = functionsNames.filter((x) => x == this.invokeName);
     }
+    const defaultRuntime = this.serverless.service.provider.runtime;
     const resources = getResources(this.serverless);
     // @ts-ignore
     const Outputs = this.serverless.service.resources?.Outputs;
     const lambdas = functionsNames.reduce((accum: any[], funcName: string) => {
       const lambda = funcs[funcName];
 
+      if (lambda.runtime && !lambda.runtime.startsWith("node")) {
+        return accum;
+      } else if (!defaultRuntime?.startsWith("node") && (!lambda.runtime || !lambda.runtime.startsWith("node"))) {
+        return accum;
+      }
       const handlerPath = (lambda as Serverless.FunctionDefinitionHandler).handler;
-      const lastPointIndex = handlerPath.lastIndexOf(".");
-      const handlerName = handlerPath.slice(lastPointIndex + 1);
-      const esEntryPoint = path.join(cwd, handlerPath.slice(0, lastPointIndex));
+      const ext = path.extname(handlerPath);
+      const handlerName = ext.slice(1);
+      const esEntryPoint = path.posix.resolve(handlerPath.replace(ext, ""));
+
       const region = this.runtimeConfig.environment.AWS_REGION ?? this.runtimeConfig.environment.REGION;
 
       const slsDeclaration: any = this.serverless.service.getFunction(funcName);

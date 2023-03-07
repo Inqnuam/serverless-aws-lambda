@@ -29,6 +29,10 @@ export interface IDdbEvent {
   StreamEnabled: boolean;
   StreamViewType?: string;
   batchSize?: number;
+  batchWindow?: number;
+  maximumRecordAgeInSeconds?: number;
+  maximumRetryAttempts?: number;
+  bisectBatchOnFunctionError?: boolean;
   functionResponseType?: string;
   filterPatterns?: any;
   onFailure?: IDestination;

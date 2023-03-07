@@ -1,6 +1,11 @@
 import { log } from "../utils/colorize";
 import { parseDestination } from "./index";
 
+enum StreamProps {
+  batchSize = 100,
+  minRecordAge = 60,
+  maxRecordAge = 604800,
+}
 const getTableNameFromResources = (ddbStreamTables: any, Outputs: any, obj: any) => {
   const [key, value] = Object.entries(obj)?.[0];
 
@@ -74,7 +79,31 @@ export const parseDdbStreamDefinitions = (Outputs: any, resources: any, event: a
     }
 
     if (parsedEvent.TableName) {
-      parsedEvent.batchSize = val.batchSize ?? 100;
+      if (!isNaN(val.batchSize) && val.batchSize > 0) {
+        parsedEvent.batchSize = val.batchSize;
+      } else {
+        parsedEvent.batchSize = StreamProps.batchSize;
+      }
+
+      if (!isNaN(val.batchWindow) && val.batchWindow > 0) {
+        parsedEvent.batchWindow = val.batchWindow;
+      }
+
+      if (
+        !isNaN(val.maximumRecordAgeInSeconds) &&
+        parsedEvent.maximumRecordAgeInSeconds >= StreamProps.minRecordAge &&
+        parsedEvent.maximumRecordAgeInSeconds <= StreamProps.maxRecordAge
+      ) {
+        parsedEvent.maximumRecordAgeInSeconds = val.maximumRecordAgeInSeconds;
+      }
+
+      if (!isNaN(val.maximumRetryAttempts) && val.maximumRetryAttempts > 0) {
+        parsedEvent.maximumRetryAttempts = val.maximumRetryAttempts;
+      }
+
+      if ("bisectBatchOnFunctionError" in val) {
+        parsedEvent.bisectBatchOnFunctionError = val.bisectBatchOnFunctionError;
+      }
 
       if (val.functionResponseType) {
         parsedEvent.functionResponseType = val.functionResponseType;

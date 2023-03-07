@@ -100,13 +100,18 @@ client
   });
 ```
 
+---
+
 ### Environment variable
 
 Lambdas are executed in worker threads. Only variables declared in your `serverless.yml` are injected into `process.env` except `IS_LOCAL`, `LOCAL_PORT` and `NODE_ENV`.
 
-### Disable functions
+---
 
-Adding the param `online: false` will omit the deployement of your Lambda.
+### Extended properties
+
+- `online`  
+  Adding the param `online: false` will omit the deployement of your Lambda.
 
 ```yaml
 functions:
@@ -115,9 +120,25 @@ functions:
     online: false
 ```
 
+- `files`  
+  include additionnal files into the package.
+
+```yaml
+functions:
+  myAwsomeLambda:
+    handler: src/handlers/awsomeLambda.default
+    files:
+      - ./resources/some/file.png
+      - ./resources/anotherFile.pdf
+```
+
+- `virtualEnvs`  
+  on key-value object which will only be available inside [defineConfig](resources/defineConfig.md).  
+  by default virtualEnvs are inherited from custom > virtualEnvs if exists.
+
 ---
 
-## Advanced configuration:
+### Advanced configuration:
 
 To have more control over the plugin you can passe a config file via `configPath` param in plugin options:
 
@@ -138,7 +159,7 @@ See [defineConfig](resources/defineConfig.md) for advanced configuration.
 
 ---
 
-## Plugins:
+### Plugins:
 
 - [AWS Local S3](resources/s3.md)
 - [AWS Local SNS](resources/sns.md)
