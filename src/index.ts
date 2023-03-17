@@ -39,6 +39,12 @@ class ServerlessAwsLambda extends Daemon {
   nodeVersion: number | boolean | string | undefined = false;
   invokeName?: string;
   afterDeployCallbacks: (() => void | Promise<void>)[] = [];
+  resources: {
+    ddb: {};
+    kinesis: {};
+    sns: {};
+    sqs: {};
+  };
   constructor(serverless: any, options: any) {
     super({ debug: process.env.SLS_DEBUG == "*" });
 
@@ -117,6 +123,8 @@ class ServerlessAwsLambda extends Daemon {
       "before:invoke:local:invoke": this.invokeLocal.bind(this),
       "after:aws:deploy:finalize:cleanup": this.afterDeploy.bind(this),
     };
+
+    this.resources = getResources(this.serverless);
   }
 
   async invokeLocal() {
@@ -289,7 +297,7 @@ class ServerlessAwsLambda extends Daemon {
       functionsNames = functionsNames.filter((x) => x == this.invokeName);
     }
     const defaultRuntime = this.serverless.service.provider.runtime;
-    const resources = getResources(this.serverless);
+
     // @ts-ignore
     const Outputs = this.serverless.service.resources?.Outputs;
     const lambdas = functionsNames.reduce((accum: any[], funcName: string) => {
@@ -319,6 +327,7 @@ class ServerlessAwsLambda extends Daemon {
         timeout: lambda.timeout ?? this.runtimeConfig.timeout ?? DEFAULT_LAMBDA_TIMEOUT,
         endpoints: [],
         sns: [],
+        sqs: [],
         ddb: [],
         s3: [],
         kinesis: [],
@@ -350,7 +359,7 @@ class ServerlessAwsLambda extends Daemon {
       };
 
       // @ts-ignore
-      lambdaDef.onError = parseDestination(lambda.onError, Outputs, resources);
+      lambdaDef.onError = parseDestination(lambda.onError, Outputs, this.resources);
 
       if (lambdaDef.onError?.kind == "lambda") {
         log.YELLOW("Dead-Letter queue could only be a SNS or SQS service");
@@ -359,9 +368,9 @@ class ServerlessAwsLambda extends Daemon {
       //@ts-ignore
       if (lambda.destinations && typeof lambda.destinations == "object") {
         //@ts-ignore
-        lambdaDef.onFailure = parseDestination(lambda.destinations.onFailure, Outputs, resources);
+        lambdaDef.onFailure = parseDestination(lambda.destinations.onFailure, Outputs, this.resources);
         //@ts-ignore
-        lambdaDef.onSuccess = parseDestination(lambda.destinations.onSuccess, Outputs, resources);
+        lambdaDef.onSuccess = parseDestination(lambda.destinations.onSuccess, Outputs, this.resources);
       }
 
       lambdaDef.onInvoke = (callback: (event: any, info?: any) => void) => {
@@ -379,9 +388,10 @@ class ServerlessAwsLambda extends Daemon {
       lambdaDef.environment.AWS_LAMBDA_FUNCTION_MEMORY_SIZE = lambdaDef.memorySize;
 
       if (lambda.events.length) {
-        const { endpoints, sns, ddb, s3, kinesis } = parseEvents(lambda.events, Outputs, resources);
+        const { endpoints, sns, sqs, ddb, s3, kinesis } = parseEvents(lambda.events, Outputs, this.resources);
         lambdaDef.endpoints = endpoints;
         lambdaDef.sns = sns;
+        lambdaDef.sqs = sqs;
         lambdaDef.ddb = ddb;
         lambdaDef.s3 = s3;
         lambdaDef.kinesis = kinesis;
@@ -479,6 +489,7 @@ class ServerlessAwsLambda extends Daemon {
       stage: this.options.stage ?? this.serverless.service.provider.stage ?? "dev",
       esbuild: esbuild,
       serverless: this.serverless,
+      resources: this.resources,
     };
     let exportedObject: any = {};
 

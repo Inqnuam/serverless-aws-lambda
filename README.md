@@ -121,7 +121,7 @@ functions:
 ```
 
 - `files`  
-  include additionnal files into the package.
+  include additional files into the package.
 
 ```yaml
 functions:
@@ -163,6 +163,7 @@ See [defineConfig](resources/defineConfig.md) for advanced configuration.
 
 - [AWS Local S3](resources/s3.md)
 - [AWS Local SNS](resources/sns.md)
+- [AWS Local SQS](resources/sqs.md)
 - [DynamoDB Local Streams](https://github.com/Inqnuam/serverless-aws-lambda-ddb-streams)
 - [Jest](https://github.com/Inqnuam/serverless-aws-lambda-jest)
 - [Vitest](https://github.com/Inqnuam/serverless-aws-lambda-vitest)

@@ -89,11 +89,7 @@ export const parseDdbStreamDefinitions = (Outputs: any, resources: any, event: a
         parsedEvent.batchWindow = val.batchWindow;
       }
 
-      if (
-        !isNaN(val.maximumRecordAgeInSeconds) &&
-        parsedEvent.maximumRecordAgeInSeconds >= StreamProps.minRecordAge &&
-        parsedEvent.maximumRecordAgeInSeconds <= StreamProps.maxRecordAge
-      ) {
+      if (!isNaN(val.maximumRecordAgeInSeconds) && val.maximumRecordAgeInSeconds >= StreamProps.minRecordAge && val.maximumRecordAgeInSeconds <= StreamProps.maxRecordAge) {
         parsedEvent.maximumRecordAgeInSeconds = val.maximumRecordAgeInSeconds;
       }
 

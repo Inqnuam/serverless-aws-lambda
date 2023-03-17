@@ -33,6 +33,12 @@ export interface ClientConfigParams {
   config: Config;
   options: Options;
   serverless: Serverless;
+  resources: {
+    ddb: {};
+    kinesis: {};
+    sns: {};
+    sqs: {};
+  };
 }
 
 export interface SlsAwsLambdaPlugin {
@@ -52,7 +58,7 @@ export interface SlsAwsLambdaPlugin {
        */
       method?: HttpMethod | HttpMethod[];
       filter: string | RegExp;
-      callback: (this: ClientConfigParams, req: IncomingMessage, res: ServerResponse) => Promise<void> | void;
+      callback: (this: ClientConfigParams, req: IncomingMessage, res: ServerResponse) => Promise<any | void> | any | void;
     }[];
   };
 }
@@ -112,7 +118,7 @@ function defineConfig(options: Options) {
   }
   return async function config(
     this: ClientConfigParams,
-    { stop, lambdas, isDeploying, isPackaging, setEnv, stage, port, esbuild, serverless }: ClientConfigParams
+    { stop, lambdas, isDeploying, isPackaging, setEnv, stage, port, esbuild, serverless, resources }: ClientConfigParams
   ): Promise<Omit<Config, "config" | "options">> {
     let config: Config = {
       esbuild: options.esbuild ?? {},
@@ -135,6 +141,7 @@ function defineConfig(options: Options) {
       serverless,
       options,
       config,
+      resources,
     };
     if (options.plugins) {
       config.offline!.onReady = async (port, ip) => {

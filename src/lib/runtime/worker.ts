@@ -47,7 +47,7 @@ const genResponsePayload = (err: any) => {
 };
 
 const returnError = (awsRequestId: string, err: any) => {
-  log.RED("Request failed");
+  log.RED(`${awsRequestId}: Request failed`);
   const data = genResponsePayload(err);
   parentPort.postMessage({ channel: "fail", data, awsRequestId });
 };

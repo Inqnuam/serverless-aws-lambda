@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "http";
 import { randomUUID } from "crypto";
 import { log } from "../../lib/utils/colorize";
 import { Handlers } from "../../lib/server/handlers";
+
 enum InvokationType {
   DryRun = 204,
   Event = 202,
@@ -52,6 +53,11 @@ export const invokeRequests = {
     res.setHeader("Content-Type", "application/json");
     res.setHeader("x-amzn-RequestId", awsRequestId);
 
+    req.on("error", (err) => {
+      res.statusCode = 502;
+      res.end(JSON.stringify(err));
+    });
+
     if (!foundHandler) {
       res.statusCode = 404;
       res.setHeader("x-amzn-errortype", errprType.notFound);
@@ -71,64 +77,67 @@ export const invokeRequests = {
     let event = "";
     let body: any = Buffer.alloc(0);
 
-    req
-      .on("data", (chunk) => {
-        body += chunk;
-      })
-      .on("end", async () => {
+    req.on("data", (chunk) => {
+      body += chunk;
+    });
+
+    await new Promise((resolve) => {
+      req.on("end", async () => {
         body = body.toString();
-
-        let isParsedBody: any = false;
-        try {
-          body = JSON.parse(body);
-          isParsedBody = true;
-        } catch (error: any) {
-          if (body && body.length) {
-            isParsedBody = error;
-          } else {
-            body = {};
-            isParsedBody = true;
-          }
-        }
-        event = body;
-
-        res.setHeader("X-Amzn-Trace-Id", `root=1-xxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx;sampled=0`);
-
-        if (isParsedBody instanceof Error) {
-          res.statusCode = 400;
-          res.setHeader("x-amzn-errortype", errprType.invalidRequest);
-
-          return res.end(invalidPayloadErrorMsg(isParsedBody.message));
-        }
-
-        res.setHeader("X-Amz-Executed-Version", "$LATEST");
-        try {
-          const date = new Date();
-
-          let info: any = {};
-          res.statusCode = exceptedStatusCode;
-          if (exceptedStatusCode !== 200) {
-            res.end();
-          }
-          // "Event" invokation type is an async invoke
-          if (exceptedStatusCode == 202) {
-            info.kind = "async";
-          }
-          log.CYAN(`${date.toLocaleDateString()} ${date.toLocaleTimeString()} requestId: ${awsRequestId} | '${foundHandler.name}' ${method}`);
-          const result = await foundHandler.invoke(event, info, clientContext);
-
-          if (exceptedStatusCode == 200) {
-            res.end(JSON.stringify(result));
-          }
-        } catch (error: any) {
-          res.setHeader("X-Amz-Function-Error", error.errorType);
-          res.statusCode = 200;
-          res.end(JSON.stringify(error));
-        }
-      })
-      .on("error", (err) => {
-        res.statusCode = 502;
-        res.end(JSON.stringify(err));
+        resolve(undefined);
       });
+    });
+
+    let isParsedBody: any = false;
+    try {
+      body = JSON.parse(body);
+      isParsedBody = true;
+    } catch (error: any) {
+      if (body && body.length) {
+        isParsedBody = error;
+      } else {
+        body = {};
+        isParsedBody = true;
+      }
+    }
+    event = body;
+
+    res.setHeader("X-Amzn-Trace-Id", `root=1-xxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx;sampled=0`);
+
+    if (isParsedBody instanceof Error) {
+      res.statusCode = 400;
+      res.setHeader("x-amzn-errortype", errprType.invalidRequest);
+
+      return res.end(invalidPayloadErrorMsg(isParsedBody.message));
+    }
+
+    res.setHeader("X-Amz-Executed-Version", "$LATEST");
+
+    const date = new Date();
+
+    let info: any = {};
+    res.statusCode = exceptedStatusCode;
+    if (exceptedStatusCode !== 200) {
+      res.end();
+    }
+    // "Event" invokation type is an async invoke
+    if (exceptedStatusCode == 202) {
+      info.kind = "async";
+    }
+    log.CYAN(`${date.toLocaleDateString()} ${date.toLocaleTimeString()} requestId: ${awsRequestId} | '${foundHandler.name}' ${method}`);
+
+    try {
+      const result = await foundHandler.invoke(event, info, clientContext);
+
+      if (exceptedStatusCode == 200) {
+        res.end(JSON.stringify(result));
+      }
+    } catch (error: any) {
+      if (!res.writableFinished) {
+        res.setHeader("X-Amz-Function-Error", error.errorType);
+        res.statusCode = 200;
+        res.end(JSON.stringify(error));
+      }
+    }
   },
 };

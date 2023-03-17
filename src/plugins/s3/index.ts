@@ -25,17 +25,21 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
   return {
     name: "s3-local",
     onInit: async function () {
-      callableLambdas = this.lambdas.filter((x) => x.s3.length);
+      if (!this.isDeploying && !this.isPackaging) {
+        callableLambdas = this.lambdas.filter((x) => x.s3.length);
 
-      try {
-        const persistence = await readFile(persisitencePath, { encoding: "utf-8" });
-        items = JSON.parse(persistence);
-      } catch (error) {}
+        try {
+          const persistence = await readFile(persisitencePath, { encoding: "utf-8" });
+          items = JSON.parse(persistence);
+        } catch (error) {}
+      }
     },
     onExit: function () {
-      try {
-        writeFileSync(persisitencePath, JSON.stringify(items), { encoding: "utf-8" });
-      } catch (error) {}
+      if (!this.isDeploying && !this.isPackaging) {
+        try {
+          writeFileSync(persisitencePath, JSON.stringify(items), { encoding: "utf-8" });
+        } catch (error) {}
+      }
     },
     offline: {
       request: [

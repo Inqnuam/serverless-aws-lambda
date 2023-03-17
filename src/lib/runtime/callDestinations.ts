@@ -24,6 +24,8 @@ const getDestinationPathname = (destination: IDestination) => {
   switch (destination.kind) {
     case "sns":
       return "@sns/parsed/";
+    case "sqs":
+      return "@sqs";
     case "lambda":
       return `@invoke/${destination.name}/`;
     default:
@@ -38,11 +40,13 @@ const genRequest = (port: string, destination: IDestination) => {
     return;
   }
 
+  const headers = {
+    "Content-Type": destination.kind == "sqs" ? "application/x-www-form-urlencoded" : "application/json",
+  };
+
   return http.request(`http://localhost:${port}/${pathname}`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers,
   });
 };
 
@@ -115,12 +119,43 @@ const genSnsParsedBody = ({ topicName, event, payload, requestId, success, lambd
   return JSON.stringify(body);
 };
 
+const genSqsBody = ({ destination, event, payload, requestId, lambdaName, success }: IGenResponse) => {
+  const query = new URLSearchParams();
+  query.append("QueueUrl", destination.name);
+  query.append("Action", "SendMessage");
+
+  let MessageBody = event;
+
+  try {
+    MessageBody = JSON.stringify(MessageBody);
+  } catch (error) {}
+  query.append("MessageBody", MessageBody);
+
+  if (!success) {
+    query.append("MessageAttribute.1.Name", "RequestID");
+    query.append("MessageAttribute.1.Value.StringValue", requestId);
+    query.append("MessageAttribute.1.Value.DataType", "String");
+
+    query.append("MessageAttribute.1.Name", "ErrorCode");
+    query.append("MessageAttribute.1.Value.StringValue", "200");
+    query.append("MessageAttribute.1.Value.DataType", "Number");
+
+    query.append("MessageAttribute.1.Name", "ErrorMessage");
+    query.append("MessageAttribute.1.Value.StringValue", payload.errorMessage);
+    query.append("MessageAttribute.1.Value.DataType", "String");
+  }
+
+  return query.toString();
+};
+
 const genResponse = ({ destination, event, payload, requestId, lambdaName, success }: IGenResponse) => {
   switch (destination.kind) {
     case "sns":
       return genSnsParsedBody({ topicName: destination.name, event, payload, requestId, success, lambdaName });
     case "lambda":
       return genLambdaResponsePayload({ event, payload, requestId, lambdaName, success });
+    case "sqs":
+      return genSqsBody({ destination, event, payload, requestId, lambdaName, success });
     default:
       return "";
   }
@@ -133,9 +168,7 @@ export const callErrorDest = ({ destination, LOCAL_PORT, event, payload, request
     if (!req) {
       return;
     }
-    req.write(genResponse({ destination, event, payload, requestId, lambdaName, success: false }));
-
-    req.end();
+    req.end(genResponse({ destination, event, payload, requestId, lambdaName, success: false }));
   } catch (error) {}
 };
 
@@ -146,8 +179,7 @@ export const callSuccessDest = ({ destination, LOCAL_PORT, event, payload, reque
     if (!req) {
       return;
     }
-    req.write(genResponse({ destination, event, payload, requestId, lambdaName, success: true }));
 
-    req.end();
+    req.end(genResponse({ destination, event, payload, requestId, lambdaName, success: true }));
   } catch (error) {}
 };

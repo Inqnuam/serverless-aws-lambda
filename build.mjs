@@ -43,6 +43,7 @@ const buildIndex = bundle.bind(null, {
     "./src/lib/runtime/worker.ts",
     "./src/lambda/router.ts",
     "./src/plugins/sns/index.ts",
+    "./src/plugins/sqs/index.ts",
     "./src/plugins/s3/index.ts",
     "./src/lambda/body-parser.ts",
   ],

@@ -19,10 +19,7 @@ export interface ISnsEvent {
   displayName?: string;
   filterScope?: "MessageAttributes" | "MessageBody";
   filter?: any;
-  redrivePolicy?: {
-    kind: string;
-    name: string;
-  };
+  redrivePolicy?: string;
 }
 export interface IDdbEvent {
   TableName: string;
@@ -36,6 +33,14 @@ export interface IDdbEvent {
   functionResponseType?: string;
   filterPatterns?: any;
   onFailure?: IDestination;
+}
+
+export interface ISqs {
+  name: string;
+  arn?: string;
+  batchSize?: number;
+  maximumBatchingWindow?: number;
+  filterPatterns?: any;
 }
 export interface IDestination {
   kind: "lambda" | "sns" | "sqs";
@@ -62,6 +67,7 @@ export interface ILambdaMock {
   s3: IS3Event[];
   sns: ISnsEvent[];
   ddb: IDdbEvent[];
+  sqs: ISqs[];
   kinesis: any[];
   timeout: number;
   memorySize: number;
@@ -84,7 +90,8 @@ export interface ILambdaMock {
   invokeSub: InvokeSub[];
   /**
    * Invoke this lambda
-   * always use with "await"
+   * must always be called with "await" or ".then()"
+   * @throws Error
    */
   invoke: (event: any, info?: any, clientContext?: any) => Promise<any>;
   onError?: IDestination;
@@ -128,6 +135,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   endpoints: LambdaEndpoint[];
   s3: IS3Event[];
   sns: ISnsEvent[];
+  sqs: ISqs[];
   ddb: IDdbEvent[];
   kinesis: any[];
   timeout: number;
@@ -160,6 +168,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     entryPoint,
     s3,
     sns,
+    sqs,
     ddb,
     kinesis,
     invokeSub,
@@ -174,6 +183,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     this.endpoints = endpoints;
     this.s3 = s3;
     this.sns = sns;
+    this.sqs = sqs;
     this.ddb = ddb;
     this.kinesis = kinesis;
     this.timeout = timeout;
@@ -290,9 +300,11 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
       await this.importEventHandler();
     }
 
-    try {
-      this.invokeSub.forEach((x) => x(event, info));
-    } catch (error) {}
+    this.invokeSub.forEach((x) => {
+      try {
+        x(event, info);
+      } catch (error) {}
+    });
 
     const eventResponse = await new Promise((resolve, reject) => {
       const awsRequestId = randomUUID();

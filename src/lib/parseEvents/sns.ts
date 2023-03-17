@@ -79,7 +79,7 @@ export const parseSns = (Outputs: any, resources: any, event: any) => {
     if (redrivePolicy) {
       const { deadLetterTargetArn, deadLetterTargetRef, deadLetterTargetImport } = redrivePolicy;
 
-      if (typeof deadLetterTargetArn == "string") {
+      if (typeof deadLetterTargetArn == "string" && deadLetterTargetArn.startsWith("arn:")) {
         const [, , kind, region, accountId, dlq] = deadLetterTargetArn.split(":");
         if (kind == "sqs") {
           sns.redrivePolicy = dlq;

@@ -1,6 +1,7 @@
 import { log } from "../../lib/utils/colorize";
 import type { ILambda } from "../../defineConfig";
 import { randomUUID } from "crypto";
+import { filterObject } from "./filter";
 
 export const parseSnsPublishBody = (encodedBody: string[]) => {
   let body: any = {};
@@ -175,8 +176,6 @@ export const getHandlersByTopicArn = (body: any, handlers: ILambda[]) => {
         return true;
       }
 
-      const filterKeys = Object.keys(foundEvent.filter);
-
       let filterContext: any = {};
 
       if (foundEvent.filterScope == "MessageAttributes") {
@@ -196,20 +195,7 @@ export const getHandlersByTopicArn = (body: any, handlers: ILambda[]) => {
         } catch (error) {}
       }
 
-      if (!filterKeys.every((x) => x in filterContext)) {
-        return false;
-      }
-
-      let hasRequiredKey = false;
-
-      for (const k of filterKeys) {
-        if (foundEvent.filter[k].some((x: string) => x == filterContext[k])) {
-          hasRequiredKey = true;
-          break;
-        }
-      }
-
-      return hasRequiredKey;
+      return filterObject(foundEvent.filter, filterContext);
     });
 
     if (streamEvent) {

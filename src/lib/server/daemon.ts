@@ -8,7 +8,7 @@ import inspector from "inspector";
 import { html404, html500 } from "../utils/htmlStatusMsg";
 import serveStatic from "serve-static";
 import { randomUUID } from "crypto";
-import { invokeRequests } from "../../plugins/invoke/index";
+import { invokeRequests } from "../../plugins/lambda/index";
 
 const accountId = Buffer.from(randomUUID()).toString("hex").slice(0, 16);
 const apiId = Buffer.from(randomUUID()).toString("ascii").slice(0, 10);
@@ -118,9 +118,9 @@ export class Daemon extends Handlers {
   customOfflineRequests: {
     method?: string | string[];
     filter: RegExp | string;
-    callback: (req: any, res: any) => {};
+    callback: (req: any, res: any) => Promise<any> | any | undefined;
   }[] = [invokeRequests];
-  onReady?: (port: number, ip: string) => Promise<void> | void;
+  onReady?: (port: number, ip: string) => any;
   stop(cb: (err?: any) => void) {
     this.#server.close(cb);
   }
@@ -162,7 +162,6 @@ export class Daemon extends Handlers {
   }
 
   #findCustomOfflineRequest(method: string, pathname: string) {
-    // TODO: check if everuthing is still correct
     pathname = pathname.endsWith("/") ? pathname : `${pathname}/`;
     const foundCustomCallback = this.customOfflineRequests.find((x) => {
       let validPath = false;
@@ -200,8 +199,10 @@ export class Daemon extends Handlers {
       //SECTION: Route provided by client in config file and/or by plugins
       try {
         await customCallback(req, res);
-      } catch (error) {
-        res.end("Internal Server Error");
+      } catch (err) {
+        if (!res.writableFinished) {
+          res.end("Internal Server Error");
+        }
       }
     } else {
       //SECTION: ALB and APG server
