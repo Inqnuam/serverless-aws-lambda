@@ -1,5 +1,19 @@
 import { log } from "../utils/colorize";
-import { parseDestination } from "./index";
+import { IDestination, parseDestination } from "./index";
+
+export interface IKinesisEvent {
+  StreamName: string;
+  enabled?: boolean;
+  batchSize?: number;
+  maximumRetryAttempts?: number;
+  startingPosition?: string;
+  startingPositionTimestamp?: number;
+  parallelizationFactor?: number;
+  functionResponseType?: "ReportBatchItemFailures";
+  consumer?: boolean | string;
+  tumblingWindowInSeconds?: number;
+  onFailure?: IDestination;
+}
 
 const parseStreamNameFromArnString = (arn: string) => {
   if (arn.split(":")[2] != "kinesis") {
@@ -39,7 +53,7 @@ export const parseKinesis = (event: any, Outputs: any, resources: any) => {
     return;
   }
 
-  let parsedEvent: any = {};
+  let parsedEvent: Partial<IKinesisEvent> = {};
 
   const val = Object.values(event)[0] as any;
   const valType = typeof val;
@@ -48,8 +62,8 @@ export const parseKinesis = (event: any, Outputs: any, resources: any) => {
     const parsedStreamName = parseStreamNameFromArnString(val);
     if (parsedStreamName) {
       parsedEvent.StreamName = parsedStreamName;
+      return parsedEvent;
     }
-    return parsedEvent;
   } else if (valType == "object") {
     if (typeof val.arn == "string") {
       const parsedStreamName = parseStreamNameFromArnString(val.arn);

@@ -50,7 +50,7 @@
   "dependencies": {
     "@types/serverless": "^3.12.11",
     "archiver": "^5.3.1",
-    "esbuild": "0.17.12",
+    "esbuild": "0.17.13",
     "serve-static": "^1.15.0"
   },
   "devDependencies": {

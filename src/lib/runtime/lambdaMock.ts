@@ -10,6 +10,7 @@ import type { ISqs } from "../parseEvents/sqs";
 import type { IDdbEvent } from "../parseEvents/ddbStream";
 import type { IDestination } from "../parseEvents/index";
 import type { LambdaEndpoint } from "../parseEvents/endpoints";
+import type { IKinesisEvent } from "../parseEvents/kinesis";
 
 export interface ILambdaMock {
   /**
@@ -32,7 +33,7 @@ export interface ILambdaMock {
   sns: ISnsEvent[];
   ddb: IDdbEvent[];
   sqs: ISqs[];
-  kinesis: any[];
+  kinesis: IKinesisEvent[];
   timeout: number;
   memorySize: number;
   environment: { [key: string]: any };
@@ -86,7 +87,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   sns: ISnsEvent[];
   sqs: ISqs[];
   ddb: IDdbEvent[];
-  kinesis: any[];
+  kinesis: IKinesisEvent[];
   timeout: number;
   memorySize: number;
   environment: { [key: string]: any };

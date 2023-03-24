@@ -49,7 +49,7 @@ const localSnsServer = `http://localhost:${process.env.LOCAL_PORT}/@sns`;
 
 const params = process.env.IS_LOCAL
   ? {
-      region: "local",
+      region: "eu-west-1",
       endpoint: localSnsServer, // <- important
     }
   : {};
@@ -107,7 +107,7 @@ export default async (snsEvent) => {
 
 ---
 
-### Supported SNS declarations
+### Example of supported SNS declarations
 
 ```yaml
 - sns: InsertUserTopic
