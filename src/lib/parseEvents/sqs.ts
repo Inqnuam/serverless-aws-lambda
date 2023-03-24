@@ -1,5 +1,11 @@
 import { log } from "../utils/colorize";
-
+export interface ISqs {
+  name: string;
+  arn?: string;
+  batchSize?: number;
+  maximumBatchingWindow?: number;
+  filterPatterns?: any;
+}
 const parseQueueNameFromObject = (resources: any, Outputs: any, obj: any) => {
   const [key, value] = Object.entries(obj)?.[0];
 
@@ -30,7 +36,7 @@ const parseQueueNameFromObject = (resources: any, Outputs: any, obj: any) => {
   }
 };
 
-export const parseSqs = (Outputs: any, resources: any, event: any) => {
+export const parseSqs = (Outputs: any, resources: any, event: any): ISqs | undefined => {
   if (!event.sqs) {
     return;
   }

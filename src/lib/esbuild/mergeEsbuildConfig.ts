@@ -9,12 +9,56 @@ export const mergeEsbuildConfig = (esBuildConfig: BuildOptions, customEsBuildCon
     esBuildConfig.external!.push(...customEsBuildConfig.external);
   }
 
-  if (typeof customEsBuildConfig.sourcemap == "boolean") {
+  if ("sourcemap" in customEsBuildConfig) {
     esBuildConfig.sourcemap = customEsBuildConfig.sourcemap;
+  }
+
+  if (typeof customEsBuildConfig.sourceRoot == "string") {
+    esBuildConfig.sourceRoot = customEsBuildConfig.sourceRoot;
+  }
+
+  if ("sourcesContent" in customEsBuildConfig) {
+    esBuildConfig.sourcesContent = customEsBuildConfig.sourcesContent;
   }
 
   if (typeof customEsBuildConfig.minify == "boolean") {
     esBuildConfig.minify = customEsBuildConfig.minify;
+  }
+
+  if (typeof customEsBuildConfig.minifyWhitespace == "boolean") {
+    esBuildConfig.minifyWhitespace = customEsBuildConfig.minifyWhitespace;
+  }
+
+  if (typeof customEsBuildConfig.minifyIdentifiers == "boolean") {
+    esBuildConfig.minifyIdentifiers = customEsBuildConfig.minifyIdentifiers;
+  }
+
+  if (typeof customEsBuildConfig.minifySyntax == "boolean") {
+    esBuildConfig.minifySyntax = customEsBuildConfig.minifySyntax;
+  }
+
+  if (typeof customEsBuildConfig.jsx == "string") {
+    esBuildConfig.jsx = customEsBuildConfig.jsx;
+  }
+
+  if (typeof customEsBuildConfig.jsxFactory == "string") {
+    esBuildConfig.jsxFactory = customEsBuildConfig.jsxFactory;
+  }
+
+  if (typeof customEsBuildConfig.jsxFragment == "string") {
+    esBuildConfig.jsxFragment = customEsBuildConfig.jsxFragment;
+  }
+
+  if (typeof customEsBuildConfig.jsxImportSource == "string") {
+    esBuildConfig.jsxImportSource = customEsBuildConfig.jsxImportSource;
+  }
+
+  if ("jsxDev" in customEsBuildConfig) {
+    esBuildConfig.jsxDev = customEsBuildConfig.jsxDev;
+  }
+
+  if ("jsxSideEffects" in customEsBuildConfig) {
+    esBuildConfig.jsxSideEffects = customEsBuildConfig.jsxSideEffects;
   }
 
   if (typeof customEsBuildConfig.outdir == "string") {
@@ -25,7 +69,7 @@ export const mergeEsbuildConfig = (esBuildConfig: BuildOptions, customEsBuildCon
     esBuildConfig.outbase = customEsBuildConfig.outbase;
   }
 
-  if (typeof customEsBuildConfig.target == "string") {
+  if (typeof customEsBuildConfig.target == "string" || Array.isArray(customEsBuildConfig.target)) {
     esBuildConfig.target = customEsBuildConfig.target;
   }
 

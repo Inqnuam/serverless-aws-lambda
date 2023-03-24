@@ -10,12 +10,56 @@ export const parseCustomEsbuild = (customConfig: BuildOptions) => {
     customEsBuild.external = customConfig.external;
   }
 
-  if (typeof customConfig.sourcemap == "boolean") {
+  if ("sourcemap" in customConfig) {
     customEsBuild.sourcemap = customConfig.sourcemap;
+  }
+
+  if (typeof customConfig.sourceRoot == "string") {
+    customEsBuild.sourceRoot = customConfig.sourceRoot;
+  }
+
+  if ("sourcesContent" in customConfig) {
+    customEsBuild.sourcesContent = customConfig.sourcesContent;
   }
 
   if (typeof customConfig.minify == "boolean") {
     customEsBuild.minify = customConfig.minify;
+  }
+
+  if (typeof customConfig.minifyWhitespace == "boolean") {
+    customEsBuild.minifyWhitespace = customConfig.minifyWhitespace;
+  }
+
+  if (typeof customConfig.minifyIdentifiers == "boolean") {
+    customEsBuild.minifyIdentifiers = customConfig.minifyIdentifiers;
+  }
+
+  if (typeof customConfig.minifySyntax == "boolean") {
+    customEsBuild.minifySyntax = customConfig.minifySyntax;
+  }
+
+  if (typeof customConfig.jsx == "string") {
+    customEsBuild.jsx = customConfig.jsx;
+  }
+
+  if (typeof customConfig.jsxFactory == "string") {
+    customEsBuild.jsxFactory = customConfig.jsxFactory;
+  }
+
+  if (typeof customConfig.jsxFragment == "string") {
+    customEsBuild.jsxFragment = customConfig.jsxFragment;
+  }
+
+  if (typeof customConfig.jsxImportSource == "string") {
+    customEsBuild.jsxImportSource = customConfig.jsxImportSource;
+  }
+
+  if ("jsxDev" in customConfig) {
+    customEsBuild.jsxDev = customConfig.jsxDev;
+  }
+
+  if ("jsxSideEffects" in customConfig) {
+    customEsBuild.jsxSideEffects = customConfig.jsxSideEffects;
   }
 
   if (typeof customConfig.outdir == "string") {
@@ -26,7 +70,7 @@ export const parseCustomEsbuild = (customConfig: BuildOptions) => {
     customEsBuild.outbase = customConfig.outbase;
   }
 
-  if (typeof customConfig.target == "string") {
+  if (typeof customConfig.target == "string" || Array.isArray(customConfig.target)) {
     customEsBuild.target = customConfig.target;
   }
 

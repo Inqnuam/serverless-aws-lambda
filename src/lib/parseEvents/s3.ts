@@ -1,6 +1,10 @@
 import { log } from "../utils/colorize";
-
-export const parseS3 = (event: any) => {
+export interface IS3Event {
+  bucket: string;
+  type: [string, string];
+  rules?: any[];
+}
+export const parseS3 = (event: any): IS3Event | undefined => {
   if (!event || !event.s3) {
     return;
   }

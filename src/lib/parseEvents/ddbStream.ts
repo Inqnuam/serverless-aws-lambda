@@ -1,5 +1,20 @@
 import { log } from "../utils/colorize";
 import { parseDestination } from "./index";
+import type { IDestination } from "./index";
+
+export interface IDdbEvent {
+  TableName: string;
+  StreamEnabled: boolean;
+  StreamViewType?: string;
+  batchSize?: number;
+  batchWindow?: number;
+  maximumRecordAgeInSeconds?: number;
+  maximumRetryAttempts?: number;
+  bisectBatchOnFunctionError?: boolean;
+  functionResponseType?: string;
+  filterPatterns?: any;
+  onFailure?: IDestination;
+}
 
 enum StreamProps {
   batchSize = 100,
@@ -50,7 +65,7 @@ const getStreamTableInfoFromTableName = (ddbStreamTables: any, tableName: string
 
   return foundInfo ?? {};
 };
-export const parseDdbStreamDefinitions = (Outputs: any, resources: any, event: any) => {
+export const parseDdbStreamDefinitions = (Outputs: any, resources: any, event: any): IDdbEvent | undefined => {
   if (!event || Object.keys(event)[0] !== "stream" || (event.stream.type && event.stream.type != "dynamodb")) {
     return;
   }

@@ -1,51 +1,15 @@
 import { Worker, WorkerOptions } from "worker_threads";
 import path from "path";
-import { HttpMethod } from "../server/handlers";
 import { randomUUID } from "crypto";
 import { EventEmitter } from "events";
 import { log } from "../utils/colorize";
 import { callErrorDest, callSuccessDest } from "./callDestinations";
-
-export interface IS3Event {
-  bucket: string;
-  type: [string, string];
-  rules: any[];
-}
-
-export interface ISnsEvent {
-  name: string;
-  arn?: string;
-  topicName?: string;
-  displayName?: string;
-  filterScope?: "MessageAttributes" | "MessageBody";
-  filter?: any;
-  redrivePolicy?: string;
-}
-export interface IDdbEvent {
-  TableName: string;
-  StreamEnabled: boolean;
-  StreamViewType?: string;
-  batchSize?: number;
-  batchWindow?: number;
-  maximumRecordAgeInSeconds?: number;
-  maximumRetryAttempts?: number;
-  bisectBatchOnFunctionError?: boolean;
-  functionResponseType?: string;
-  filterPatterns?: any;
-  onFailure?: IDestination;
-}
-
-export interface ISqs {
-  name: string;
-  arn?: string;
-  batchSize?: number;
-  maximumBatchingWindow?: number;
-  filterPatterns?: any;
-}
-export interface IDestination {
-  kind: "lambda" | "sns" | "sqs";
-  name: string;
-}
+import type { ISnsEvent } from "../parseEvents/sns";
+import type { IS3Event } from "../parseEvents/s3";
+import type { ISqs } from "../parseEvents/sqs";
+import type { IDdbEvent } from "../parseEvents/ddbStream";
+import type { IDestination } from "../parseEvents/index";
+import type { LambdaEndpoint } from "../parseEvents/endpoints";
 
 export interface ILambdaMock {
   /**
@@ -101,33 +65,18 @@ export interface ILambdaMock {
 
 type InvokeSub = (event: any, info?: any) => void;
 
-/**
- * @internal
- */
-export interface LambdaEndpoint {
-  kind: "alb" | "apg";
-  paths: string[];
-  methods: HttpMethod[];
-  async?: boolean;
-  multiValueHeaders?: boolean;
-  version?: 1 | 2;
-}
-/**
- * @internal
- */
-
+const runtimeLifetime = 18 * 60 * 1000;
 const workerPath = path.resolve(__dirname, "./lib/runtime/worker.js");
 // https://aws.amazon.com/blogs/architecture/understanding-the-different-ways-to-invoke-lambda-functions/
-const asyncEvents = ["async", "ddb", "kinesis", "s3", "sns", "sqs"];
+const asyncEvents = new Set(["async", "ddb", "kinesis", "s3", "sns", "sqs"]);
 
 const isAsync = (info: any) => {
   if (typeof info?.kind == "string") {
-    return asyncEvents.includes(info.kind) || info.async;
+    return asyncEvents.has(info.kind) || info.async;
   }
 
   return false;
 };
-
 export class LambdaMock extends EventEmitter implements ILambdaMock {
   name: string;
   outName: string;
@@ -146,13 +95,14 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   esEntryPoint: string;
   esOutputPath: string;
   entryPoint: string;
-  invokeSub: InvokeSub[];
   onError?: IDestination;
   onSuccess?: IDestination;
   onFailure?: IDestination;
+  invokeSub: InvokeSub[];
   _worker?: Worker;
   _isLoaded: boolean = false;
   _isLoading: boolean = false;
+  #_tmLifetime?: NodeJS.Timeout;
   constructor({
     name,
     outName,
@@ -204,7 +154,9 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     await new Promise((resolve, reject) => {
       this._worker = new Worker(workerPath, {
         env: this.environment,
-        stackSizeMb: this.memorySize,
+        resourceLimits: {
+          stackSizeMb: this.memorySize,
+        },
         workerData: {
           name: this.name,
           timeout: this.timeout,
@@ -282,6 +234,7 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
       lambdaName: this.outName,
     });
   }
+
   async invoke(event: any, info?: any, clientContext?: any) {
     if (this._isLoading) {
       this.setMaxListeners(0);
@@ -306,34 +259,52 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
       } catch (error) {}
     });
 
-    const eventResponse = await new Promise((resolve, reject) => {
-      const awsRequestId = randomUUID();
+    try {
+      const eventResponse = await new Promise((resolve, reject) => {
+        const awsRequestId = randomUUID();
 
-      this._worker!.postMessage({
-        channel: "exec",
-        data: { event, clientContext },
-        awsRequestId,
+        this._worker!.postMessage({
+          channel: "exec",
+          data: { event, clientContext },
+          awsRequestId,
+        });
+
+        this.once(awsRequestId, (channel: string, data: any) => {
+          switch (channel) {
+            case "return":
+            case "succeed":
+            case "done":
+              this.handleSuccessDestination(event, info, data, awsRequestId);
+              resolve(data);
+              break;
+            case "fail":
+              this.handleErrorDestination(event, info, data, awsRequestId);
+              reject(data);
+              break;
+            default:
+              reject(new Error("Unknown error"));
+              break;
+          }
+        });
       });
-
-      this.once(awsRequestId, (channel: string, data: any) => {
-        switch (channel) {
-          case "return":
-          case "succeed":
-          case "done":
-            this.handleSuccessDestination(event, info, data, awsRequestId);
-            resolve(data);
-            break;
-          case "fail":
-            this.handleErrorDestination(event, info, data, awsRequestId);
-            reject(data);
-            break;
-          default:
-            reject(new Error("Unknown error"));
-            break;
-        }
-      });
-    });
-
-    return eventResponse;
+      return eventResponse;
+    } catch (error) {
+      throw error;
+    } finally {
+      this.#setLifetime();
+    }
   }
+
+  #setLifetime = () => {
+    clearTimeout(this.#_tmLifetime);
+    this.#_tmLifetime = setTimeout(() => {
+      if (this._worker) {
+        this._worker.terminate();
+        this._isLoaded = false;
+        this._isLoading = false;
+      }
+    }, runtimeLifetime);
+  };
 }
+
+export type { ISnsEvent, IS3Event, ISqs, IDdbEvent, IDestination, LambdaEndpoint };

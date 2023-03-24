@@ -1,5 +1,13 @@
 import { log } from "../utils/colorize";
-
+export interface ISnsEvent {
+  name: string;
+  arn?: string;
+  topicName?: string;
+  displayName?: string;
+  filterScope?: "MessageAttributes" | "MessageBody";
+  filter?: any;
+  redrivePolicy?: string;
+}
 const onlySqsAllowed = "SNS redrivePolicy destination could only be a SQS service";
 
 const parseTopicNameFromObject = (resources: any, Outputs: any, obj: any) => {
@@ -32,7 +40,7 @@ const parseTopicNameFromObject = (resources: any, Outputs: any, obj: any) => {
   }
 };
 
-export const parseSns = (Outputs: any, resources: any, event: any) => {
+export const parseSns = (Outputs: any, resources: any, event: any): ISnsEvent | undefined => {
   if (!event.sns) {
     return;
   }

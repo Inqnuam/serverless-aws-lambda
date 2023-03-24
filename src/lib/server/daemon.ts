@@ -4,6 +4,7 @@ import { networkInterfaces } from "os";
 import { Handlers, HttpMethod } from "./handlers";
 import { ILambdaMock, LambdaMock, LambdaEndpoint } from "../runtime/lambdaMock";
 import { log } from "../utils/colorize";
+import { checkHeaders } from "../utils/checkHeaders";
 import inspector from "inspector";
 import { html404, html500 } from "../utils/htmlStatusMsg";
 import serveStatic from "serve-static";
@@ -24,7 +25,7 @@ if (networkInterfaces) {
     .find(Boolean)?.address;
 }
 
-const debuggerIsAttached = inspector.url() != undefined;
+const debuggerIsAttached = inspector?.url() != undefined;
 
 if (debuggerIsAttached) {
   console.warn("Lambdas timeout are disabled when a Debugger is attached");
@@ -126,7 +127,7 @@ export class Daemon extends Handlers {
   }
   constructor(config: IDaemonConfig = { debug: false }) {
     super(config);
-    this.#server = http.createServer(this.#requestListener.bind(this));
+    this.#server = http.createServer({ maxHeaderSize: 105536 }, this.#requestListener.bind(this));
   }
   get port() {
     return Handlers.PORT;
@@ -139,6 +140,14 @@ export class Daemon extends Handlers {
     if (isNaN(port)) {
       throw Error("port should be a number");
     }
+    this.#server.once("error", async (err: any) => {
+      if (err.code === "EADDRINUSE") {
+        log.RED(err.message);
+        process.exit(1);
+      } else {
+        console.log(err);
+      }
+    });
     this.#server.listen(port, async () => {
       const { port: listeningPort, address } = this.#server.address() as AddressInfo;
 
@@ -190,7 +199,7 @@ export class Daemon extends Handlers {
     }
   }
   async #requestListener(req: IncomingMessage, res: ServerResponse) {
-    const { url, method, headers } = req;
+    const { url, method, headers, rawHeaders } = req;
     const parsedURL = new URL(url as string, "http://localhost:3003");
 
     const customCallback = this.#findCustomOfflineRequest(method!, parsedURL.pathname);
@@ -206,6 +215,10 @@ export class Daemon extends Handlers {
       }
     } else {
       //SECTION: ALB and APG server
+
+      const { searchParams } = parsedURL;
+      const multiValueHeaders = this.#getMultiValueHeaders(rawHeaders);
+
       let body = Buffer.alloc(0);
       let requestMockType: string | undefined | null = undefined;
 
@@ -219,12 +232,29 @@ export class Daemon extends Handlers {
         }
       }
 
-      const lambdaController = this.getHandler(method as HttpMethod, decodeURIComponent(parsedURL.pathname), requestMockType);
+      const lambdaController = this.getHandler({
+        headers: multiValueHeaders,
+        query: searchParams,
+        method: method as HttpMethod,
+        path: decodeURIComponent(parsedURL.pathname),
+        kind: requestMockType,
+      });
 
       if (lambdaController) {
         const mockEvent = lambdaController.event;
 
-        let event = mockEvent.kind == "alb" ? this.#convertReqToAlbEvent(req, mockEvent) : this.#convertReqToApgEvent(req, mockEvent, lambdaController.handler.outName);
+        try {
+          checkHeaders(headers, mockEvent.kind);
+        } catch (error: any) {
+          res.statusCode = 400;
+          res.setHeader("Content-Type", "text/html");
+          return res.end(error.message);
+        }
+        // TODO: create a class which handles the request and response parsing/checking based on event kind
+        let event =
+          mockEvent.kind == "alb"
+            ? this.#convertReqToAlbEvent(req, mockEvent, multiValueHeaders)
+            : this.#convertReqToApgEvent(req, mockEvent, lambdaController.handler.outName, multiValueHeaders);
 
         req
           .on("data", (chunk) => {
@@ -433,7 +463,7 @@ export class Daemon extends Handlers {
     res.end(resContent);
   }
 
-  #getMultiValueHeaders(rawHeaders: string[]) {
+  #getMultiValueHeaders = (rawHeaders: string[]) => {
     let multiValueHeaders: any = {};
     const multiKeys = rawHeaders.filter((x, i) => i % 2 == 0).map((x) => x.toLowerCase());
     const multiValues = rawHeaders.filter((x, i) => i % 2 !== 0);
@@ -450,8 +480,8 @@ export class Daemon extends Handlers {
     });
 
     return multiValueHeaders;
-  }
-  #convertReqToAlbEvent(req: IncomingMessage, mockEvent: LambdaEndpoint) {
+  };
+  #convertReqToAlbEvent(req: IncomingMessage, mockEvent: LambdaEndpoint, multiValueHeaders: { [key: string]: string[] }) {
     const { method, headers, url, rawHeaders } = req;
 
     const parsedURL = new URL(url as string, "http://localhost:3003");
@@ -472,7 +502,7 @@ export class Daemon extends Handlers {
         "x-forwarded-for": [String(req.socket.remoteAddress)],
         "x-forwarded-proto": ["http"],
         "x-forwarded-port": [String(this.port)],
-        ...this.#getMultiValueHeaders(rawHeaders),
+        ...multiValueHeaders,
       };
 
       event.multiValueQueryStringParameters = {};
@@ -502,7 +532,7 @@ export class Daemon extends Handlers {
     return event;
   }
 
-  #convertReqToApgEvent(req: IncomingMessage, mockEvent: LambdaEndpoint, lambdaName: string): ApgHttpApiEvent | ApgHttpEvent {
+  #convertReqToApgEvent(req: IncomingMessage, mockEvent: LambdaEndpoint, lambdaName: string, multiValueHeaders: { [key: string]: string[] }): ApgHttpApiEvent | ApgHttpEvent {
     const { method, headers, url, rawHeaders } = req;
 
     const parsedURL = new URL(url as string, "http://localhost:3003");
@@ -514,7 +544,7 @@ export class Daemon extends Handlers {
     let pathParameters: any = {};
 
     paramDeclarations.forEach((k, i) => {
-      if (k.startsWith("{") && k.endsWith("}")) {
+      if (k.startsWith("{") && k.endsWith("}") && !k.endsWith("+}")) {
         pathParameters[k.slice(1, -1)] = reqParams[i];
       }
     });
@@ -528,11 +558,11 @@ export class Daemon extends Handlers {
       for (const k of Array.from(new Set(parsedURL.searchParams.keys()))) {
         multiValueQueryStringParameters[k] = parsedURL.searchParams.getAll(k);
       }
-      const multiValueHeaders = {
+      const mergedMultiValueHeaders = {
         "x-forwarded-for": [String(req.socket.remoteAddress)],
         "x-forwarded-proto": ["http"],
         "x-forwarded-port": [String(this.port)],
-        ...this.#getMultiValueHeaders(rawHeaders),
+        ...multiValueHeaders,
       };
       const apgEvent: ApgHttpEvent = {
         version: "1.0",
@@ -540,7 +570,7 @@ export class Daemon extends Handlers {
         path: parsedURL.pathname,
         httpMethod: method!,
         headers: customHeaders,
-        multiValueHeaders,
+        multiValueHeaders: mergedMultiValueHeaders,
         // @ts-ignore
         queryStringParameters: Object.fromEntries(parsedURL.searchParams),
         multiValueQueryStringParameters,

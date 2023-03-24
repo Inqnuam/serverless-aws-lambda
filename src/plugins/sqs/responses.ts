@@ -414,10 +414,21 @@ export const UntagQueueResponse = (RequestId: string) => {
   </ResponseMetadata>
 </UntagQueueResponse>`;
 };
-export const DeleteQueueResponse = (RequestId: string) => {
-  return `<?xml version="1.0"?><DeleteQueueResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
+export const DeleteQueueResponse = (RequestId: string) => `<?xml version="1.0"?><DeleteQueueResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
   <ResponseMetadata>
     <RequestId>${RequestId}</RequestId>
   </ResponseMetadata>
 </DeleteQueueResponse>`;
-};
+
+export const GetQueueUrlResponse = (
+  RequestId: string,
+  port: number,
+  QueueName: string
+) => `<?xml version="1.0"?><GetQueueUrlResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
+  <GetQueueUrlResult>
+    <QueueUrl>http://localhost:${port}/123456789012/${QueueName}</QueueUrl>
+  </GetQueueUrlResult>
+  <ResponseMetadata>
+    <RequestId>${RequestId}</RequestId>
+  </ResponseMetadata>
+</GetQueueUrlResponse> `;

@@ -2,9 +2,10 @@
 
 ### Description
 
-Plugin for serverless-aws-lambda to trigger locally your sqs event defined lambdas automatically.
+Plugin for serverless-aws-lambda to trigger locally your sqs event defined lambdas automatically.  
 Local Queues are created based on your serverless.yml.  
-To define default and/or override Queue attributes see [Plugin configs](../src/plugins/sqs/types.ts).
+To define default and/or override Queue attributes see [Plugin configs](../src/plugins/sqs/types.ts).  
+Currently FIFO queues are considered as Standart.
 
 ### Installation
 
@@ -22,7 +23,7 @@ module.exports = defineConfig({
 
 ### Supported Requests
 
-supports both AWS SDK and CLI requests.
+supports both AWS SDK, CLI and raw low-level API requests.
 
 ✅ supported  
 🌕 planned  
@@ -36,7 +37,7 @@ supports both AWS SDK and CLI requests.
 - ✅ DeleteMessageBatch
 - ✅ DeleteQueue
 - 🌕 GetQueueAttributes
-- 🌕 GetQueueUrl
+- ✅ GetQueueUrl
 - 🌕 ListDeadLetterSourceQueues
 - ✅ ListQueues
 - ✅ ListQueueTags

@@ -30,15 +30,16 @@ export class Handlers {
     const name = Handlers.parseNameFromUrl(lambdaName);
     return Handlers.handlers.find((x) => x.name == name || x.outName == name);
   }
-  getHandler(method: HttpMethod, path: string, kind?: string | null) {
+  getHandler({ method, path, kind, headers, query }: { method: HttpMethod; path: string; headers: { [key: string]: string[] }; kind?: string | null; query: URLSearchParams }) {
     const hasNotWilcard = !path.includes("*");
     const hasNotBrackets = !path.includes("{") && !path.includes("}");
 
     let foundLambda: { event: LambdaEndpoint; handler: ILambdaMock } | undefined;
+    const kindToLowerCase = kind?.toLowerCase();
 
     const foundHandler = Handlers.handlers.find((x) => {
       return x.endpoints
-        .filter((e) => (kind ? e.kind == kind.toLowerCase() : e))
+        .filter((e) => (kind ? e.kind == kindToLowerCase : e))
         .find((w) => {
           if (w.kind == "apg") {
             const isValidApgEvent = hasNotBrackets && w.paths.includes(path) && (w.methods.includes("ANY") || w.methods.includes(method));
@@ -52,12 +53,41 @@ export class Handlers {
           }
           const isValidAlbEvent = hasNotWilcard && w.paths.includes(path) && (w.methods.includes("ANY") || w.methods.includes(method));
           if (isValidAlbEvent) {
-            foundLambda = {
-              event: w,
-              handler: x,
-            };
+            const matches: boolean[] = [isValidAlbEvent];
+
+            if (w.query) {
+              const hasRequiredQueryString = Object.keys(w.query).some((k) => {
+                const value = query.get(k);
+
+                return typeof value == "string" && value == w.query![k];
+              });
+
+              matches.push(hasRequiredQueryString);
+            }
+
+            if (w.header) {
+              const foundHeader = headers[w.header.name.toLowerCase()];
+
+              if (foundHeader) {
+                const hasRequiredHeader = w.header.values.some((v) => foundHeader.find((val) => val == v));
+
+                matches.push(hasRequiredHeader);
+              } else {
+                matches.push(false);
+              }
+            }
+
+            const matchesAll = matches.every((x) => x === true);
+
+            if (matchesAll) {
+              foundLambda = {
+                event: w,
+                handler: x,
+              };
+            }
+
+            return matchesAll;
           }
-          return isValidAlbEvent;
         });
     });
 
@@ -67,7 +97,7 @@ export class Handlers {
       // Use Regex to find lambda controller
       const foundHandler = Handlers.handlers.find((x) =>
         x.endpoints
-          .filter((e) => (kind ? e.kind == kind : e))
+          .filter((e) => (kind ? e.kind == kindToLowerCase : e))
           .find((w) => {
             const hasPath = w.paths.find((p) => {
               const AlbAnyPathMatch = p.replace(/\*/g, ".*").replace(/\//g, "\\/");
@@ -81,12 +111,42 @@ export class Handlers {
 
             const isValidEvent = hasPath && (w.methods.includes("ANY") || w.methods.includes(method));
             if (isValidEvent) {
-              foundLambda = {
-                event: w,
-                handler: x,
-              };
+              const matches: boolean[] = [isValidEvent];
+
+              if (w.kind == "alb") {
+                if (w.query) {
+                  const hasRequiredQueryString = Object.keys(w.query).some((k) => {
+                    const value = query.get(k);
+
+                    return typeof value == "string" && value == w.query![k];
+                  });
+
+                  matches.push(hasRequiredQueryString);
+                }
+
+                if (w.header) {
+                  const foundHeader = headers[w.header.name.toLowerCase()];
+
+                  if (foundHeader) {
+                    const hasRequiredHeader = w.header.values.some((v) => foundHeader.find((val) => val == v));
+
+                    matches.push(hasRequiredHeader);
+                  } else {
+                    matches.push(false);
+                  }
+                }
+              }
+
+              const matchesAll = matches.every((x) => x === true);
+              if (matchesAll) {
+                foundLambda = {
+                  event: w,
+                  handler: x,
+                };
+              }
+
+              return matchesAll;
             }
-            return isValidEvent;
           })
       );
 

@@ -28,7 +28,6 @@ class ServerlessAwsLambda extends Daemon {
   serverless: Serverless;
   options: any;
   pluginConfig: any;
-  tsconfig: any;
   commands: any;
   hooks: any;
   esBuildConfig: any;
@@ -277,10 +276,8 @@ class ServerlessAwsLambda extends Daemon {
       try {
         if (this.customBuildCallback) {
           await this.customBuildCallback(result, true);
-          await this.load(this.#lambdas);
-        } else {
-          await this.load(this.#lambdas);
         }
+        await this.load(this.#lambdas);
       } catch (error) {
         console.error(error);
       }
@@ -485,7 +482,6 @@ class ServerlessAwsLambda extends Daemon {
       setEnv: (n: string, k: string, v: string) => {
         this.setEnv(n, k, v);
       },
-      port: ServerlessAwsLambda.PORT,
       stage: this.options.stage ?? this.serverless.service.provider.stage ?? "dev",
       esbuild: esbuild,
       serverless: this.serverless,

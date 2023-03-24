@@ -25,3 +25,32 @@ export const html404 = `<html>
 </body>
 
 </html>`;
+
+export const headerTooLarge = `<html>
+
+<head>
+	<title>400 Request Header Or Cookie Too Large</title>
+</head>
+
+<body>
+	<center>
+		<h1>400 Bad Request</h1>
+	</center>
+	<center>Request Header Or Cookie Too Large</center>
+</body>
+
+</html>`;
+
+export const badRequest = `<html>
+
+<head>
+	<title>400 Bad Request</title>
+</head>
+
+<body>
+	<center>
+		<h1>400 Bad Request</h1>
+	</center>
+</body>
+
+</html>`;

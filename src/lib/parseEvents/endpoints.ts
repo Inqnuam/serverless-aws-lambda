@@ -1,6 +1,20 @@
 import { HttpMethod } from "../server/handlers";
-import { LambdaEndpoint } from "../runtime/lambdaMock";
 
+export interface LambdaEndpoint {
+  kind: "alb" | "apg";
+  paths: string[];
+  methods: HttpMethod[];
+  async?: boolean;
+  multiValueHeaders?: boolean;
+  version?: 1 | 2;
+  header?: {
+    name: string;
+    values: string[];
+  };
+  query?: {
+    [key: string]: string;
+  };
+}
 export const parseEndpoints = (event: any): LambdaEndpoint | null => {
   const supportedEvents = ["http", "httpApi", "alb"];
 
@@ -28,6 +42,13 @@ export const parseEndpoints = (event: any): LambdaEndpoint | null => {
     }
     if (event.alb.multiValueHeaders) {
       parsendEvent.multiValueHeaders = true;
+    }
+    if (event.alb.conditions.header) {
+      parsendEvent.header = event.alb.conditions.header;
+    }
+
+    if (event.alb.conditions.query) {
+      parsendEvent.query = event.alb.conditions.query;
     }
   } else if (event.http || event.httpApi) {
     if (event.http) {

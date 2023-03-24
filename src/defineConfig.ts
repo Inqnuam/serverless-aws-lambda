@@ -28,7 +28,6 @@ export interface ClientConfigParams {
   isPackaging: boolean;
   setEnv: (lambdaName: string, key: string, value: string) => void;
   stage: string;
-  port: number;
   esbuild: PluginBuild["esbuild"];
   config: Config;
   options: Options;
@@ -118,7 +117,7 @@ function defineConfig(options: Options) {
   }
   return async function config(
     this: ClientConfigParams,
-    { stop, lambdas, isDeploying, isPackaging, setEnv, stage, port, esbuild, serverless, resources }: ClientConfigParams
+    { stop, lambdas, isDeploying, isPackaging, setEnv, stage, esbuild, serverless, resources }: ClientConfigParams
   ): Promise<Omit<Config, "config" | "options">> {
     let config: Config = {
       esbuild: options.esbuild ?? {},
@@ -136,7 +135,6 @@ function defineConfig(options: Options) {
       isPackaging,
       setEnv,
       stage,
-      port,
       esbuild,
       serverless,
       options,

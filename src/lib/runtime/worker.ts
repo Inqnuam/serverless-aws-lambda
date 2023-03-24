@@ -1,8 +1,8 @@
 const { parentPort, workerData } = require("worker_threads");
 import { log } from "../utils/colorize";
-const inspector = require("inspector");
+import inspector from "inspector";
 
-const debuggerIsAttached = inspector.url() != undefined;
+const debuggerIsAttached = inspector?.url() != undefined;
 
 let eventHandler: Function;
 const invalidResponse = new Error("Invalid response payload");

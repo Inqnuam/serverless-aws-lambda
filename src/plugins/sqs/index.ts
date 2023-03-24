@@ -25,6 +25,7 @@ import {
   DeleteQueueResponse,
   TagQueueResponse,
   UntagQueueResponse,
+  GetQueueUrlResponse,
 } from "./responses";
 import { Queue } from "./queue";
 import { SqsError } from "./errors";
@@ -93,6 +94,25 @@ export const sqsPlugin = (attributes?: QueueAttributes): SlsAwsLambdaPlugin => {
                 const body = simpleBodyParser(encodedBody);
                 const { list, nextToken } = Queue.listQueues({ limit: Number(body.MaxResults), prefix: body.QueueNamePrefix, token: body.NextToken });
                 res.end(ListQueuesResponse(RequestId, list, nextToken));
+              } catch (error: any) {
+                handleError(error);
+              }
+            } else if (Action == "GetQueueUrl") {
+              try {
+                const body = simpleBodyParser(encodedBody);
+
+                const { QueueName } = body;
+
+                if (!QueueName) {
+                  throw new SqsError({ Code: "InvalidParameterValue", Message: "Value for parameter QueueName is invalid. Reason: Must specify a queue name." });
+                }
+
+                const foundQueue = Queue.Queues.find((x) => x.QueueName == QueueName);
+                if (!foundQueue || deletingQueues.has(foundQueue.QueueName)) {
+                  res.statusCode = 400;
+                  return res.end(queueNotFound(RequestId));
+                }
+                res.end(GetQueueUrlResponse(RequestId, Queue.PORT, QueueName));
               } catch (error: any) {
                 handleError(error);
               }

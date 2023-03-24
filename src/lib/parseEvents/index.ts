@@ -1,5 +1,4 @@
-import type { IDestination } from "../runtime/lambdaMock";
-import { LambdaEndpoint } from "../runtime/lambdaMock";
+import type { LambdaEndpoint } from "./endpoints";
 import { parseEndpoints } from "./endpoints";
 import { parseSns } from "./sns";
 import { parseDdbStreamDefinitions } from "./ddbStream";
@@ -9,7 +8,10 @@ import { parseSqs } from "./sqs";
 
 const supportedServices: IDestination["kind"][] = ["lambda", "sns", "sqs"];
 type arn = [string, string, IDestination["kind"], string, string, string, string];
-
+export interface IDestination {
+  kind: "lambda" | "sns" | "sqs";
+  name: string;
+}
 export const parseEvents = (events: any[], Outputs: any, resources: any) => {
   const endpoints: LambdaEndpoint[] = [];
   const sns: any[] = [];

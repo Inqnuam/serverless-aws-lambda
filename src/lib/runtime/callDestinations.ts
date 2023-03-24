@@ -1,5 +1,5 @@
 import http from "http";
-import type { IDestination } from "./lambdaMock";
+import type { IDestination } from "../parseEvents/index";
 
 interface ICallDestination {
   destination: IDestination;

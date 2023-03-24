@@ -22,7 +22,8 @@ const getMiddleware = (controllers: (RouteController | RouteMiddleware | Functio
     return controllers[0];
   }
 };
-const isProd = process.env.NODE_ENV == "production";
+const { IS_LOCAL, NODE_ENV } = process.env;
+const isProd = NODE_ENV == "production";
 
 class Route extends Function {
   controllers: (RouteController | RouteMiddleware | Function)[] = [];
@@ -70,6 +71,9 @@ class Route extends Function {
         if (foundErrorHandler) {
           await foundErrorHandler(error, req, res, next);
         } else {
+          if (IS_LOCAL) {
+            console.log(error);
+          }
           resolve({ statusCode: 500, body: "Internal Server Error" });
         }
       } catch (err) {
