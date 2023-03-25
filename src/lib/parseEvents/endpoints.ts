@@ -15,9 +15,8 @@ export interface LambdaEndpoint {
     [key: string]: string;
   };
 }
+const supportedEvents = ["http", "httpApi", "alb"];
 export const parseEndpoints = (event: any): LambdaEndpoint | null => {
-  const supportedEvents = ["http", "httpApi", "alb"];
-
   const keys = Object.keys(event);
 
   if (!keys.length || !supportedEvents.includes(keys[0])) {
@@ -57,6 +56,7 @@ export const parseEndpoints = (event: any): LambdaEndpoint | null => {
         parsendEvent.async = true;
       }
     } else {
+      // TODO: parse httpApi payload version if it exists in lambda or in provider
       parsendEvent.version = 2;
     }
 

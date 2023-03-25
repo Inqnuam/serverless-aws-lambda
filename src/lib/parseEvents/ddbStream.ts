@@ -8,6 +8,7 @@ export interface IDdbEvent {
   StreamViewType?: string;
   batchSize?: number;
   batchWindow?: number;
+  tumblingWindowInSeconds?: number;
   maximumRecordAgeInSeconds?: number;
   maximumRetryAttempts?: number;
   bisectBatchOnFunctionError?: boolean;
@@ -20,6 +21,9 @@ enum StreamProps {
   batchSize = 100,
   minRecordAge = 60,
   maxRecordAge = 604800,
+  maxBatchWindow = 300,
+  maxBatchSize = 10000,
+  maxRetryAttempts = 10000,
 }
 const getTableNameFromResources = (ddbStreamTables: any, Outputs: any, obj: any) => {
   const [key, value] = Object.entries(obj)?.[0];
@@ -94,13 +98,13 @@ export const parseDdbStreamDefinitions = (Outputs: any, resources: any, event: a
     }
 
     if (parsedEvent.TableName) {
-      if (!isNaN(val.batchSize) && val.batchSize > 0) {
+      if (!isNaN(val.batchSize) && val.batchSize > 0 && val.batchSize <= StreamProps.maxBatchSize) {
         parsedEvent.batchSize = val.batchSize;
       } else {
         parsedEvent.batchSize = StreamProps.batchSize;
       }
 
-      if (!isNaN(val.batchWindow) && val.batchWindow > 0) {
+      if (!isNaN(val.batchWindow) && val.batchWindow > 0 && val.batchWindow <= StreamProps.maxBatchWindow) {
         parsedEvent.batchWindow = val.batchWindow;
       }
 
@@ -108,7 +112,7 @@ export const parseDdbStreamDefinitions = (Outputs: any, resources: any, event: a
         parsedEvent.maximumRecordAgeInSeconds = val.maximumRecordAgeInSeconds;
       }
 
-      if (!isNaN(val.maximumRetryAttempts) && val.maximumRetryAttempts > 0) {
+      if (!isNaN(val.maximumRetryAttempts) && val.maximumRetryAttempts > 0 && val.maximumRetryAttempts <= StreamProps.maxRetryAttempts) {
         parsedEvent.maximumRetryAttempts = val.maximumRetryAttempts;
       }
 
@@ -121,6 +125,10 @@ export const parseDdbStreamDefinitions = (Outputs: any, resources: any, event: a
       }
       if (val.filterPatterns) {
         parsedEvent.filterPatterns = val.filterPatterns;
+      }
+
+      if (!isNaN(val.tumblingWindowInSeconds)) {
+        parsedEvent.tumblingWindowInSeconds = val.tumblingWindowInSeconds;
       }
 
       if (val.destinations?.onFailure) {
