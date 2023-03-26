@@ -294,6 +294,8 @@ class ServerlessAwsLambda extends Daemon {
       functionsNames = functionsNames.filter((x) => x == this.invokeName);
     }
     const defaultRuntime = this.serverless.service.provider.runtime;
+    // @ts-ignore
+    const defaultHttpApiPayload: 1 | 2 = this.serverless.service.provider.httpApi?.payload == "1.0" ? 1 : 2;
 
     // @ts-ignore
     const Outputs = this.serverless.service.resources?.Outputs;
@@ -385,7 +387,12 @@ class ServerlessAwsLambda extends Daemon {
       lambdaDef.environment.AWS_LAMBDA_FUNCTION_MEMORY_SIZE = lambdaDef.memorySize;
 
       if (lambda.events.length) {
-        const { endpoints, sns, sqs, ddb, s3, kinesis } = parseEvents(lambda.events, Outputs, this.resources);
+        let httpApiPayload = defaultHttpApiPayload;
+        if (typeof slsDeclaration.httpApi?.payload == "string") {
+          const { payload } = slsDeclaration.httpApi;
+          httpApiPayload = payload == "1.0" ? 1 : payload == "2.0" ? 2 : defaultHttpApiPayload;
+        }
+        const { endpoints, sns, sqs, ddb, s3, kinesis } = parseEvents(lambda.events, Outputs, this.resources, httpApiPayload);
         lambdaDef.endpoints = endpoints;
         lambdaDef.sns = sns;
         lambdaDef.sqs = sqs;

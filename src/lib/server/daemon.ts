@@ -482,7 +482,7 @@ export class Daemon extends Handlers {
     return multiValueHeaders;
   };
   #convertReqToAlbEvent(req: IncomingMessage, mockEvent: LambdaEndpoint, multiValueHeaders: { [key: string]: string[] }) {
-    const { method, headers, url, rawHeaders } = req;
+    const { method, headers, url } = req;
 
     const parsedURL = new URL(url as string, "http://localhost:3003");
 
@@ -533,7 +533,7 @@ export class Daemon extends Handlers {
   }
 
   #convertReqToApgEvent(req: IncomingMessage, mockEvent: LambdaEndpoint, lambdaName: string, multiValueHeaders: { [key: string]: string[] }): ApgHttpApiEvent | ApgHttpEvent {
-    const { method, headers, url, rawHeaders } = req;
+    const { method, headers, url } = req;
 
     const parsedURL = new URL(url as string, "http://localhost:3003");
     parsedURL.searchParams.delete("x_mock_type");
