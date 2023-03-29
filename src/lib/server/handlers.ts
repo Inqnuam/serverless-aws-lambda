@@ -173,6 +173,8 @@ export class Handlers {
         }
       }
     } else {
+      // @ts-ignore
+      Handlers.handlers[foundIndex].clear();
       Handlers.handlers[foundIndex] = lambdaController;
     }
   }

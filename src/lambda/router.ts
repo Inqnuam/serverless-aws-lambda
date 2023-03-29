@@ -19,7 +19,7 @@ const getMiddleware = (controllers: (RouteController | RouteMiddleware | Functio
       return errorHandler;
     }
   } else {
-    return controllers[0];
+    return controllers[0]?.length < 4 ? controllers[0] : undefined;
   }
 };
 const { IS_LOCAL, NODE_ENV } = process.env;
@@ -102,14 +102,21 @@ class Route extends Function {
           await handleError(error, res, res, next);
         }
 
-        if (!response) {
+        if (!response && !controllers.length) {
           res.status(404).send(`Cannot ${req.method} ${req.path}`);
         }
       } else {
-        if (err) {
-          const errorResponse = isProd ? "Not Found" : err.stack ? err.stack : err;
-          res.status(404).send(`<pre>${errorResponse}</pre>`);
+        let errorResponse: any;
+        let code = 500;
+        if (isProd) {
+          errorResponse = "Not Found";
+          code = 404;
+        } else if (err) {
+          errorResponse = err.stack ? err.stack : err;
+        } else {
+          errorResponse = "Cannot find route controller";
         }
+        res.status(code).send(`<pre>${errorResponse}</pre>`);
       }
     };
 

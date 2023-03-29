@@ -175,7 +175,7 @@ parentPort.on("message", async (e: any) => {
           returnError(awsRequestId, err);
         });
 
-      if (typeof eventResponse.then !== "function" && !isSent) {
+      if (typeof eventResponse?.then !== "function" && !isSent) {
         resIsSent();
         returnResponse("return", awsRequestId, null);
       }

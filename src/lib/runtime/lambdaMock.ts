@@ -296,6 +296,10 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     }
   }
 
+  clear = () => {
+    clearTimeout(this.#_tmLifetime);
+    this._worker?.terminate();
+  };
   #setLifetime = () => {
     clearTimeout(this.#_tmLifetime);
     this.#_tmLifetime = setTimeout(() => {
