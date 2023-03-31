@@ -3,6 +3,7 @@ import { Daemon } from "./lib/server/daemon";
 import { ILambdaMock } from "./lib/runtime/lambdaMock";
 import { log } from "./lib/utils/colorize";
 import { zip } from "./lib/utils/zip";
+import type { IZipOptions } from "./lib/utils/zip";
 import esbuild from "esbuild";
 import type { BuildOptions, BuildResult } from "esbuild";
 import type Serverless from "serverless";
@@ -241,7 +242,13 @@ class ServerlessAwsLambda extends Daemon {
           // @ts-ignore
           const filesToInclude = slsDeclaration.files;
           const zipableBundledFilePath = l.esOutputPath.slice(0, -3);
-          const zipOutputPath = await zip(zipableBundledFilePath, l.outName, filesToInclude);
+          const zipOptions: IZipOptions = {
+            filePath: zipableBundledFilePath,
+            zipName: l.outName,
+            include: filesToInclude,
+            sourcemap: this.esBuildConfig.sourcemap,
+          };
+          const zipOutputPath = await zip(zipOptions);
 
           // @ts-ignore
           slsDeclaration.package = { ...slsDeclaration.package, disable: true, artifact: zipOutputPath };

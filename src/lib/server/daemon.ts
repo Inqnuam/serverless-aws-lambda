@@ -453,10 +453,7 @@ export class Daemon extends Handlers {
             resContent = JSON.stringify(responseData);
           }
         } else {
-          log.YELLOW("Invalid response content");
-          res.setHeader("Content-Type", "text/html");
-          res.statusCode = 502;
-          resContent = html500;
+          res.setHeader("Content-Type", "application/octet-stream");
         }
       }
     }

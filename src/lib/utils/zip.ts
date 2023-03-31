@@ -3,7 +3,13 @@ import { createReadStream, createWriteStream } from "fs";
 import { access } from "fs/promises";
 import path from "path";
 
-export const zip = (filePath: string, zipName: string, include?: string[]) => {
+export interface IZipOptions {
+  filePath: string;
+  zipName: string;
+  include?: string[];
+  sourcemap?: boolean | string;
+}
+export const zip = ({ filePath, zipName, include, sourcemap }: IZipOptions) => {
   return new Promise(async (resolve) => {
     const archive = archiver("zip", {
       zlib: { level: 9 },
@@ -19,6 +25,16 @@ export const zip = (filePath: string, zipName: string, include?: string[]) => {
 
     const fileName = path.basename(filePath) + ".js";
     archive.append(createReadStream(`${filePath}.js`), { name: fileName });
+
+    if (sourcemap && sourcemap != "inline") {
+      const sourcemapName = `${fileName}.map`;
+      const sourcemapPath = `${filePath}.js.map`;
+
+      try {
+        await access(sourcemapPath);
+        archive.append(createReadStream(sourcemapPath), { name: sourcemapName });
+      } catch (error) {}
+    }
 
     if (include && include.every((x) => typeof x == "string")) {
       for (const file of include) {
