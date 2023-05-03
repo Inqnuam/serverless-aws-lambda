@@ -1,5 +1,7 @@
 import { md5 } from "./utils";
 
+const SQS_BATCH_MSG_TOP_LEVEL_KEYS = ["Id", "MessageBody", "DelaySeconds", "MessageDeduplicationId", "MessageGroupId"];
+
 export const parseSqsPublishBody = (encodedBody: string[]) => {
   let body: any = {};
 
@@ -67,7 +69,7 @@ export const parseSqsPublishBatchBody = (encodedBody: string[]) => {
 
         const foundMember = memberMap.get(memberNumber);
         if (foundMember) {
-          if (entryType == "MessageBody" || entryType == "Id") {
+          if (SQS_BATCH_MSG_TOP_LEVEL_KEYS.includes(entryType)) {
             foundMember.value[entryType] = v;
           } else if (entryType == "MessageAttribute" || entryType == "MessageSystemAttribute") {
             const attribName = foundMember[entryType][entryNumber];
