@@ -138,11 +138,18 @@ class Route extends Function {
     return response ?? { statusCode: 204 };
   }
 
+  /**
+   * Express like route.ANY() without path filter.
+   * @deprecated use `.use()` instead.
+   */
   handle(...controllers: (RouteController | Function)[]) {
     this.controllers.push(...controllers);
     return this;
   }
 
+  /**
+   * Express like route.use()
+   */
   use(...middlewares: (RouteMiddleware | RouteController | Function)[]) {
     this.controllers.push(...middlewares);
     return this;

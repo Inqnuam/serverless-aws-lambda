@@ -2,7 +2,7 @@ import { RawResponseContent } from "./request";
 import { cookie, CookieOptions } from "./cookies";
 
 export type RedirectOptions = [code: number, path: string];
-
+type Stringifiable = [] | { [key: string]: any } | null | boolean;
 export interface IResponse {
   locals: { [key: string]: any };
   callbackWaitsForEmptyEventLoop: boolean;
@@ -22,9 +22,9 @@ export interface IResponse {
   getRemainingTimeInMillis: Function;
   status: (code: number) => this;
   sendStatus: (code: number) => void;
-  send: (content?: string) => void;
+  send: (content?: string | Buffer) => void;
   end: (rawContent: any) => void;
-  json: (content: [] | { [key: string]: any }) => void;
+  json: (content: Stringifiable) => void;
   set: (header: string | { [key: string]: string }, value?: string) => this;
   setHeader: (header: string | { [key: string]: string }, value?: string) => this;
   get: (headerKey: string) => string;
@@ -35,6 +35,17 @@ export interface IResponse {
   cookie: (name: string, value: string, options?: CookieOptions) => this;
   clearCookie(name: string, options?: CookieOptions): this;
 }
+
+const getSetCookieKey = (i: number) => {
+  if (i == 0 || i > 8) {
+    return "Set-Cookie";
+  } else {
+    const sc = ["s", "e", "t", "c", "o", "o", "k", "i", "e"];
+    sc[i] = sc[i].toUpperCase();
+
+    return [...sc.slice(0, 3), "-", ...sc.slice(3)].join("");
+  }
+};
 
 export class _Response implements IResponse {
   locals: { [key: string]: any };
@@ -119,7 +130,10 @@ export class _Response implements IResponse {
         delete this.responseObject.cookies;
       }
       if (this.#req.requestContext?.elb && !this.#req.multiValueHeaders && !this.#req.multiValueQueryStringParameters) {
-        this.#setHeader("Set-Cookie", this.responseObject.cookies[this.responseObject.cookies.length - 1]);
+        (this.responseObject.cookies as []).forEach((cookie, i) => {
+          this.#setHeader(getSetCookieKey(i), cookie);
+        });
+
         delete this.responseObject.cookies;
       }
     }
@@ -138,8 +152,13 @@ export class _Response implements IResponse {
     }
     this.#resolve({ ...this.responseObject });
   }
-  #setBody(content?: string): this {
-    this.responseObject.body = content;
+  #setBody(content?: string | Buffer): this {
+    if (content instanceof Buffer) {
+      this.responseObject.body = content.toString("base64");
+      this.responseObject.isBase64Encoded = true;
+    } else {
+      this.responseObject.body = content;
+    }
     return this;
   }
   cookie(name: string, value: string, options?: CookieOptions): this {
@@ -187,11 +206,11 @@ export class _Response implements IResponse {
     return this.responseObject.headers[headerKey];
   }
   getHeader = this.get;
-  json(content: { [key: string]: any }) {
+  json(content: Stringifiable) {
     this.type("application/json").#setBody(JSON.stringify(content)).#sendResponse();
   }
 
-  send(content?: string) {
+  send(content?: string | Buffer) {
     this.#setBody(content).#sendResponse();
   }
   end(rawContent: any) {
@@ -223,7 +242,7 @@ export class _Response implements IResponse {
   }
 
   links(links: any): this {
-    var link = this.get("Link") || "";
+    let link = this.get("Link") || "";
     if (link) link += ", ";
     return this.set(
       "Link",

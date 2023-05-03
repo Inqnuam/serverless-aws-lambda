@@ -1,6 +1,6 @@
 import type { PluginBuild, BuildResult } from "esbuild";
 import type { Config, OfflineConfig } from "./config";
-import type { ILambdaMock } from "./lib/runtime/lambdaMock";
+import type { ILambdaMock } from "./lib/runtime/rapidApi";
 import type { HttpMethod } from "./lib/server/handlers";
 import type { IncomingMessage, ServerResponse } from "http";
 import type Serverless from "serverless";
@@ -19,13 +19,18 @@ export type ILambda = {
    * Be notified when this lambda is invoked.
    */
   onInvoke: (callback: (event: any, info?: any) => void) => void;
-} & Omit<ILambdaMock, "invokeSub">;
+  onInvokeError: (callback: (input: any, error: any, info?: any) => void) => void;
+  onInvokeSuccess: (callback: (input: any, output: any, info?: any) => void) => void;
+} & Omit<ILambdaMock, "invokeSub" | "invokeSuccessSub" | "invokeErrorSub">;
 
 export interface ClientConfigParams {
   stop: (err?: any) => Promise<void>;
   lambdas: ILambda[];
   isDeploying: boolean;
   isPackaging: boolean;
+  /**
+   * @deprecated use `someLambda.setEnv(key, value)` instead.
+   */
   setEnv: (lambdaName: string, key: string, value: string) => void;
   stage: string;
   esbuild: PluginBuild["esbuild"];
@@ -40,6 +45,15 @@ export interface ClientConfigParams {
   };
 }
 
+export interface OfflineRequest {
+  /**
+   * @default "ANY"
+   */
+  method?: HttpMethod | HttpMethod[];
+  filter: string | RegExp;
+  callback: (this: ClientConfigParams, req: IncomingMessage, res: ServerResponse) => Promise<any | void> | any | void;
+}
+
 export interface SlsAwsLambdaPlugin {
   name: string;
   buildCallback?: (this: ClientConfigParams, result: BuildResult, isRebuild: boolean) => Promise<void> | void;
@@ -49,22 +63,18 @@ export interface SlsAwsLambdaPlugin {
   offline?: {
     onReady?: (this: ClientConfigParams, port: number, ip: string) => Promise<void> | void;
     /**
-     * Add new requests to the offline server.
+     * Add new requests to the local server.
      */
-    request?: {
-      /**
-       * @default "ANY"
-       */
-      method?: HttpMethod | HttpMethod[];
-      filter: string | RegExp;
-      callback: (this: ClientConfigParams, req: IncomingMessage, res: ServerResponse) => Promise<any | void> | any | void;
-    }[];
+    request?: OfflineRequest[];
   };
 }
 
 export interface Options {
   esbuild?: Config["esbuild"];
   offline?: {
+    /**
+     * Serve files locally from provided directory
+     */
     staticPath?: string;
     port?: number;
   };

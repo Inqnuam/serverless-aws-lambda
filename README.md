@@ -145,7 +145,6 @@ To have more control over the plugin you can passe a config file via `configPath
 ```yaml
 custom:
   serverless-aws-lambda:
-    port: 3000
     configPath: ./config.default
 ```
 
@@ -164,6 +163,7 @@ See [defineConfig](resources/defineConfig.md) for advanced configuration.
 - [AWS Local S3](resources/s3.md)
 - [AWS Local SNS](resources/sns.md)
 - [AWS Local SQS](resources/sqs.md)
+- [DocumentDB Local Streams](https://github.com/Inqnuam/serverless-aws-lambda-documentdb-streams)
 - [DynamoDB Local Streams](https://github.com/Inqnuam/serverless-aws-lambda-ddb-streams)
 - [Jest](https://github.com/Inqnuam/serverless-aws-lambda-jest)
 - [Vitest](https://github.com/Inqnuam/serverless-aws-lambda-vitest)

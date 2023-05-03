@@ -8,8 +8,9 @@ export interface IZipOptions {
   zipName: string;
   include?: string[];
   sourcemap?: boolean | string;
+  format: string;
 }
-export const zip = ({ filePath, zipName, include, sourcemap }: IZipOptions) => {
+export const zip = ({ filePath, zipName, include, sourcemap, format }: IZipOptions) => {
   return new Promise(async (resolve) => {
     const archive = archiver("zip", {
       zlib: { level: 9 },
@@ -34,6 +35,10 @@ export const zip = ({ filePath, zipName, include, sourcemap }: IZipOptions) => {
         await access(sourcemapPath);
         archive.append(createReadStream(sourcemapPath), { name: sourcemapName });
       } catch (error) {}
+    }
+
+    if (format == "esm") {
+      archive.append('{"type":"module"}', { name: "package.json" });
     }
 
     if (include && include.every((x) => typeof x == "string")) {

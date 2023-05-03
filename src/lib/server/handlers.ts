@@ -1,6 +1,12 @@
-import { ILambdaMock, LambdaEndpoint } from "../runtime/lambdaMock";
+import { ILambdaMock, LambdaEndpoint } from "../runtime/rapidApi";
+import { log } from "../utils/colorize";
+import type { normalizedSearchParams } from "../../plugins/lambda/events/common";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "ANY";
+const customInvokeUrls = ["@invoke", "@url"];
+
+const invalidParams = (lambdaName: string) => log.YELLOW(`Invalid Request Headers or query string for ${lambdaName}`);
+// const canMatchWithTrailingSlash = (reqPath: string, declaredPath: string) => {};
 
 export class Handlers {
   static handlers: ILambdaMock[] = [];
@@ -14,7 +20,7 @@ export class Handlers {
   static parseNameFromUrl(lambdaName: string) {
     const components = lambdaName.split("/");
 
-    let name = components[1] == "@invoke" ? components[2] : components[3];
+    let name = customInvokeUrls.includes(components[1]) ? components[2] : components[3];
     name = decodeURIComponent(name);
     if (name.includes(":function")) {
       const arnComponent = name.split(":");
@@ -30,10 +36,49 @@ export class Handlers {
     const name = Handlers.parseNameFromUrl(lambdaName);
     return Handlers.handlers.find((x) => x.name == name || x.outName == name);
   }
-  getHandler({ method, path, kind, headers, query }: { method: HttpMethod; path: string; headers: { [key: string]: string[] }; kind?: string | null; query: URLSearchParams }) {
-    const hasNotWilcard = !path.includes("*");
-    const hasNotBrackets = !path.includes("{") && !path.includes("}");
 
+  static #matchAlbQuery = (query: LambdaEndpoint["query"], reqQuery: normalizedSearchParams) => {
+    const matchesAll: boolean[] = [];
+
+    const queryAsString = reqQuery.toString();
+    query!.forEach((q) => {
+      const matches: boolean = q.some(({ Key, Value }) => {
+        if (Key) {
+          const keysValues = reqQuery[Key.toLowerCase()];
+          if (!Value) {
+            log.RED("alb conditions query must have 'Value' when 'Key' is specified");
+            return false;
+          }
+          if (keysValues) {
+            return keysValues.includes(Value.toLowerCase());
+          } else {
+            return false;
+          }
+        } else if (Value) {
+          // in AWS when no Key is provided, Value = URLSearchParams's Key
+          return queryAsString == Value.toLowerCase();
+        }
+      });
+
+      matchesAll.push(matches);
+    });
+
+    return matchesAll.every((x) => x === true);
+  };
+
+  static findHandler = ({
+    method,
+    path,
+    kind,
+    headers,
+    query,
+  }: {
+    method: HttpMethod;
+    path: string;
+    headers: { [key: string]: string[] };
+    kind?: string | null;
+    query: normalizedSearchParams;
+  }) => {
     let foundLambda: { event: LambdaEndpoint; handler: ILambdaMock } | undefined;
     const kindToLowerCase = kind?.toLowerCase();
 
@@ -42,39 +87,45 @@ export class Handlers {
         .filter((e) => (kind ? e.kind == kindToLowerCase : e))
         .find((w) => {
           if (w.kind == "apg") {
-            const isValidApgEvent = hasNotBrackets && w.paths.includes(path) && (w.methods.includes("ANY") || w.methods.includes(method));
+            const matchsPath = w.paths.includes(path);
+            // if (!matchsPath) {
+            //   const canMatch = canMatchWithTrailingSlash(path, w.paths[0]);
+            // }
+            const isValidApgEvent = matchsPath && (w.methods.includes("ANY") || w.methods.includes(method));
             if (isValidApgEvent) {
-              foundLambda = {
-                event: w,
-                handler: x,
-              };
+              const matches: boolean[] = [isValidApgEvent];
+
+              if (w.headers) {
+                matches.push(w.headers.every((h) => h in headers));
+              }
+              if (w.querystrings) {
+                matches.push(w.querystrings.every((q) => q in query));
+              }
+
+              const matchesAll = matches.every((x) => x === true);
+
+              if (matchesAll) {
+                foundLambda = {
+                  event: w,
+                  handler: x,
+                };
+              } else {
+                invalidParams(x.name);
+              }
+              return matchesAll;
             }
-            return isValidApgEvent;
           }
-          const isValidAlbEvent = hasNotWilcard && w.paths.includes(path) && (w.methods.includes("ANY") || w.methods.includes(method));
+          const isValidAlbEvent = w.paths.includes(path) && (w.methods.includes("ANY") || w.methods.includes(method));
           if (isValidAlbEvent) {
             const matches: boolean[] = [isValidAlbEvent];
 
             if (w.query) {
-              const hasRequiredQueryString = Object.keys(w.query).some((k) => {
-                const value = query.get(k);
-
-                return typeof value == "string" && value == w.query![k];
-              });
-
-              matches.push(hasRequiredQueryString);
+              matches.push(Handlers.#matchAlbQuery(w.query, query));
             }
 
             if (w.header) {
-              const foundHeader = headers[w.header.name.toLowerCase()];
-
-              if (foundHeader) {
-                const hasRequiredHeader = w.header.values.some((v) => foundHeader.find((val) => val == v));
-
-                matches.push(hasRequiredHeader);
-              } else {
-                matches.push(false);
-              }
+              const matchsAllHeaders = w.header.every((x) => headers[x.name.toLowerCase()] && x.values.some((v) => headers[x.name.toLowerCase()].find((s) => s == v)));
+              matches.push(matchsAllHeaders);
             }
 
             const matchesAll = matches.every((x) => x === true);
@@ -84,6 +135,8 @@ export class Handlers {
                 event: w,
                 handler: x,
               };
+            } else {
+              invalidParams(x.name);
             }
 
             return matchesAll;
@@ -95,18 +148,23 @@ export class Handlers {
       return foundLambda;
     } else {
       // Use Regex to find lambda controller
+      const pathComponentsLength = path.split("/").filter(Boolean).length;
       const foundHandler = Handlers.handlers.find((x) =>
         x.endpoints
           .filter((e) => (kind ? e.kind == kindToLowerCase : e))
           .find((w) => {
-            const hasPath = w.paths.find((p) => {
-              const AlbAnyPathMatch = p.replace(/\*/g, ".*").replace(/\//g, "\\/");
-              const ApgPathPartMatch = p.replace(/\{[\w.:-]+\+?\}/g, ".*").replace(/\//g, "\\/");
+            const hasPath = w.paths.find((p, i) => {
+              const isValid = path.match(w.pathsRegex[i]);
+              if (w.kind == "alb") {
+                return isValid;
+              } else {
+                const hasPlus = p.includes("+") || p == "/*";
 
-              const AlbPattern = new RegExp(`^${AlbAnyPathMatch}$`, "g");
-              const ApgPattern = new RegExp(`^${ApgPathPartMatch}$`, "g");
-
-              return (w.kind == "alb" && hasNotWilcard && AlbPattern.test(path)) || (w.kind == "apg" && hasNotBrackets && ApgPattern.test(path));
+                if (hasPlus) {
+                  return isValid;
+                }
+                return isValid && p.split("/").filter(Boolean).length == pathComponentsLength;
+              }
             });
 
             const isValidEvent = hasPath && (w.methods.includes("ANY") || w.methods.includes(method));
@@ -115,25 +173,19 @@ export class Handlers {
 
               if (w.kind == "alb") {
                 if (w.query) {
-                  const hasRequiredQueryString = Object.keys(w.query).some((k) => {
-                    const value = query.get(k);
-
-                    return typeof value == "string" && value == w.query![k];
-                  });
-
-                  matches.push(hasRequiredQueryString);
+                  matches.push(Handlers.#matchAlbQuery(w.query, query));
                 }
 
                 if (w.header) {
-                  const foundHeader = headers[w.header.name.toLowerCase()];
-
-                  if (foundHeader) {
-                    const hasRequiredHeader = w.header.values.some((v) => foundHeader.find((val) => val == v));
-
-                    matches.push(hasRequiredHeader);
-                  } else {
-                    matches.push(false);
-                  }
+                  const matchsAllHeaders = w.header.every((x) => headers[x.name.toLowerCase()] && x.values.some((v) => headers[x.name.toLowerCase()].find((s) => s == v)));
+                  matches.push(matchsAllHeaders);
+                }
+              } else {
+                if (w.headers) {
+                  matches.push(w.headers.every((h) => h in headers));
+                }
+                if (w.querystrings) {
+                  matches.push(w.querystrings.every((q) => q in query));
                 }
               }
 
@@ -143,6 +195,8 @@ export class Handlers {
                   event: w,
                   handler: x,
                 };
+              } else {
+                invalidParams(x.name);
               }
 
               return matchesAll;
@@ -154,7 +208,7 @@ export class Handlers {
         return foundLambda;
       }
     }
-  }
+  };
 
   addHandler(lambdaController: ILambdaMock) {
     const foundIndex = Handlers.handlers.findIndex((x) => x.name == lambdaController.name && x.esOutputPath == lambdaController.esOutputPath);
@@ -164,12 +218,16 @@ export class Handlers {
       if (this.debug) {
         if (lambdaController.endpoints.length) {
           lambdaController.endpoints.forEach((x) => {
+            const color = x.kind == "alb" ? "36" : "35";
             x.paths.forEach((p) => {
-              this.#printPath(x.methods.join(" "), p);
+              this.#printPath(x.methods.join(" "), p, color);
             });
           });
         } else {
           this.#printPath("ANY", `/@invoke/${lambdaController.name}`);
+        }
+        if (lambdaController.url) {
+          this.#printPath("ANY", `/@url/${lambdaController.name}`, "34");
         }
       }
     } else {
@@ -179,8 +237,8 @@ export class Handlers {
     }
   }
 
-  #printPath(method: string, path: string) {
+  #printPath(method: string, path: string, color: string = "90") {
     const printingString = `${method}\thttp://localhost:${Handlers.PORT}${path}`;
-    console.log(`\x1b[36m${printingString}\x1b[0m`);
+    console.log(`\x1b[${color}m${printingString}\x1b[0m`);
   }
 }

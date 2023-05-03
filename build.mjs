@@ -10,7 +10,7 @@ const compileDeclarations = () => {
     console.log(error.output?.[1]?.toString());
   }
 };
-const external = ["esbuild", "archiver", "serve-static"];
+const external = ["esbuild", "archiver", "serve-static", "@aws-sdk/eventstream-codec"];
 const watchPlugin = {
   name: "watch-plugin",
   setup: (build) => {
@@ -40,7 +40,7 @@ const buildIndex = bundle.bind(null, {
     "./src/index.ts",
     "./src/server.ts",
     "./src/defineConfig.ts",
-    "./src/lib/runtime/worker.ts",
+    "./src/lib/runtime/runners/node.ts",
     "./src/lambda/router.ts",
     "./src/plugins/sns/index.ts",
     "./src/plugins/sqs/index.ts",
@@ -51,7 +51,15 @@ const buildIndex = bundle.bind(null, {
 
 const buildRouterESM = bundle.bind(null, {
   ...esBuildConfig,
-  entryPoints: ["./src/lambda/router.ts", "./src/server.ts", "./src/lambda/body-parser.ts"],
+  entryPoints: [
+    "./src/lambda/router.ts",
+    "./src/server.ts",
+    "./src/lambda/body-parser.ts",
+    "./src/defineConfig.ts",
+    "./src/plugins/sns/index.ts",
+    "./src/plugins/sqs/index.ts",
+    "./src/plugins/s3/index.ts",
+  ],
   format: "esm",
   outExtension: { ".js": ".mjs" },
 });

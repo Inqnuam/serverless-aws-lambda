@@ -5,6 +5,7 @@ import { parseDdbStreamDefinitions } from "./ddbStream";
 import { parseS3 } from "./s3";
 import { parseKinesis } from "./kinesis";
 import { parseSqs } from "./sqs";
+import { parseDocumentDb } from "./documentDb";
 
 const supportedServices: IDestination["kind"][] = ["lambda", "sns", "sqs"];
 type arn = [string, string, IDestination["kind"], string, string, string, string];
@@ -19,6 +20,7 @@ export const parseEvents = (events: any[], Outputs: any, resources: any, httpApi
   const ddb: any[] = [];
   const s3: any[] = [];
   const kinesis: any[] = [];
+  const documentDb: any[] = [];
   for (const event of events) {
     const slsEvent = parseEndpoints(event, httpApiPayload);
     const snsEvent = parseSns(Outputs, resources, event);
@@ -26,6 +28,8 @@ export const parseEvents = (events: any[], Outputs: any, resources: any, httpApi
     const ddbStream = parseDdbStreamDefinitions(Outputs, resources, event);
     const s3Event = parseS3(event);
     const kinesisStream = parseKinesis(event, Outputs, resources);
+    const docDbStream = parseDocumentDb(Outputs, resources, event);
+
     if (slsEvent) {
       endpoints.push(slsEvent);
     }
@@ -47,9 +51,13 @@ export const parseEvents = (events: any[], Outputs: any, resources: any, httpApi
     if (kinesisStream) {
       kinesis.push(kinesisStream);
     }
+
+    if (docDbStream) {
+      documentDb.push(docDbStream);
+    }
   }
 
-  return { ddb, endpoints, s3, sns, sqs, kinesis };
+  return { ddb, endpoints, s3, sns, sqs, kinesis, documentDb };
 };
 
 export const parseDestination = (destination: any, Outputs: any, resources: any): IDestination | undefined => {

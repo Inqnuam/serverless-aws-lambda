@@ -22,7 +22,7 @@ import { playersController } from "../controllers/playersController";
 
 const route = Router();
 
-route.handle(auth, playersController);
+route.use(auth, playersController);
 
 route.use((error, req, res, next) => {
   console.log(error);
@@ -32,9 +32,7 @@ route.use((error, req, res, next) => {
 export default route;
 ```
 
-`route.handle` is similar to Express [app.METHOD("/somePath, ...")](https://expressjs.com/en/4x/api.html#app), a function (async or not) which accepts 3 arguments. request, response and next.
-
-It is also possible to use `route.use` instead of `route.handle`.
+`route.use` is similar to Express [app.use(...)](https://expressjs.com/en/4x/api.html#app), a function (async or not) which accepts 3-4 arguments. request, response and next.
 
 ```js
 const route = Router();
@@ -63,28 +61,32 @@ route.use(auth).use(playersController).use(errorHandler);
 or with multi argument:
 
 ```js
-const route = Router();
+import { Router } from "serverless-aws-lambda/router";
+
+const handler = Router();
 
 const errorHandler = (error, req, res, next) => {
   console.log(error);
   res.status(500).send("Internal Server Error");
 };
 
-route.use(auth, playersController, errorHandler);
+handler.use(auth, playersController, errorHandler);
+
+export { handler };
 ```
 
 ### Request
 
-| property | type      | doc                                                                                                                                                                                    | info                                                                                                                              |
-| -------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| body     | any       | [doc](https://expressjs.com/en/4x/api.html#req.body)                                                                                                                                   | Request with json content-type are automatically parsed. Use body-parser middleware from the package to parse Form Data and files |
-| cookies  | key-value | [doc](https://expressjs.com/en/4x/api.html#req.cookies)                                                                                                                                | compatible with Express's cookie-parser                                                                                           |
-| method   | string    | [doc](https://expressjs.com/en/4x/api.html#req.method)                                                                                                                                 |                                                                                                                                   |
-| params   | string[]  | As we don't handle custom routes we can't support named params, instead `params` will return an array of string containing `path` components separated by `/` (without `query` string) | Not compatible with Express                                                                                                       |
-| path     | string    | [doc](https://expressjs.com/en/4x/api.html#req.path)                                                                                                                                   |                                                                                                                                   |
-| protocol | string    | [doc](https://expressjs.com/en/4x/api.html#req.protocol)                                                                                                                               |                                                                                                                                   |
-| query    | key-value | [doc](https://expressjs.com/en/4x/api.html#req.query)                                                                                                                                  |                                                                                                                                   |
-| get      | function  | [doc](https://expressjs.com/en/4x/api.html#req.get)                                                                                                                                    |                                                                                                                                   |
+| property | type      | doc                                                                                                                                                                                    | info                                                                                                                                                      |
+| -------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| body     | any       | [doc](https://expressjs.com/en/4x/api.html#req.body)                                                                                                                                   | Request with json content-type are automatically parsed. Use body-parser middleware from `serverless-aws-lambda/body-parser` to parse Form Data and files |
+| cookies  | key-value | [doc](https://expressjs.com/en/4x/api.html#req.cookies)                                                                                                                                | compatible with Express's cookie-parser                                                                                                                   |
+| method   | string    | [doc](https://expressjs.com/en/4x/api.html#req.method)                                                                                                                                 |                                                                                                                                                           |
+| params   | string[]  | As we don't handle custom routes we can't support named params, instead `params` will return an array of string containing `path` components separated by `/` (without `query` string) | Not compatible with Express                                                                                                                               |
+| path     | string    | [doc](https://expressjs.com/en/4x/api.html#req.path)                                                                                                                                   |                                                                                                                                                           |
+| protocol | string    | [doc](https://expressjs.com/en/4x/api.html#req.protocol)                                                                                                                               |                                                                                                                                                           |
+| query    | key-value | [doc](https://expressjs.com/en/4x/api.html#req.query)                                                                                                                                  |                                                                                                                                                           |
+| get      | function  | [doc](https://expressjs.com/en/4x/api.html#req.get)                                                                                                                                    |                                                                                                                                                           |
 
 ++ includes also `event` raw object from AWS Lambda (except "`cookies`" which can be easly parsed with `cookie-parser` middleware)
 
@@ -110,4 +112,9 @@ route.use(auth, playersController, errorHandler);
 
 ### Next
 
-similar to ExpressJs next function
+Similar to ExpressJs next function.
+
+`next()` can take one argument.  
+If an argument is provided Router triggers next middleware which has 4 arguments.  
+This is usally used to handle errors (see examples above).  
+Check Express documentation for more info.

@@ -1,18 +1,15 @@
 import http, { Server, IncomingMessage, ServerResponse } from "http";
 import { AddressInfo } from "net";
 import { networkInterfaces } from "os";
-import { Handlers, HttpMethod } from "./handlers";
-import { ILambdaMock, LambdaMock, LambdaEndpoint } from "../runtime/lambdaMock";
+import { Handlers } from "./handlers";
+import { ILambdaMock, LambdaMock } from "../runtime/rapidApi";
 import { log } from "../utils/colorize";
-import { checkHeaders } from "../utils/checkHeaders";
 import inspector from "inspector";
-import { html404, html500 } from "../utils/htmlStatusMsg";
+import { html404 } from "../../plugins/lambda/htmlStatusMsg";
 import serveStatic from "serve-static";
 import { randomUUID } from "crypto";
-import { invokeRequests } from "../../plugins/lambda/index";
-
-const accountId = Buffer.from(randomUUID()).toString("hex").slice(0, 16);
-const apiId = Buffer.from(randomUUID()).toString("ascii").slice(0, 10);
+import { CommonEventGenerator } from "../../plugins/lambda/events/common";
+import { defaultServer } from "../../plugins/lambda/defaultServer";
 
 let localIp: string;
 if (networkInterfaces) {
@@ -31,84 +28,6 @@ if (debuggerIsAttached) {
   console.warn("Lambdas timeout are disabled when a Debugger is attached");
 }
 
-interface AlbEvent {
-  requestContext: {
-    elb: {
-      targetGroupArn: string;
-    };
-  };
-  multiValueHeaders?: {
-    [key: string]: string[];
-  };
-
-  multiValueQueryStringParameters?: {
-    [key: string]: string[];
-  };
-  queryStringParameters?: { [key: string]: string };
-  headers?: { [key: string]: any };
-  httpMethod: string;
-  path: string;
-  isBase64Encoded: boolean;
-  body?: string;
-}
-
-interface CommonApgEvent {
-  version: string;
-  body?: string;
-  queryStringParameters: { [key: string]: string };
-  isBase64Encoded: boolean;
-  headers: { [key: string]: any };
-  pathParameters?: { [key: string]: any };
-}
-
-type ApgHttpApiEvent = {
-  routeKey: string;
-  rawPath: string;
-  rawQueryString: string;
-  cookies?: string[];
-  requestContext: {
-    accountId: string;
-    apiId: string;
-    domainName: string;
-    domainPrefix: string;
-    http: {
-      method: string;
-      path: string;
-      protocol: string;
-      sourceIp: string;
-      userAgent: string;
-    };
-    requestId: string;
-    routeKey: string;
-    stage: string;
-    time: string;
-    timeEpoch: number;
-  };
-} & CommonApgEvent;
-
-type ApgHttpEvent = {
-  resource: string;
-  path: string;
-  httpMethod: string;
-  multiValueHeaders: { [key: string]: any };
-  multiValueQueryStringParameters: { [key: string]: any };
-  requestContext: {
-    accountId: string;
-    apiId: string;
-    domainName: string;
-    domainPrefix: string;
-    extendedRequestId: string;
-    httpMethod: string;
-    path: string;
-    protocol: string;
-    requestId: string;
-    requestTime: string;
-    requestTimeEpoch: number;
-    resourcePath: string;
-    stage: string;
-  };
-} & CommonApgEvent;
-
 interface IDaemonConfig {
   debug: boolean;
 }
@@ -120,17 +39,40 @@ export class Daemon extends Handlers {
     method?: string | string[];
     filter: RegExp | string;
     callback: (req: any, res: any) => Promise<any> | any | undefined;
-  }[] = [invokeRequests];
+  }[] = [];
   onReady?: (port: number, ip: string) => any;
   stop(cb: (err?: any) => void) {
     this.#server.close(cb);
   }
   constructor(config: IDaemonConfig = { debug: false }) {
     super(config);
+    log.setDebug(config.debug);
+    // @ts-ignore
+    globalThis.sco = [];
     this.#server = http.createServer({ maxHeaderSize: 105536 }, this.#requestListener.bind(this));
+    this.#server.on("connection", (socket) => {
+      socket.on("close", () => {
+        // @ts-ignore
+        const connectionIndex = globalThis.sco.findIndex((x) => x == socket);
+        if (connectionIndex != -1) {
+          // @ts-ignore
+          globalThis.sco.splice(connectionIndex, 1);
+        }
+      });
+      // @ts-ignore
+      globalThis.sco.push(socket);
+    });
+    const uuid = randomUUID();
+    CommonEventGenerator.accountId = Buffer.from(uuid).toString("hex").slice(0, 16);
+    CommonEventGenerator.apiId = Buffer.from(uuid).toString("ascii").slice(0, 10);
+    CommonEventGenerator.port = this.port;
   }
   get port() {
     return Handlers.PORT;
+  }
+  set port(p) {
+    Handlers.PORT = p;
+    CommonEventGenerator.port = p;
   }
 
   set serve(root: string) {
@@ -151,7 +93,7 @@ export class Daemon extends Handlers {
     this.#server.listen(port, async () => {
       const { port: listeningPort, address } = this.#server.address() as AddressInfo;
 
-      Handlers.PORT = listeningPort;
+      this.port = listeningPort;
       if (localIp) {
         Handlers.ip = localIp;
       }
@@ -170,7 +112,7 @@ export class Daemon extends Handlers {
     });
   }
 
-  #findCustomOfflineRequest(method: string, pathname: string) {
+  #findRequestHandler(method: string, pathname: string) {
     pathname = pathname.endsWith("/") ? pathname : `${pathname}/`;
     const foundCustomCallback = this.customOfflineRequests.find((x) => {
       let validPath = false;
@@ -199,13 +141,13 @@ export class Daemon extends Handlers {
     }
   }
   async #requestListener(req: IncomingMessage, res: ServerResponse) {
-    const { url, method, headers, rawHeaders } = req;
+    const { url, method } = req;
     const parsedURL = new URL(url as string, "http://localhost:3003");
 
-    const customCallback = this.#findCustomOfflineRequest(method!, parsedURL.pathname);
+    const customCallback = this.#findRequestHandler(method!, parsedURL.pathname);
 
     if (customCallback) {
-      //SECTION: Route provided by client in config file and/or by plugins
+      //SECTION: Route @invoke, @url and other routes provided by plugins
       try {
         await customCallback(req, res);
       } catch (err) {
@@ -214,459 +156,28 @@ export class Daemon extends Handlers {
         }
       }
     } else {
-      //SECTION: ALB and APG server
+      // fallback to ALB and APG server
 
-      const { searchParams } = parsedURL;
-      const multiValueHeaders = this.#getMultiValueHeaders(rawHeaders);
-
-      let body = Buffer.alloc(0);
-      let requestMockType: string | undefined | null = undefined;
-
-      if (parsedURL.searchParams.get("x_mock_type") !== null) {
-        requestMockType = parsedURL.searchParams.get("x_mock_type");
-      } else if (headers["x-mock-type"]) {
-        if (Array.isArray(headers["x-mock-type"])) {
-          requestMockType = headers["x-mock-type"][0];
-        } else {
-          requestMockType = headers["x-mock-type"];
-        }
-      }
-
-      const lambdaController = this.getHandler({
-        headers: multiValueHeaders,
-        query: searchParams,
-        method: method as HttpMethod,
-        path: decodeURIComponent(parsedURL.pathname),
-        kind: requestMockType,
+      req.on("error", (err) => {
+        console.error(err.stack);
       });
 
-      if (lambdaController) {
-        const mockEvent = lambdaController.event;
+      const foundLambda = await defaultServer(req, res, parsedURL);
 
-        try {
-          checkHeaders(headers, mockEvent.kind);
-        } catch (error: any) {
-          res.statusCode = 400;
-          res.setHeader("Content-Type", "text/html");
-          return res.end(error.message);
-        }
-        // TODO: create a class which handles the request and response parsing/checking based on event kind
-        let event =
-          mockEvent.kind == "alb"
-            ? this.#convertReqToAlbEvent(req, mockEvent, multiValueHeaders)
-            : this.#convertReqToApgEvent(req, mockEvent, lambdaController.handler.outName, multiValueHeaders);
-
-        req
-          .on("data", (chunk) => {
-            body += chunk;
-          })
-          .on("end", async () => {
-            const isBase64 = headers["content-type"]?.includes("multipart/form-data");
-            event.body = body.length ? body.toString() : mockEvent.kind == "alb" ? "" : undefined;
-
-            if (isBase64 && event.body) {
-              event.body = Buffer.from(event.body).toString("base64");
-            }
-
-            if (this.debug) {
-              log.YELLOW(`${mockEvent.kind.toUpperCase()} event`);
-              console.log(event);
-            }
-            this.#responseHandler(res, event, lambdaController.handler, method as HttpMethod, parsedURL.pathname, mockEvent);
-          })
-          .on("error", (err) => {
-            console.error(err.stack);
-          });
-      } else if (this.#serve) {
-        this.#serve(req, res, () => {
-          res.setHeader("Content-Type", "text/html");
-          res.statusCode = 404;
-          res.end(html404);
-        });
-      } else {
+      const notFound = () => {
         res.setHeader("Content-Type", "text/html");
         res.statusCode = 404;
         res.end(html404);
-      }
-    }
-  }
-
-  async #responseHandler(res: ServerResponse, event: any, lambdaController: ILambdaMock, method: HttpMethod, path: string, mockEvent: LambdaEndpoint) {
-    if (this.debug) {
-      const hrTimeStart = process.hrtime();
-
-      res.on("close", () => {
-        const endAt = process.hrtime(hrTimeStart);
-        const execTime = `${endAt[0]},${endAt[1]}s`;
-        const executedTime = `⌛️ '${lambdaController.name}' execution time: ${execTime}`;
-        // NOTE: as main and worker process share the same stdout we need a timeout before printing any additionnal info
-        setTimeout(() => {
-          log.YELLOW(executedTime);
-        }, 400);
-      });
-    }
-
-    try {
-      const date = new Date();
-      const awsRequestId = randomUUID();
-      log.CYAN(`${date.toLocaleDateString()} ${date.toLocaleTimeString()} requestId: ${awsRequestId} | '${lambdaController.name}' ${method} ${path}`);
-
-      if (mockEvent.async) {
-        res.statusCode = 200;
-        res.end();
-      }
-      const responseData = await lambdaController.invoke(event, mockEvent);
-      if (!res.writableFinished) {
-        this.#setResponseHead(res, responseData, mockEvent);
-        if (!res.writableFinished) {
-          this.#writeResponseBody(res, responseData, mockEvent.kind);
-        }
-      }
-    } catch (error) {
-      if (!res.writableFinished) {
-        res.statusCode = 500;
-        res.setHeader("Content-Type", "text/html");
-        res.end(html500);
-      }
-    }
-  }
-
-  #setResponseHead(res: ServerResponse, responseData: any, mockEvent: LambdaEndpoint) {
-    if (mockEvent.kind == "alb") {
-      res.setHeader("Server", "awselb/2.0");
-      const { statusDescription } = responseData;
-      if (typeof responseData.statusCode == "number" && typeof statusDescription == "string") {
-        const descComponents = statusDescription.split(" ");
-        if (isNaN(descComponents[0] as unknown as number)) {
-          log.RED("statusDescription must start with a statusCode number followed by a space + status description text");
-          log.YELLOW("example: '200 Found'");
-        } else {
-          const desc = descComponents.slice(1).join(" ");
-          if (desc.length) {
-            res.statusMessage = desc;
-          }
-        }
-      }
-    } else if (mockEvent.kind == "apg") {
-      res.setHeader("Apigw-Requestid", Buffer.from(randomUUID()).toString("base64").slice(0, 16));
-    }
-
-    res.setHeader("Date", new Date().toUTCString());
-
-    if (responseData) {
-      if (mockEvent.kind == "alb") {
-        if (mockEvent.multiValueHeaders) {
-          if (responseData.multiValueHeaders) {
-            const headersKeys = Object.keys(responseData.multiValueHeaders).filter((key) => key !== "Server" && key !== "Apigw-Requestid" && key !== "Date");
-            headersKeys.forEach((key) => {
-              if (Array.isArray(responseData.multiValueHeaders[key])) {
-                res.setHeader(key, responseData.multiValueHeaders[key]);
-              } else {
-                log.RED("multiValueHeaders values must be an array");
-                log.YELLOW("example:");
-                log.GREEN("'Content-Type': ['application/json']");
-              }
-            });
-          } else if (responseData.headers) {
-            log.RED("An ALB Lambda with 'multiValueHeaders enabled' must return 'multiValueHeaders' instead of 'headers'");
-            res.statusCode = 502;
-            res.setHeader("Content-Type", "text/html; charset=utf-8");
-            res.end(html500);
-          }
-        } else {
-          if (typeof responseData.headers == "object" && !Array.isArray(responseData.headers)) {
-            const headersKeys = Object.keys(responseData.headers).filter((key) => key !== "Server" && key !== "Apigw-Requestid" && key !== "Date");
-            headersKeys.forEach((key) => {
-              res.setHeader(key, responseData.headers[key]);
-            });
-          }
-        }
-      } else {
-        if (typeof responseData.headers == "object" && !Array.isArray(responseData.headers)) {
-          const headersKeys = Object.keys(responseData.headers).filter((key) => key !== "Server" && key !== "Apigw-Requestid" && key !== "Date");
-          headersKeys.forEach((key) => {
-            res.setHeader(key, responseData.headers[key]);
-          });
-        }
-
-        if (mockEvent.version == 1 && responseData.multiValueHeaders) {
-          const headersKeys = Object.keys(responseData.multiValueHeaders).filter((key) => key !== "Server" && key !== "Apigw-Requestid" && key !== "Date");
-          headersKeys.forEach((key) => {
-            if (Array.isArray(responseData.multiValueHeaders[key])) {
-              res.setHeader(key, responseData.multiValueHeaders[key]);
-            } else {
-              log.RED("multiValueHeaders values must be an array");
-              log.YELLOW("example:");
-              log.GREEN("'Content-Type': ['application/json']");
-            }
-          });
-        }
-      }
-
-      if (!responseData.statusCode) {
-        if (mockEvent.kind == "alb") {
-          log.RED("Invalid 'statusCode'.\nALB Lambdas must return a valid 'statusCode' number");
-          res.statusCode = 502;
-          res.setHeader("Content-Type", "text/html");
-          res.end(html500);
-        } else {
-          res.statusCode = 200;
-        }
-      } else {
-        if (mockEvent.kind == "alb") {
-          if (typeof responseData.statusCode == "number") {
-            res.statusCode = responseData.statusCode;
-          } else {
-            log.RED("Invalid 'statusCode'.\nALB Lambdas must return a valid 'statusCode' number");
-            res.statusCode = 502;
-          }
-        } else {
-          res.statusCode = responseData.statusCode;
-        }
-
-        if (responseData.cookies?.length) {
-          if (mockEvent.version == 2) {
-            res.setHeader("Set-Cookie", responseData.cookies);
-          } else {
-            log.RED(`'cookies' as return value is supported only in API Gateway HTTP API (httpApi).\nUse 'Set-Cookie' header instead`);
-          }
-        }
-      }
-    } else {
-      res.statusCode = mockEvent.kind == "alb" ? 502 : 200;
-    }
-  }
-
-  #writeResponseBody(res: ServerResponse, responseData: any, mockEvent: string) {
-    let resContent = "";
-    if (responseData) {
-      if (typeof responseData.body == "string") {
-        resContent = responseData.body;
-      } else if (responseData.body) {
-        console.log("response 'body' must be a string. Receievd", typeof responseData.body);
-      } else {
-        if (mockEvent == "apg") {
-          res.setHeader("Content-Type", "application/json");
-          if (typeof responseData == "string") {
-            resContent = responseData;
-          } else if (typeof responseData == "object") {
-            resContent = JSON.stringify(responseData);
-          }
-        } else {
-          res.setHeader("Content-Type", "application/octet-stream");
-        }
-      }
-    }
-    res.end(resContent);
-  }
-
-  #getMultiValueHeaders = (rawHeaders: string[]) => {
-    let multiValueHeaders: any = {};
-    const multiKeys = rawHeaders.filter((x, i) => i % 2 == 0).map((x) => x.toLowerCase());
-    const multiValues = rawHeaders.filter((x, i) => i % 2 !== 0);
-
-    multiKeys.forEach((x, i) => {
-      if (x == "x-mock-type") {
-        return;
-      }
-      if (multiValueHeaders[x]) {
-        multiValueHeaders[x].push(multiValues[i]);
-      } else {
-        multiValueHeaders[x] = [multiValues[i]];
-      }
-    });
-
-    return multiValueHeaders;
-  };
-  #convertReqToAlbEvent(req: IncomingMessage, mockEvent: LambdaEndpoint, multiValueHeaders: { [key: string]: string[] }) {
-    const { method, headers, url } = req;
-
-    const parsedURL = new URL(url as string, "http://localhost:3003");
-
-    let event: Partial<AlbEvent> = {
-      requestContext: {
-        elb: {
-          targetGroupArn: "arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/lambda-279XGJDqGZ5rsrHC2Fjr/49e9d65c45c6791a",
-        },
-      },
-      httpMethod: method as string,
-      path: parsedURL.pathname,
-      isBase64Encoded: false,
-    };
-
-    if (mockEvent.multiValueHeaders) {
-      event.multiValueHeaders = {
-        "x-forwarded-for": [String(req.socket.remoteAddress)],
-        "x-forwarded-proto": ["http"],
-        "x-forwarded-port": [String(this.port)],
-        ...multiValueHeaders,
       };
 
-      event.multiValueQueryStringParameters = {};
-
-      const parsedURL = new URL(url as string, "http://localhost:3003");
-      parsedURL.searchParams.delete("x_mock_type");
-
-      for (const k of Array.from(new Set(parsedURL.searchParams.keys()))) {
-        event.multiValueQueryStringParameters[k] = parsedURL.searchParams.getAll(k).map(encodeURI);
-      }
-    } else {
-      event.headers = {
-        "x-forwarded-for": req.socket.remoteAddress,
-        "x-forwarded-proto": "http",
-        "x-forwarded-port": this.port,
-        ...headers,
-      };
-      event.queryStringParameters = this.#paramsToAlbObject(url as string);
-
-      if (event.headers["x-mock-type"]) {
-        delete event.headers["x-mock-type"];
-      }
-      if (headers["content-type"]?.includes("multipart/form-data")) {
-        event.isBase64Encoded = true;
+      if (!foundLambda) {
+        if (this.#serve) {
+          this.#serve(req, res, notFound);
+        } else {
+          notFound();
+        }
       }
     }
-    return event;
-  }
-
-  #convertReqToApgEvent(req: IncomingMessage, mockEvent: LambdaEndpoint, lambdaName: string, multiValueHeaders: { [key: string]: string[] }): ApgHttpApiEvent | ApgHttpEvent {
-    const { method, headers, url } = req;
-
-    const parsedURL = new URL(url as string, "http://localhost:3003");
-    parsedURL.searchParams.delete("x_mock_type");
-
-    const paramDeclarations = mockEvent.paths[0].split("/");
-    const reqParams = parsedURL.pathname.split("/");
-
-    let pathParameters: any = {};
-
-    paramDeclarations.forEach((k, i) => {
-      if (k.startsWith("{") && k.endsWith("}") && !k.endsWith("+}")) {
-        pathParameters[k.slice(1, -1)] = reqParams[i];
-      }
-    });
-
-    const customHeaders: any = { "x-forwarded-for": req.socket.remoteAddress, "x-forwarded-proto": "http", "x-forwarded-port": this.port, ...headers };
-
-    let event: any;
-    if (mockEvent.version == 1) {
-      const multiValueQueryStringParameters: any = {};
-
-      for (const k of Array.from(new Set(parsedURL.searchParams.keys()))) {
-        multiValueQueryStringParameters[k] = parsedURL.searchParams.getAll(k);
-      }
-      const mergedMultiValueHeaders = {
-        "x-forwarded-for": [String(req.socket.remoteAddress)],
-        "x-forwarded-proto": ["http"],
-        "x-forwarded-port": [String(this.port)],
-        ...multiValueHeaders,
-      };
-      const apgEvent: ApgHttpEvent = {
-        version: "1.0",
-        resource: `/${lambdaName}`,
-        path: parsedURL.pathname,
-        httpMethod: method!,
-        headers: customHeaders,
-        multiValueHeaders: mergedMultiValueHeaders,
-        // @ts-ignore
-        queryStringParameters: Object.fromEntries(parsedURL.searchParams),
-        multiValueQueryStringParameters,
-        requestContext: {
-          accountId: String(accountId),
-          apiId: apiId,
-          domainName: `localhost:${this.port}`,
-          domainPrefix: "localhost",
-          extendedRequestId: "fake-id",
-          path: parsedURL.pathname,
-          protocol: "HTTP/1.1",
-          httpMethod: method!,
-          resourcePath: `/${lambdaName}`,
-          requestId: "",
-          requestTime: new Date().toISOString(),
-          requestTimeEpoch: Date.now(),
-          stage: "$local",
-        },
-        isBase64Encoded: false,
-      };
-      if (Object.keys(pathParameters).length) {
-        apgEvent.pathParameters = pathParameters;
-      }
-      event = apgEvent;
-    } else {
-      const customMethod = mockEvent.methods.find((x) => x == method) ?? "ANY";
-
-      let queryStringParameters: any = {};
-      let rawQueryString = "";
-      for (const k of Array.from(new Set(parsedURL.searchParams.keys()))) {
-        const values = parsedURL.searchParams.getAll(k);
-
-        rawQueryString += `&${values.map((x) => encodeURI(`${k}=${x}`)).join("&")}`;
-        queryStringParameters[k] = values.join(",");
-      }
-      if (rawQueryString) {
-        rawQueryString = rawQueryString.slice(1);
-      }
-
-      const apgEvent: ApgHttpApiEvent = {
-        version: "2.0",
-        routeKey: `${customMethod} ${parsedURL.pathname}`,
-        rawPath: parsedURL.pathname,
-        rawQueryString,
-        headers: customHeaders,
-        queryStringParameters,
-        isBase64Encoded: false,
-        requestContext: {
-          accountId: String(accountId),
-          apiId: apiId,
-          domainName: `localhost:${this.port}`,
-          domainPrefix: "localhost",
-          http: {
-            method: method as string,
-            path: parsedURL.pathname,
-            protocol: "HTTP/1.1",
-            sourceIp: "127.0.0.1",
-            userAgent: headers["user-agent"] ?? "",
-          },
-          requestId: "",
-          routeKey: `${method} ${parsedURL.pathname}`,
-          stage: "$local",
-          time: new Date().toISOString(),
-          timeEpoch: Date.now(),
-        },
-      };
-      if (Object.keys(pathParameters).length) {
-        apgEvent.pathParameters = pathParameters;
-      }
-      if (headers.cookie) {
-        apgEvent.cookies = headers.cookie.split("; ");
-      }
-
-      event = apgEvent;
-    }
-    if (event.headers["x-mock-type"]) {
-      delete event.headers["x-mock-type"];
-    }
-    if (headers["content-type"]?.includes("multipart/form-data")) {
-      event.isBase64Encoded = true;
-    }
-    return event;
-  }
-
-  #paramsToAlbObject(reqUrl: string) {
-    const queryStartIndex = reqUrl.indexOf("?");
-    if (queryStartIndex == -1) return {};
-
-    let queryStringComponents: any = {};
-    const queryString = reqUrl.slice(queryStartIndex + 1);
-    const queryComponents = queryString.split("&");
-
-    queryComponents.forEach((c) => {
-      const [key, value] = c.split("=");
-      queryStringComponents[key] = value;
-    });
-
-    delete queryStringComponents.x_mock_type;
-    return queryStringComponents;
   }
 
   async load(lambdaDefinitions: ILambdaMock[]) {

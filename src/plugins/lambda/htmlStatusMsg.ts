@@ -1,4 +1,4 @@
-export const html500 = `<html>
+export const html502 = `<html>
 
 <head>
 	<title>502 Bad Gateway</title>

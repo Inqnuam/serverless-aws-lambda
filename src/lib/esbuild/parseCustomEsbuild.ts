@@ -18,6 +18,10 @@ export const parseCustomEsbuild = (customConfig: BuildOptions) => {
     customEsBuild.sourceRoot = customConfig.sourceRoot;
   }
 
+  if (typeof customConfig.format == "string") {
+    customEsBuild.format = customConfig.format;
+  }
+
   if ("sourcesContent" in customConfig) {
     customEsBuild.sourcesContent = customConfig.sourcesContent;
   }

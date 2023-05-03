@@ -16,6 +16,9 @@ export const mergeEsbuildConfig = (esBuildConfig: BuildOptions, customEsBuildCon
   if (typeof customEsBuildConfig.sourceRoot == "string") {
     esBuildConfig.sourceRoot = customEsBuildConfig.sourceRoot;
   }
+  if (typeof customEsBuildConfig.format == "string") {
+    esBuildConfig.format = customEsBuildConfig.format;
+  }
 
   if ("sourcesContent" in customEsBuildConfig) {
     esBuildConfig.sourcesContent = customEsBuildConfig.sourcesContent;

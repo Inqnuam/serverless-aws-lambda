@@ -1,16 +1,22 @@
-const GREEN = (s: string) => {
-  console.log(`\x1b[32m${s}\x1b[0m`);
+let debug = false;
+
+const setDebug = (_debug: boolean) => {
+  debug = _debug;
 };
-const YELLOW = (s: string) => {
-  console.log(`\x1b[33m${s}\x1b[0m`);
+const getDebug = () => debug;
+
+const print = (color: string, s: string) => {
+  if (debug) {
+    console.log(`\x1b[${color}m${s}\x1b[0m`);
+  }
 };
-const RED = (s: string) => {
-  console.log(`\x1b[31m${s}\x1b[0m`);
-};
-const CYAN = (s: string) => {
-  console.log(`\x1b[36m${s}\x1b[0m`);
-};
-const BR_BLUE = (s: string) => {
-  console.log(`\x1b[94m${s}\x1b[0m`);
-};
-export const log = { GREEN, YELLOW, CYAN, BR_BLUE, RED };
+
+const RED = (s: string) => print("31", s);
+const GREEN = (s: string) => print("32", s);
+const YELLOW = (s: string) => print("33", s);
+const CYAN = (s: string) => print("36", s);
+const GREY = (s: string) => print("90", s);
+const BR_BLUE = (s: string) => print("94", s);
+const info = (s: any) => (debug ? console.log(s) : void 0);
+
+export const log = { GREEN, YELLOW, CYAN, BR_BLUE, RED, GREY, setDebug, getDebug, info };

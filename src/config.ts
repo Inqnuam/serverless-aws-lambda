@@ -1,6 +1,7 @@
 import type { BuildOptions, BuildResult } from "esbuild";
 import { IncomingMessage, ServerResponse } from "http";
 import type { HttpMethod } from "./lib/server/handlers";
+import type { awslambda } from "./lib/runtime/awslambda";
 export interface OfflineConfig {
   staticPath?: string;
   port?: number;
@@ -13,7 +14,7 @@ export interface OfflineConfig {
 }
 
 export interface Config {
-  esbuild?: Omit<BuildOptions, "entryPoints" | "outExtension" | "outfile" | "bundle" | "splitting" | "stdin" | "format" | "platforme" | "metafile">;
+  esbuild?: Omit<BuildOptions, "entryPoints" | "outExtension" | "outfile" | "bundle" | "splitting" | "stdin" | "platforme" | "metafile" | "format"> & { format?: "cjs" | "esm" };
   offline?: OfflineConfig;
   buildCallback?: (result: BuildResult, isRebuild: boolean) => Promise<void> | void;
   afterDeployCallbacks?: (() => Promise<void> | void)[];
@@ -25,4 +26,8 @@ export interface ServerConfig {
   debug?: boolean;
   port?: number;
   onRebuild?: () => Promise<void> | void;
+}
+
+declare global {
+  const awslambda: awslambda;
 }

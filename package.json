@@ -1,6 +1,6 @@
 {
   "name": "serverless-aws-lambda",
-  "version": "4.4.4",
+  "version": "4.5.0",
   "description": "AWS Application Load Balancer and API Gateway - Lambda dev tool for Serverless. Allows Express synthax in handlers. Supports packaging, local invoking and offline ALB, APG, S3, SNS, SQS, DynamoDB Stream server mocking.",
   "author": "Inqnuam",
   "license": "MIT",
@@ -17,7 +17,8 @@
     },
     "./defineConfig": {
       "types": "./dist/defineConfig.d.ts",
-      "require": "./dist/defineConfig.js"
+      "require": "./dist/defineConfig.js",
+      "import": "./dist/defineConfig.mjs"
     },
     "./router": {
       "types": "./dist/lambda/router.d.ts",
@@ -36,28 +37,32 @@
     },
     "./sns": {
       "types": "./dist/plugins/sns/index.d.ts",
-      "require": "./dist/plugins/sns/index.js"
+      "require": "./dist/plugins/sns/index.js",
+      "import": "./dist/plugins/sns/index.mjs"
     },
     "./sqs": {
       "types": "./dist/plugins/sqs/index.d.ts",
-      "require": "./dist/plugins/sqs/index.js"
+      "require": "./dist/plugins/sqs/index.js",
+      "import": "./dist/plugins/sqs/index.mjs"
     },
     "./s3": {
       "types": "./dist/plugins/s3/index.d.ts",
-      "require": "./dist/plugins/s3/index.js"
+      "require": "./dist/plugins/s3/index.js",
+      "import": "./dist/plugins/s3/index.mjs"
     }
   },
   "dependencies": {
+    "@aws-sdk/eventstream-codec": "^3.310.0",
     "@types/serverless": "^3.12.11",
     "archiver": "^5.3.1",
-    "esbuild": "0.17.15",
+    "esbuild": "0.17.18",
     "serve-static": "^1.15.0"
   },
   "devDependencies": {
-    "@types/archiver": "^5.3.1",
+    "@types/archiver": "^5.3.2",
     "@types/node": "^14.14.31",
     "@types/serve-static": "^1.15.1",
-    "typescript": "^4.9.5"
+    "typescript": "^5.0.4"
   },
   "keywords": [
     "aws",
@@ -73,6 +78,7 @@
     "s3",
     "stream",
     "dynamodb",
+    "documentdb",
     "invoke",
     "bundle",
     "esbuild",

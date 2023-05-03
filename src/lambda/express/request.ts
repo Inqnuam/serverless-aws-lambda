@@ -2,10 +2,10 @@ type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTION
 
 export interface RawAPIResponseContent {
   cookies?: string[];
-  isBase64Encoded: boolean;
+  isBase64Encoded?: boolean;
   statusCode: number;
-  headers: { [key: string]: any };
-  body: string | null | undefined;
+  headers?: { [key: string]: any };
+  body?: string | null | undefined;
 }
 
 export interface RawResponseContent {
@@ -13,22 +13,58 @@ export interface RawResponseContent {
   [key: string]: any;
 }
 
-export interface IRequest {
+interface KnownRequestProperties {
   requestContext: { [key: string]: any };
   httpMethod: HttpMethod;
   queryStringParameters: { [key: string]: string };
   path: string;
   headers: any;
   isBase64Encoded: boolean;
+  /**
+   * parsed queryStringParameters.
+   *
+   * Values may be `array` if multiValueQueryStringParameters is available and there's multiples values for the key.
+   *
+   */
   query: any;
+  /**
+   * Request body.
+   *
+   * Tries to parse with JSON.parse().
+   *
+   * Use `body-parser` middleware from `serverless-aws-lambda/body-parser` to parse Form-Data.
+   */
   body: any;
   method: HttpMethod;
-  get: (headerField: string) => { [key: string]: any } | undefined;
+  /**
+   * Get header value by key.
+   *
+   * Case insensitive.
+   */
+  get: (headerKey: string) => string | string[];
+  /**
+   * request url splitted with `/`.
+   */
   params: string[];
   protocol: string;
   secure: boolean;
+  /**
+   * Use `body-parser` middleware from `serverless-aws-lambda/body-parser` to get files as Buffers.
+   *
+   * Otherwise it will be undefined.
+   */
   files?: any[];
+  /**
+   * Use {@link https://www.npmjs.com/package/cookie-parser cookie-parser} middleware to get parsed cookies.
+   *
+   * Otherwise it will be undefined.
+   */
+  cookies?: {
+    [key: string]: any;
+  };
 }
+
+export type IRequest = KnownRequestProperties & { [key: string]: any };
 
 export const _buildUniversalEvent = (event: any) => {
   let uE = { ...event };
@@ -48,6 +84,7 @@ export const _buildUniversalEvent = (event: any) => {
         }
       }
     } else if (event.queryStringParameters) {
+      // TODO maybe getAll from search params ?
       for (const [key, value] of Object.entries(event.queryStringParameters)) {
         uE.query[key] = decodeURIComponent(value as string);
       }
