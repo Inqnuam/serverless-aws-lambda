@@ -1,11 +1,12 @@
 import { parentPort, workerData } from "worker_threads";
+import { createHook } from "async_hooks";
 import inspector from "inspector";
 import { ResponseStream } from "../streamResponse";
 import type { WritableOptions } from "stream";
 
 const debuggerIsAttached = inspector?.url() != undefined;
 let log: any = { RED: (s: string) => void 0 };
-
+const stackRegex = /\/.*(\d+):(\d+)/;
 let eventHandler: Function & { stream?: boolean; streamOpt?: any };
 const invalidResponse = new Error("Invalid response payload");
 const { AWS_LAMBDA_FUNCTION_NAME } = process.env;
@@ -16,7 +17,24 @@ if (workerData.debug) {
   };
   console = new Proxy(console, {
     get(obj: any, prop: string) {
-      process.stdout.write(`\x1b[90m${new Date().toISOString()}\t${prop.toUpperCase()}\t${AWS_LAMBDA_FUNCTION_NAME}\x1b[0m\n`);
+      if (typeof obj[prop] == "function") {
+        return (...params: any) => {
+          let stack = "";
+          try {
+            throw new Error();
+          } catch (err: any) {
+            try {
+              const line = stackRegex.exec(err.stack.split("at")[2])?.[0];
+              if (typeof line == "string") {
+                stack = line;
+              }
+            } catch (e) {}
+          } finally {
+            process.stdout.write(`\x1b[90m${new Date().toISOString()}\t${prop.toUpperCase()}\t${AWS_LAMBDA_FUNCTION_NAME}\t${stack}\x1b[0m\n`);
+            obj[prop](...params);
+          }
+        };
+      }
       return obj[prop];
     },
   });
@@ -66,16 +84,7 @@ const returnError = (awsRequestId: string, err: any) => {
   const data = genResponsePayload(err);
   parentPort!.postMessage({ channel: "fail", data, awsRequestId });
 };
-const getEventQueueLength = () => {
-  // only in nodejs 16+
-  let length = 0;
-  //@ts-ignore
-  if (process.getActiveResourcesInfo) {
-    //@ts-ignore
-    length = process.getActiveResourcesInfo().length;
-  }
-  return length - 2;
-};
+
 const returnResponse = (channel: string, awsRequestId: string, data: any) => {
   try {
     JSON.stringify(data);
@@ -89,8 +98,30 @@ const returnResponse = (channel: string, awsRequestId: string, data: any) => {
     returnError(awsRequestId, invalidResponse);
   }
 };
+class EventQueue extends Map {
+  static IGNORE = ["PROMISE", "RANDOMBYTESREQUEST", "PerformanceObserver", "TIMERWRAP"];
+  onEmpty?: () => void;
+  constructor() {
+    super();
+  }
+  isEmpty = () => {
+    const resources = [...this.values()].filter((r) => {
+      if (typeof r.hasRef === "function" && !r.hasRef()) return false;
+      return true;
+    });
 
-parentPort!.on("message", async (e: any) => {
+    return resources.length ? false : true;
+  };
+  add = (asyncId: number, type: string, triggerAsyncId: number, resource: any) => {
+    return EventQueue.IGNORE.includes(type) ? this : this.set(asyncId, resource);
+  };
+  destroy = (asyncId: number) => {
+    if (this.delete(asyncId) && this.isEmpty() && this.onEmpty) {
+      this.onEmpty();
+    }
+  };
+}
+const listener = async (e: any) => {
   const { channel, data, awsRequestId } = e;
 
   if (channel == "import") {
@@ -140,13 +171,6 @@ parentPort!.on("message", async (e: any) => {
     };
     let callbackWaitsForEmptyEventLoop = true;
     const commonContext = {
-      get callbackWaitsForEmptyEventLoop() {
-        return callbackWaitsForEmptyEventLoop;
-      },
-      set callbackWaitsForEmptyEventLoop(val) {
-        callbackWaitsForEmptyEventLoop = val;
-      },
-
       functionVersion: "$LATEST",
       functionName: workerData.name,
       memoryLimitInMB: workerData.memorySize,
@@ -191,7 +215,16 @@ parentPort!.on("message", async (e: any) => {
         return parentPort!.postMessage({ channel: "stream", data: contentType, awsRequestId, type: "ct" });
       });
 
-      const ret = eventHandler(event, streamRes, commonContext)?.catch?.((err: any) => {
+      const streamContext = {
+        get callbackWaitsForEmptyEventLoop() {
+          return callbackWaitsForEmptyEventLoop;
+        },
+        set callbackWaitsForEmptyEventLoop(val) {
+          callbackWaitsForEmptyEventLoop = val;
+        },
+        ...commonContext,
+      };
+      const ret = eventHandler(event, streamRes, streamContext)?.catch?.((err: any) => {
         streamRes.destroy();
         resIsSent();
         log.RED(err);
@@ -204,9 +237,20 @@ parentPort!.on("message", async (e: any) => {
         returnError(awsRequestId, new Error("Streaming does not support non-async handlers."));
       }
     } else {
-      // NOTE: this is a workaround for async versus callback lambda different behaviour
-      const queueInitLength = getEventQueueLength();
+      const eventQueue = new EventQueue();
+
+      createHook({
+        init: eventQueue.add,
+        destroy: eventQueue.destroy,
+      }).enable();
+
       const context = {
+        get callbackWaitsForEmptyEventLoop() {
+          return callbackWaitsForEmptyEventLoop;
+        },
+        set callbackWaitsForEmptyEventLoop(val) {
+          callbackWaitsForEmptyEventLoop = val;
+        },
         ...commonContext,
         succeed: (lambdaRes: any) => {
           if (isSent) {
@@ -236,12 +280,23 @@ parentPort!.on("message", async (e: any) => {
         },
       };
 
-      const callback = context.done;
+      let cbCalled: any;
+      const callback = (err: any, res: any) => {
+        if (!cbCalled) {
+          cbCalled = {
+            error: err,
+            res,
+          };
+        }
+      };
       try {
         const eventResponse = eventHandler(event, context, callback);
-
+        // NOTE: this is a workaround for async versus callback lambda different behaviour
         eventResponse
           ?.then?.((data: any) => {
+            if (cbCalled) {
+              return;
+            }
             clearInterval(lambdaTimeoutInterval);
             if (isSent) {
               return;
@@ -254,12 +309,24 @@ parentPort!.on("message", async (e: any) => {
             returnError(awsRequestId, err);
           });
 
-        if (typeof eventResponse?.then !== "function" && !isSent && queueInitLength >= 0) {
-          const currentQueueLength = getEventQueueLength();
-          const isEmpty = currentQueueLength >= 0 && currentQueueLength - (queueInitLength + 1) <= 0;
-          if (isEmpty) {
-            resIsSent();
-            returnResponse("return", awsRequestId, null);
+        if (!isSent && (typeof eventResponse?.then !== "function" || cbCalled)) {
+          const returnCallback = () => {
+            if (cbCalled) {
+              context.done(cbCalled.error, cbCalled.res);
+            } else {
+              resIsSent();
+              returnResponse("return", awsRequestId, null);
+            }
+          };
+
+          if (eventQueue.isEmpty()) {
+            returnCallback();
+          } else if (!cbCalled || callbackWaitsForEmptyEventLoop) {
+            eventQueue.onEmpty = () => {
+              returnCallback();
+            };
+          } else {
+            returnCallback();
           }
         }
       } catch (err) {
@@ -268,4 +335,5 @@ parentPort!.on("message", async (e: any) => {
       }
     }
   }
-});
+};
+parentPort!.on("message", listener);
