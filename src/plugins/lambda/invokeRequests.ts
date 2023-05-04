@@ -62,7 +62,6 @@ export const invokeRequests: OfflineRequest = {
       // required for destinations executions
       info.kind = "async";
     }
-    log.CYAN(`${date.toLocaleDateString()} ${date.toLocaleTimeString()} requestId: ${awsRequestId} | '${foundHandler.name}' ${method}`);
 
     try {
       const result = await foundHandler.invoke(body, info, clientContext);
@@ -83,7 +82,7 @@ export const invokeRequests: OfflineRequest = {
 
           res.end(response);
         } else {
-          res.end();
+          res.end(result === null ? "null" : undefined);
         }
       }
     } catch (error: any) {

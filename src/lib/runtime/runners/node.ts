@@ -1,15 +1,26 @@
 import { parentPort, workerData } from "worker_threads";
-import { log } from "../../utils/colorize";
 import inspector from "inspector";
 import { ResponseStream } from "../streamResponse";
 import type { WritableOptions } from "stream";
 
 const debuggerIsAttached = inspector?.url() != undefined;
-log.setDebug(workerData.debug);
+let log: any = { RED: (s: string) => void 0 };
 
 let eventHandler: Function & { stream?: boolean; streamOpt?: any };
 const invalidResponse = new Error("Invalid response payload");
 const { AWS_LAMBDA_FUNCTION_NAME } = process.env;
+
+if (workerData.debug) {
+  log.RED = (s: string) => {
+    process.stdout.write(`\x1b[31m${s}\x1b[0m\n`);
+  };
+  console = new Proxy(console, {
+    get(obj: any, prop: string) {
+      process.stdout.write(`\x1b[90m${new Date().toISOString()}\t${prop.toUpperCase()}\t${AWS_LAMBDA_FUNCTION_NAME}\x1b[0m\n`);
+      return obj[prop];
+    },
+  });
+}
 
 class Timeout extends Error {
   constructor(timeout: number, awsRequestId: string) {
@@ -55,7 +66,16 @@ const returnError = (awsRequestId: string, err: any) => {
   const data = genResponsePayload(err);
   parentPort!.postMessage({ channel: "fail", data, awsRequestId });
 };
-
+const getEventQueueLength = () => {
+  // only in nodejs 16+
+  let length = 0;
+  //@ts-ignore
+  if (process.getActiveResourcesInfo) {
+    //@ts-ignore
+    length = process.getActiveResourcesInfo().length;
+  }
+  return length - 2;
+};
 const returnResponse = (channel: string, awsRequestId: string, data: any) => {
   try {
     JSON.stringify(data);
@@ -185,7 +205,7 @@ parentPort!.on("message", async (e: any) => {
       }
     } else {
       // NOTE: this is a workaround for async versus callback lambda different behaviour
-
+      const queueInitLength = getEventQueueLength();
       const context = {
         ...commonContext,
         succeed: (lambdaRes: any) => {
@@ -234,9 +254,13 @@ parentPort!.on("message", async (e: any) => {
             returnError(awsRequestId, err);
           });
 
-        if (typeof eventResponse?.then !== "function" && !isSent) {
-          resIsSent();
-          returnResponse("return", awsRequestId, null);
+        if (typeof eventResponse?.then !== "function" && !isSent && queueInitLength >= 0) {
+          const currentQueueLength = getEventQueueLength();
+          const isEmpty = currentQueueLength >= 0 && currentQueueLength - (queueInitLength + 1) <= 0;
+          if (isEmpty) {
+            resIsSent();
+            returnResponse("return", awsRequestId, null);
+          }
         }
       } catch (err) {
         resIsSent();
