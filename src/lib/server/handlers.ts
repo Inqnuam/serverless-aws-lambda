@@ -231,9 +231,12 @@ export class Handlers {
         }
       }
     } else {
-      // @ts-ignore
-      Handlers.handlers[foundIndex].clear();
-      Handlers.handlers[foundIndex] = lambdaController;
+      // esbuild rebuild
+      if (Handlers.handlers[foundIndex].runtime.startsWith("n")) {
+        // @ts-ignore
+        Handlers.handlers[foundIndex].clear();
+        Handlers.handlers[foundIndex] = lambdaController;
+      }
     }
   }
 

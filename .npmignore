@@ -9,6 +9,7 @@ yarn.lock
 src
 !src/lib/runtime/awslambda.ts
 !src/lib/runtime/streamResponse.ts
+!src/lib/runtime/runners/python/index.py
 build.mjs
 TODO.md
 tsconfig.json

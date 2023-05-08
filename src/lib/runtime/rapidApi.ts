@@ -1,10 +1,6 @@
-import { Worker, WorkerOptions } from "worker_threads";
-import path from "path";
 import { randomUUID } from "crypto";
-import { EventEmitter } from "events";
 import { log } from "../utils/colorize";
 import { callErrorDest, callSuccessDest } from "./callDestinations";
-import { BufferedStreamResponse } from "./bufferedStreamResponse";
 import type { ServerResponse } from "http";
 import type { ISnsEvent } from "../parseEvents/sns";
 import type { IS3Event } from "../parseEvents/s3";
@@ -14,6 +10,7 @@ import type { IDestination } from "../parseEvents/index";
 import type { LambdaEndpoint } from "../parseEvents/endpoints";
 import type { IKinesisEvent } from "../parseEvents/kinesis";
 import type { IDocumentDbEvent } from "../parseEvents/documentDb";
+import type { Runner } from "./runners/index";
 
 type InvokeSub = (event: any, info?: any) => void;
 type InvokeSuccessSub = (input: any, output: any, info?: any) => void;
@@ -34,6 +31,7 @@ export interface ILambdaMock {
   /**
    * API Gateway and Application Load balancer events.
    */
+  runtime: string;
   endpoints: LambdaEndpoint[];
   s3: IS3Event[];
   sns: ISnsEvent[];
@@ -79,6 +77,7 @@ export interface ILambdaMock {
   onError?: IDestination;
   onSuccess?: IDestination;
   onFailure?: IDestination;
+  runner: Runner;
 }
 
 const runtimeLifetime = 18 * 60 * 1000;
@@ -92,11 +91,12 @@ const isAsync = (info: any) => {
 
   return false;
 };
-export class LambdaMock extends EventEmitter implements ILambdaMock {
+export class LambdaMock implements ILambdaMock {
   name: string;
   outName: string;
   online: boolean | string | string[];
   endpoints: LambdaEndpoint[];
+  runtime: string;
   s3: IS3Event[];
   sns: ISnsEvent[];
   sqs: ISqs[];
@@ -118,16 +118,16 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
   invokeSub: InvokeSub[];
   invokeSuccessSub: InvokeSuccessSub[];
   invokeErrorSub: InvokeErrorSub[];
-  _worker?: Worker;
-  _isLoaded: boolean = false;
-  _isLoading: boolean = false;
+
   #_tmLifetime?: NodeJS.Timeout;
-  #workerPath: string;
+  runner: Runner;
+  static ENABLE_TIMEOUT = true;
   constructor({
     name,
     outName,
     online,
     endpoints,
+    runtime,
     timeout,
     memorySize,
     environment,
@@ -149,12 +149,13 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     onError,
     onSuccess,
     onFailure,
-  }: ILambdaMock) {
-    super();
+    runner,
+  }: ILambdaMock & { runner: Runner }) {
     this.name = name;
     this.outName = outName;
     this.online = online;
     this.endpoints = endpoints;
+    this.runtime = runtime;
     this.s3 = s3;
     this.sns = sns;
     this.sqs = sqs;
@@ -176,57 +177,11 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     this.onError = onError;
     this.onSuccess = onSuccess;
     this.onFailure = onFailure;
-    this.#workerPath = path.resolve(__dirname, "./lib/runtime/runners/node.js");
+    this.runner = runner;
   }
 
-  async importEventHandler() {
-    await new Promise((resolve, reject) => {
-      this._worker = new Worker(this.#workerPath, {
-        env: this.environment,
-        execArgv: ["--enable-source-maps"],
-        workerData: {
-          name: this.name,
-          timeout: this.timeout,
-          memorySize: this.memorySize,
-          esOutputPath: this.esOutputPath,
-          handlerName: this.handlerName,
-          debug: log.getDebug(),
-        },
-      } as WorkerOptions);
-
-      this._worker.setMaxListeners(0);
-
-      const errorHandler = (err: any) => {
-        this._isLoaded = false;
-        this._isLoading = false;
-        log.RED("Lambda execution fatal error");
-        console.error(err);
-        this.emit("loaded", false);
-        reject(err);
-      };
-
-      this._worker.on("message", (e) => {
-        const { channel, data, awsRequestId, type, encoding } = e;
-        if (channel == "import") {
-          this._worker!.setMaxListeners(55);
-          this.setMaxListeners(10);
-          this._worker!.removeListener("error", errorHandler);
-          this._isLoaded = true;
-          this._isLoading = false;
-          this.emit("loaded", true);
-          resolve(undefined);
-        } else {
-          this.emit(awsRequestId, channel, data, type, encoding);
-        }
-      });
-      this._worker.on("error", errorHandler);
-      this._worker.postMessage({ channel: "import" });
-    });
-  }
   handleErrorDestination(event: any, info: any, error: any, awsRequestId: string) {
-    if (!this.onError || !this.onFailure) {
-      console.error(error);
-    }
+    console.error(error);
 
     this.invokeErrorSub.forEach((x) => {
       try {
@@ -271,26 +226,8 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     });
   }
 
-  async #load() {
-    if (this._isLoading) {
-      this.setMaxListeners(0);
-      await new Promise((resolve, reject) => {
-        this.once("loaded", (isLoaded) => {
-          if (isLoaded) {
-            resolve(undefined);
-          } else {
-            reject();
-          }
-        });
-      });
-    } else if (!this._isLoaded) {
-      this._isLoading = true;
-      log.BR_BLUE(`❄️ Cold start '${this.outName}'`);
-      await this.importEventHandler();
-    }
-  }
   async invoke(event: any, info?: any, clientContext?: any, response?: ServerResponse) {
-    await this.#load();
+    await this.runner.mount();
     const awsRequestId = randomUUID();
     const hrTimeStart = this.#printStart(awsRequestId, event, info);
     this.invokeSub.forEach((x) => {
@@ -300,56 +237,33 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     });
 
     try {
-      const eventResponse = await new Promise((resolve, reject) => {
-        this._worker!.postMessage({
-          channel: "exec",
-          data: { event, clientContext },
-          awsRequestId,
-        });
-        const res = response ?? new BufferedStreamResponse(info);
-
-        function listener(this: LambdaMock, channel: string, data: any, type: string, encoding: BufferEncoding) {
-          switch (channel) {
-            case "return":
-            case "succeed":
-            case "done":
-              this.handleSuccessDestination(event, info, data, awsRequestId);
-              this.removeListener(awsRequestId, listener);
-              resolve(data);
-              break;
-            case "fail":
-              this.handleErrorDestination(event, info, data, awsRequestId);
-              this.removeListener(awsRequestId, listener);
-              reject(data);
-              break;
-            case "stream":
-              if (type == "write") {
-                res.write(data, encoding);
-              } else if (type == "ct") {
-                res.setHeader("Content-Type", data);
-              } else if (type == "timeout") {
-                this.handleErrorDestination(event, info, data, awsRequestId);
-                this.removeListener(awsRequestId, listener);
-                res.destroy();
-                reject(data);
-              } else {
-                this.handleSuccessDestination(event, info, data, awsRequestId);
-                this.removeListener(awsRequestId, listener);
-                res.end(data);
-                resolve(res instanceof BufferedStreamResponse ? res : undefined);
-              }
-              break;
-            default:
-              this.removeListener(awsRequestId, listener);
-              this.clear();
-              reject(new Error("Unknown error"));
-              break;
-          }
+      const eventResponse = await new Promise(async (resolve, reject) => {
+        let tm;
+        if (LambdaMock.ENABLE_TIMEOUT) {
+          tm = setTimeout(() => {
+            response?.destroy();
+            this.runner.unmount(awsRequestId);
+            log.RED(`'${this.outName}' | ${awsRequestId}: Request failed`);
+            reject({
+              errorType: "Unhandled",
+              errorMessage: `${new Date().toISOString()} ${awsRequestId} Task timed out after ${this.timeout} seconds`,
+            });
+          }, this.timeout * 1000);
         }
-        this.on(awsRequestId, listener);
+
+        try {
+          const res = await this.runner.invoke({ event, awsRequestId, info, clientContext, response });
+          resolve(res);
+        } catch (error) {
+          reject(error);
+        } finally {
+          clearTimeout(tm);
+        }
       });
+      this.handleSuccessDestination(event, info, eventResponse, awsRequestId);
       return eventResponse;
     } catch (error) {
+      this.handleErrorDestination(event, info, error, awsRequestId);
       throw error;
     } finally {
       this.#setLifetime();
@@ -359,16 +273,12 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
 
   clear = () => {
     clearTimeout(this.#_tmLifetime);
-    this._worker?.terminate();
+    this.runner.unmount();
   };
   #setLifetime = () => {
     clearTimeout(this.#_tmLifetime);
     this.#_tmLifetime = setTimeout(() => {
-      if (this._worker) {
-        this._worker.terminate();
-        this._isLoaded = false;
-        this._isLoading = false;
-      }
+      this.runner.unmount();
     }, runtimeLifetime);
   };
   #printStart = (awsRequestId: string, event: any, info?: any) => {
@@ -401,5 +311,13 @@ export class LambdaMock extends EventEmitter implements ILambdaMock {
     }, 400);
   };
 }
+
+process.on("unhandledRejection", (er) => {
+  console.log("er", er);
+});
+
+process.on("uncaughtException", (er) => {
+  console.log("er", er);
+});
 
 export type { ISnsEvent, IS3Event, ISqs, IDdbEvent, IDestination, LambdaEndpoint, IDocumentDbEvent, IKinesisEvent };

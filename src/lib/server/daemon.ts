@@ -10,6 +10,8 @@ import serveStatic from "serve-static";
 import { randomUUID } from "crypto";
 import { CommonEventGenerator } from "../../plugins/lambda/events/common";
 import { defaultServer } from "../../plugins/lambda/defaultServer";
+import { NodeRunner } from "../runtime/runners/node/runner";
+import { PythonRunner } from "../runtime/runners/python/runner";
 
 let localIp: string;
 if (networkInterfaces) {
@@ -26,6 +28,7 @@ const debuggerIsAttached = inspector?.url() != undefined;
 
 if (debuggerIsAttached) {
   console.warn("Lambdas timeout are disabled when a Debugger is attached");
+  LambdaMock.ENABLE_TIMEOUT = false;
 }
 
 interface IDaemonConfig {
@@ -182,6 +185,7 @@ export class Daemon extends Handlers {
 
   async load(lambdaDefinitions: ILambdaMock[]) {
     for (const lambda of lambdaDefinitions) {
+      lambda.runner = lambda.runtime.charAt(0) == "n" ? new NodeRunner(lambda) : new PythonRunner(lambda);
       const lambdaController = new LambdaMock(lambda);
 
       this.addHandler(lambdaController);

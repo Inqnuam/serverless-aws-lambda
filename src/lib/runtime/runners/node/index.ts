@@ -1,11 +1,9 @@
 import { parentPort, workerData } from "worker_threads";
 import { createHook } from "async_hooks";
-import inspector from "inspector";
-import { ResponseStream } from "../streamResponse";
+import { ResponseStream } from "../../streamResponse";
 import type { WritableOptions } from "stream";
 
-const debuggerIsAttached = inspector?.url() != undefined;
-let log: any = { RED: (s: string) => void 0 };
+let log: any = { RED: (s: string) => void 0, BLUE: (s: string) => void 0 };
 const stackRegex = /\/.*(\d+):(\d+)/;
 let eventHandler: Function & { stream?: boolean; streamOpt?: any };
 const invalidResponse = new Error("Invalid response payload");
@@ -14,6 +12,9 @@ const { AWS_LAMBDA_FUNCTION_NAME } = process.env;
 if (workerData.debug) {
   log.RED = (s: string) => {
     process.stdout.write(`\x1b[31m${s}\x1b[0m\n`);
+  };
+  log.BLUE = (s: string) => {
+    process.stdout.write(`\x1b[34m${s}\x1b[0m\n`);
   };
   console = new Proxy(console, {
     get(obj: any, prop: string) {
@@ -40,11 +41,6 @@ if (workerData.debug) {
   });
 }
 
-class Timeout extends Error {
-  constructor(timeout: number, awsRequestId: string) {
-    super(`${new Date().toISOString()} ${awsRequestId} Task timed out after ${timeout} seconds`);
-  }
-}
 interface LambdaErrorResponse {
   errorType?: string;
   errorMessage: string;
@@ -57,11 +53,7 @@ const genResponsePayload = (err: any) => {
     trace: [],
   };
 
-  if (err instanceof Timeout) {
-    responsePayload.errorMessage = err.message;
-    responsePayload.errorType = "Unhandled";
-    delete responsePayload.trace;
-  } else if (err instanceof Error) {
+  if (err instanceof Error) {
     responsePayload.errorType = err.name;
     responsePayload.errorMessage = err.message;
 
@@ -80,7 +72,6 @@ const genResponsePayload = (err: any) => {
 };
 
 const returnError = (awsRequestId: string, err: any) => {
-  log.RED(`'${AWS_LAMBDA_FUNCTION_NAME}' | ${awsRequestId}: Request failed`);
   const data = genResponsePayload(err);
   parentPort!.postMessage({ channel: "fail", data, awsRequestId });
 };
@@ -98,11 +89,29 @@ const returnResponse = (channel: string, awsRequestId: string, data: any) => {
     returnError(awsRequestId, invalidResponse);
   }
 };
+
+const genSolution = (fn: string) => {
+  const body = fn.match(/{[\w\W]*}/);
+
+  if (body) {
+    const solution = `${fn.slice(0, body.index! + 1)}
+\x1b[33m  try {\x1b[0m
+    ${fn.slice(body.index! + 1, -1).trim()}
+\x1b[33m  } catch (error) {\x1b[0m
+  \x1b[35m  // handle the error\x1b[0m
+\x1b[33m  }\x1b[0m
+}`;
+    return solution;
+  }
+};
+
 class EventQueue extends Map {
-  static IGNORE = ["PROMISE", "RANDOMBYTESREQUEST", "PerformanceObserver", "TIMERWRAP"];
+  static IGNORE = ["RANDOMBYTESREQUEST", "PerformanceObserver", "TIMERWRAP"]; // ,"PROMISE",
   onEmpty?: () => void;
-  constructor() {
+  requestId: string;
+  constructor(requestId: string) {
     super();
+    this.requestId = requestId;
   }
   isEmpty = () => {
     const resources = [...this.values()].filter((r) => {
@@ -113,7 +122,25 @@ class EventQueue extends Map {
     return resources.length ? false : true;
   };
   add = (asyncId: number, type: string, triggerAsyncId: number, resource: any) => {
-    return EventQueue.IGNORE.includes(type) ? this : this.set(asyncId, resource);
+    if (type == "Timeout") {
+      const timmerTime = resource._repeat ? "setInterval" : "setTimeout";
+      const fnString = resource._onTimeout.toString();
+      const org = resource._onTimeout.bind(resource._onTimeout);
+      resource._onTimeout = () => {
+        try {
+          org();
+        } catch (error) {
+          const data = genResponsePayload(error);
+          const solution = genSolution(fnString);
+          parentPort!.postMessage({ channel: "uncaught", type: timmerTime, data: { error: data, solution } });
+        }
+      };
+    }
+
+    if (EventQueue.IGNORE.includes(type)) {
+      return this;
+    }
+    return this.set(asyncId, resource);
   };
   destroy = (asyncId: number) => {
     if (this.delete(asyncId) && this.isEmpty() && this.onEmpty) {
@@ -142,32 +169,15 @@ const listener = async (e: any) => {
     const { event, clientContext } = data;
 
     let isSent = false;
-    let timeout = workerData.timeout * 1000;
+    const timeout = workerData.timeout * 1000;
     let streamRes: ResponseStream;
-    const lambdaTimeoutInterval = setInterval(() => {
-      timeout -= 250;
-
-      if (timeout <= 0) {
-        clearInterval(lambdaTimeoutInterval);
-        if (!debuggerIsAttached) {
-          isSent = true;
-          const tm = new Timeout(workerData.timeout, awsRequestId);
-          if (streamRes) {
-            streamRes.destroy(tm);
-          } else {
-            returnError(awsRequestId, tm);
-          }
-        }
-      }
-    }, 250);
 
     const resIsSent = () => {
       isSent = true;
-      clearInterval(lambdaTimeoutInterval);
     };
-
+    const start = Date.now();
     const getRemainingTimeInMillis = () => {
-      return timeout;
+      return Math.max(timeout - (Date.now() - start), 0);
     };
     let callbackWaitsForEmptyEventLoop = true;
     const commonContext = {
@@ -201,10 +211,7 @@ const listener = async (e: any) => {
       });
 
       streamRes.on("error", (err: any) => {
-        if (err instanceof Timeout) {
-          const data = genResponsePayload(err);
-          parentPort!.postMessage({ channel: "stream", data, awsRequestId, type: "timeout" });
-        } else if (!isSent) {
+        if (!isSent) {
           resIsSent();
           log.RED(err);
           returnError(awsRequestId, err);
@@ -237,7 +244,7 @@ const listener = async (e: any) => {
         returnError(awsRequestId, new Error("Streaming does not support non-async handlers."));
       }
     } else {
-      const eventQueue = new EventQueue();
+      const eventQueue = new EventQueue(awsRequestId);
 
       createHook({
         init: eventQueue.add,
@@ -294,16 +301,13 @@ const listener = async (e: any) => {
         // NOTE: this is a workaround for async versus callback lambda different behaviour
         eventResponse
           ?.then?.((data: any) => {
-            if (cbCalled) {
-              return;
-            }
-            clearInterval(lambdaTimeoutInterval);
-            if (isSent) {
+            if (cbCalled || isSent) {
               return;
             }
             resIsSent();
             returnResponse("return", awsRequestId, data);
           })
+
           ?.catch((err: any) => {
             resIsSent();
             returnError(awsRequestId, err);
@@ -311,6 +315,11 @@ const listener = async (e: any) => {
 
         if (!isSent && (typeof eventResponse?.then !== "function" || cbCalled)) {
           const returnCallback = () => {
+            [...eventQueue.values()].forEach((r) => {
+              // TODO create a method on eventQueue to destoryAll or keep the context for next invokation
+              // check in AWS
+              r.close?.();
+            });
             if (cbCalled) {
               context.done(cbCalled.error, cbCalled.res);
             } else {
@@ -322,6 +331,9 @@ const listener = async (e: any) => {
           if (eventQueue.isEmpty()) {
             returnCallback();
           } else if (!cbCalled || callbackWaitsForEmptyEventLoop) {
+            if (cbCalled && callbackWaitsForEmptyEventLoop) {
+              log.BLUE("callbackWaitsForEmptyEventLoop...");
+            }
             eventQueue.onEmpty = () => {
               returnCallback();
             };
@@ -329,6 +341,7 @@ const listener = async (e: any) => {
             returnCallback();
           }
         }
+        // TODO: destroy all event queue resources after function is returned
       } catch (err) {
         resIsSent();
         returnError(awsRequestId, err);

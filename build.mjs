@@ -40,7 +40,7 @@ const buildIndex = bundle.bind(null, {
     "./src/index.ts",
     "./src/server.ts",
     "./src/defineConfig.ts",
-    "./src/lib/runtime/runners/node.ts",
+    "./src/lib/runtime/runners/node/index.ts",
     "./src/lambda/router.ts",
     "./src/plugins/sns/index.ts",
     "./src/plugins/sqs/index.ts",

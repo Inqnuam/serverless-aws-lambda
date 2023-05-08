@@ -167,7 +167,7 @@ class ServerlessAwsLambda extends Daemon {
     });
   }
   setEsBuildConfig = (isPackaging: boolean) => {
-    const entryPoints = this.#lambdas.map((x) => x.esEntryPoint);
+    const entryPoints = this.#lambdas.filter((x) => x.runtime.startsWith("n")).map((x) => x.esEntryPoint);
 
     let esBuildConfig: BuildOptions = {
       sourcemap: !isPackaging,
@@ -321,23 +321,19 @@ class ServerlessAwsLambda extends Daemon {
     const lambdas = functionsNames.reduce((accum: any[], funcName: string) => {
       const lambda = funcs[funcName];
 
-      if (lambda.runtime && !lambda.runtime.startsWith("node")) {
-        return accum;
-      } else if (!defaultRuntime?.startsWith("node") && (!lambda.runtime || !lambda.runtime.startsWith("node"))) {
-        return accum;
-      }
       const handlerPath = (lambda as Serverless.FunctionDefinitionHandler).handler;
       const ext = path.extname(handlerPath);
       const handlerName = ext.slice(1);
       const esEntryPoint = path.posix.resolve(handlerPath.replace(ext, ""));
 
       const region = this.runtimeConfig.environment.AWS_REGION ?? this.runtimeConfig.environment.REGION;
-
       const slsDeclaration: any = this.serverless.service.getFunction(funcName);
+      const runtime = slsDeclaration.runtime ?? defaultRuntime;
 
       let lambdaDef: any = {
         name: funcName,
         outName: slsDeclaration.name,
+        runtime: slsDeclaration.runtime ?? defaultRuntime,
         handlerPath,
         handlerName,
         esEntryPoint,
@@ -353,7 +349,7 @@ class ServerlessAwsLambda extends Daemon {
         virtualEnvs: { ...this.defaultVirtualEnvs, ...(slsDeclaration.virtualEnvs ?? {}) },
         online: typeof slsDeclaration.online == "boolean" ? slsDeclaration.online : true,
         environment: {
-          AWS_EXECUTION_ENV: `AWS_Lambda_nodejs${this.nodeVersion}.x`,
+          AWS_EXECUTION_ENV: `AWS_Lambda_${runtime}`,
           AWS_LAMBDA_FUNCTION_VERSION: "$LATEST",
           AWS_LAMBDA_FUNCTION_NAME: funcName,
           _HANDLER: path.basename(handlerPath),

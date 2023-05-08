@@ -21,7 +21,7 @@ export type ILambda = {
   onInvoke: (callback: (event: any, info?: any) => void) => void;
   onInvokeError: (callback: (input: any, error: any, info?: any) => void) => void;
   onInvokeSuccess: (callback: (input: any, output: any, info?: any) => void) => void;
-} & Omit<ILambdaMock, "invokeSub" | "invokeSuccessSub" | "invokeErrorSub">;
+} & Omit<ILambdaMock, "invokeSub" | "invokeSuccessSub" | "invokeErrorSub" | "runner">;
 
 export interface ClientConfigParams {
   stop: (err?: any) => Promise<void>;

@@ -7,7 +7,7 @@ import { BufferedStreamResponse } from "../../lib/runtime/bufferedStreamResponse
 export const invokeRequests: OfflineRequest = {
   filter: /(^\/2015-03-31\/functions\/)|(^\/@invoke\/)/,
   callback: async function (req, res) {
-    const { url, method, headers } = req;
+    const { url, headers } = req;
     const parsedURL = new URL(url as string, "http://localhost:3003");
 
     const requestedName = Handlers.parseNameFromUrl(parsedURL.pathname);
@@ -86,7 +86,6 @@ export const invokeRequests: OfflineRequest = {
         }
       }
     } catch (error: any) {
-      console.error(error);
       if (!res.writableFinished) {
         res.setHeader("X-Amz-Function-Error", error.errorType ?? error.message ?? "");
         res.statusCode = 200;
