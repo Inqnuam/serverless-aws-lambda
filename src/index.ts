@@ -44,7 +44,6 @@ class ServerlessAwsLambda extends Daemon {
   esBuildConfig: any;
   buildContext: any = {};
   customEsBuildConfig: any;
-  customBuildCallback?: Function;
   defaultVirtualEnvs: any;
   nodeVersion: number | boolean | string | undefined = false;
   invokeName?: string;

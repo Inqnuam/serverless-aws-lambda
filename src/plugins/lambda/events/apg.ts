@@ -329,7 +329,8 @@ export class ApgRequestHandler extends CommonEventGenerator {
     let code = 200;
 
     if (!output || isNaN(output.statusCode)) {
-      log.RED("Valid 'http' response payload must be an object which includes a valid 'statusCode'");
+      log.RED("Valid 'http' response payload must be an object which includes a valid 'statusCode'.\nReceived:");
+      console.log(output);
 
       throw new Error();
     }

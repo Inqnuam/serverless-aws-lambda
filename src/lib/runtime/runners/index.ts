@@ -9,6 +9,7 @@ interface IRunnerInvoke {
 
 export interface Runner {
   mount: () => Promise<any> | any;
-  unmount: (awsRequestId?: string) => Promise<any> | any;
+  unmount: (lifecycleEnds?: boolean) => Promise<any> | any;
   invoke: (request: IRunnerInvoke) => Promise<any>;
+  onComplete: (awsRequestId: string, timeout?: boolean) => any;
 }

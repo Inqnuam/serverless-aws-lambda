@@ -4,12 +4,8 @@ import esbuild from "esbuild";
 import { createRequire } from "node:module";
 import vm from "vm";
 import { fileURLToPath, pathToFileURL } from "url";
-import { access } from "fs/promises";
 
-const jsExts = [".js", ".cjs", ".mjs"];
-const tsExts = [".ts", ".mts"];
-
-const readTsDefineConfig = async (sourcefile: string) => {
+const readFromPath = async (sourcefile: string) => {
   const { href } = pathToFileURL(sourcefile);
   const filename = fileURLToPath(href);
   const exports = {};
@@ -30,6 +26,9 @@ const readTsDefineConfig = async (sourcefile: string) => {
     packages: "external",
     platform: "node",
     format: "cjs",
+    // supported: {
+    //   "top-level-await": true, // TODO: esbuild ask for cjs + top-level-await support
+    // },
     banner: {
       js: `async (${Object.keys(context).join(",")})=>{`,
     },
@@ -58,37 +57,9 @@ export const readDefineConfig = async (config: string) => {
   const configPath = path.posix.resolve(customFilePath);
 
   let exportedFunc;
-  let err;
-  const sourceFile = `${configPath}${parsed.ext}`;
 
   try {
-    if (jsExts.includes(parsed.ext)) {
-      exportedFunc = await import(`file://${sourceFile}`);
-    } else if (tsExts.includes(parsed.ext)) {
-      exportedFunc = await readTsDefineConfig(sourceFile);
-    } else {
-      for (const ext of jsExts) {
-        try {
-          exportedFunc = await import(`file://${configPath}${ext}`);
-          break;
-        } catch (error) {
-          err = error;
-        }
-      }
-
-      if (err) {
-        for (const ext of tsExts) {
-          try {
-            const predictedPath = `${configPath}${ext}`;
-            await access(predictedPath);
-            exportedFunc = await readTsDefineConfig(predictedPath);
-            break;
-          } catch (error) {
-            err = error;
-          }
-        }
-      }
-    }
+    exportedFunc = await readFromPath(configPath);
   } catch (error) {}
 
   if (!exportedFunc) {

@@ -78,8 +78,8 @@ export class AlbRequestHandler extends CommonEventGenerator {
     let statusMessage = undefined;
 
     if (!output || typeof output.statusCode !== "number") {
-      log.RED("Valid ALB Lambda response must be an object which includes a valid 'statusCode' number");
-
+      log.RED("Valid ALB Lambda response must be an object which includes a valid 'statusCode' number.\nReceived:");
+      console.log(output);
       throw AlbRequestHandler.#execError;
     }
 

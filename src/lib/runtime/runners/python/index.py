@@ -1,5 +1,6 @@
 import decimal
 import sys
+import os
 import json
 from importlib import import_module
 from time import strftime, time
@@ -14,22 +15,20 @@ def decimal_serializer(o):
         return f
 
 
-handlerDir = sys.argv[1]
-handlerPath = sys.argv[2]
-handlerName = sys.argv[3]
-lambdaName = sys.argv[4]
-timeout = int(sys.argv[5])
-sys.path.append(handlerDir)
+handlerPath = sys.argv[1]
+handlerName = sys.argv[2]
+lambdaName = sys.argv[3]
+timeout = int(sys.argv[4])
+sys.path.append(".")
 
 
 class LambdaContext(object):
-    def __init__(self, name='Fake', version='LATEST', **kwargs):
+    def __init__(self, reqId="1234567890"):
         self.name = lambdaName
-        self.version = version
+        self.version = "$LATEST"
         self.created = time()
         self.timeout = timeout
-        for key, value in kwargs.items():
-            setattr(self, key, value)
+        self.reqId = reqId
 
     def get_remaining_time_in_millis(self):
         return int(max((self.timeout * 1000) - (int(round(time() * 1000)) - int(round(self.created * 1000))), 0))
@@ -44,15 +43,15 @@ class LambdaContext(object):
 
     @property
     def invoked_function_arn(self):
-        return 'arn:aws:lambda:serverless:' + self.name
+        return 'arn:aws:lambda:us-east-1:123456789012:function:' + self.name
 
     @property
     def memory_limit_in_mb(self):
-        return '1024'
+        return os.environ["AWS_LAMBDA_FUNCTION_MEMORY_SIZE"]
 
     @property
     def aws_request_id(self):
-        return '1234567890'
+        return self.reqId
 
     @property
     def log_group_name(self):
@@ -72,10 +71,11 @@ handler = getattr(module, handlerName)
 
 for line in sys.stdin:
     input = json.loads(line)
-    context = LambdaContext(input["context"], {})
+    context = LambdaContext(input["awsRequestId"])  # input["context"]
     try:
         response = handler(input["event"], context)
         jsonRes = json.dumps(response, default=decimal_serializer)
+        sys.stdout.flush()
         sys.stdout.write(f"__|response|__{jsonRes}")
         sys.stdout.flush()
     except:

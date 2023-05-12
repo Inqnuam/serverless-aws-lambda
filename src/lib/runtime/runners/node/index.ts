@@ -1,13 +1,13 @@
 import { parentPort, workerData } from "worker_threads";
-import { createHook } from "async_hooks";
 import { ResponseStream } from "../../streamResponse";
+import { genResponsePayload, EventQueue, patchConsole, formatStack } from "./utils";
+import { inspect } from "util";
 import type { WritableOptions } from "stream";
 
-let log: any = { RED: (s: string) => void 0, BLUE: (s: string) => void 0 };
-const stackRegex = /\/.*(\d+):(\d+)/;
+let log = { RED: (s: string) => {}, BLUE: (s: string) => {}, PINK: (s: string) => {} };
+
 let eventHandler: Function & { stream?: boolean; streamOpt?: any };
 const invalidResponse = new Error("Invalid response payload");
-const { AWS_LAMBDA_FUNCTION_NAME } = process.env;
 
 if (workerData.debug) {
   log.RED = (s: string) => {
@@ -16,60 +16,12 @@ if (workerData.debug) {
   log.BLUE = (s: string) => {
     process.stdout.write(`\x1b[34m${s}\x1b[0m\n`);
   };
-  console = new Proxy(console, {
-    get(obj: any, prop: string) {
-      if (typeof obj[prop] == "function") {
-        return (...params: any) => {
-          let stack = "";
-          try {
-            throw new Error();
-          } catch (err: any) {
-            try {
-              const line = stackRegex.exec(err.stack.split("at")[2])?.[0];
-              if (typeof line == "string") {
-                stack = line;
-              }
-            } catch (e) {}
-          } finally {
-            process.stdout.write(`\x1b[90m${new Date().toISOString()}\t${prop.toUpperCase()}\t${AWS_LAMBDA_FUNCTION_NAME}\t${stack}\x1b[0m\n`);
-            obj[prop](...params);
-          }
-        };
-      }
-      return obj[prop];
-    },
-  });
-}
-
-interface LambdaErrorResponse {
-  errorType?: string;
-  errorMessage: string;
-  trace?: string[];
-}
-const genResponsePayload = (err: any) => {
-  const responsePayload: LambdaErrorResponse = {
-    errorType: "string",
-    errorMessage: "",
-    trace: [],
+  log.PINK = (s: string) => {
+    process.stdout.write(`\x1b[95m${s}\x1b[0m\n`);
   };
-
-  if (err instanceof Error) {
-    responsePayload.errorType = err.name;
-    responsePayload.errorMessage = err.message;
-
-    if (typeof err.stack == "string") {
-      responsePayload.trace = err.stack.split("\n");
-    }
-  } else {
-    responsePayload.errorType = typeof err;
-
-    try {
-      responsePayload.errorMessage = err.toString();
-    } catch (error) {}
-  }
-
-  return responsePayload;
-};
+  patchConsole();
+}
+EventQueue.parentPort = parentPort;
 
 const returnError = (awsRequestId: string, err: any) => {
   const data = genResponsePayload(err);
@@ -90,64 +42,19 @@ const returnResponse = (channel: string, awsRequestId: string, data: any) => {
   }
 };
 
-const genSolution = (fn: string) => {
-  const body = fn.match(/{[\w\W]*}/);
-
-  if (body) {
-    const solution = `${fn.slice(0, body.index! + 1)}
-\x1b[33m  try {\x1b[0m
-    ${fn.slice(body.index! + 1, -1).trim()}
-\x1b[33m  } catch (error) {\x1b[0m
-  \x1b[35m  // handle the error\x1b[0m
-\x1b[33m  }\x1b[0m
-}`;
-    return solution;
-  }
+//@ts-ignore
+process.exit = (code?: number | undefined) => {
+  process.stdout.write(`\x1b[31musage of process.exit() will throw Runtime error in AWS Lambda\x1b[0m\n`);
 };
 
-class EventQueue extends Map {
-  static IGNORE = ["RANDOMBYTESREQUEST", "PerformanceObserver", "TIMERWRAP"]; // ,"PROMISE",
-  onEmpty?: () => void;
-  requestId: string;
-  constructor(requestId: string) {
-    super();
-    this.requestId = requestId;
-  }
-  isEmpty = () => {
-    const resources = [...this.values()].filter((r) => {
-      if (typeof r.hasRef === "function" && !r.hasRef()) return false;
-      return true;
-    });
+process.on("unhandledRejection", (er) => {
+  process.stdout.write(inspect(er));
+});
 
-    return resources.length ? false : true;
-  };
-  add = (asyncId: number, type: string, triggerAsyncId: number, resource: any) => {
-    if (type == "Timeout") {
-      const timmerTime = resource._repeat ? "setInterval" : "setTimeout";
-      const fnString = resource._onTimeout.toString();
-      const org = resource._onTimeout.bind(resource._onTimeout);
-      resource._onTimeout = () => {
-        try {
-          org();
-        } catch (error) {
-          const data = genResponsePayload(error);
-          const solution = genSolution(fnString);
-          parentPort!.postMessage({ channel: "uncaught", type: timmerTime, data: { error: data, solution } });
-        }
-      };
-    }
+process.on("uncaughtException", (er) => {
+  process.stdout.write(inspect(er));
+});
 
-    if (EventQueue.IGNORE.includes(type)) {
-      return this;
-    }
-    return this.set(asyncId, resource);
-  };
-  destroy = (asyncId: number) => {
-    if (this.delete(asyncId) && this.isEmpty() && this.onEmpty) {
-      this.onEmpty();
-    }
-  };
-}
 const listener = async (e: any) => {
   const { channel, data, awsRequestId } = e;
 
@@ -165,6 +72,11 @@ const listener = async (e: any) => {
     }
 
     parentPort!.postMessage({ channel: "import" });
+  } else if (channel == "complete") {
+    const ctx = EventQueue.context[awsRequestId];
+    if (typeof e.timeout == "boolean") {
+      ctx.timeout = true;
+    }
   } else if (channel == "exec") {
     const { event, clientContext } = data;
 
@@ -179,7 +91,8 @@ const listener = async (e: any) => {
     const getRemainingTimeInMillis = () => {
       return Math.max(timeout - (Date.now() - start), 0);
     };
-    let callbackWaitsForEmptyEventLoop = true;
+
+    const eventQueue = new EventQueue(awsRequestId);
     const commonContext = {
       functionVersion: "$LATEST",
       functionName: workerData.name,
@@ -224,10 +137,10 @@ const listener = async (e: any) => {
 
       const streamContext = {
         get callbackWaitsForEmptyEventLoop() {
-          return callbackWaitsForEmptyEventLoop;
+          return eventQueue.callbackWaitsForEmptyEventLoop;
         },
         set callbackWaitsForEmptyEventLoop(val) {
-          callbackWaitsForEmptyEventLoop = val;
+          eventQueue.callbackWaitsForEmptyEventLoop = val;
         },
         ...commonContext,
       };
@@ -244,19 +157,12 @@ const listener = async (e: any) => {
         returnError(awsRequestId, new Error("Streaming does not support non-async handlers."));
       }
     } else {
-      const eventQueue = new EventQueue(awsRequestId);
-
-      createHook({
-        init: eventQueue.add,
-        destroy: eventQueue.destroy,
-      }).enable();
-
       const context = {
         get callbackWaitsForEmptyEventLoop() {
-          return callbackWaitsForEmptyEventLoop;
+          return eventQueue.callbackWaitsForEmptyEventLoop;
         },
         set callbackWaitsForEmptyEventLoop(val) {
-          callbackWaitsForEmptyEventLoop = val;
+          eventQueue.callbackWaitsForEmptyEventLoop = val;
         },
         ...commonContext,
         succeed: (lambdaRes: any) => {
@@ -294,13 +200,21 @@ const listener = async (e: any) => {
             error: err,
             res,
           };
+          // TODO: set context cb called to true, if timeout then check if this was called if async func
+        } else {
+          log.RED("Invocation has already been reported as done. Cannot call complete more than once per invocation.");
         }
       };
+      eventQueue.enable();
+
       try {
         const eventResponse = eventHandler(event, context, callback);
         // NOTE: this is a workaround for async versus callback lambda different behaviour
         eventResponse
           ?.then?.((data: any) => {
+            eventQueue.storeContextTimers();
+            EventQueue.logTimeoutPossibleCause(awsRequestId);
+
             if (cbCalled || isSent) {
               return;
             }
@@ -313,13 +227,16 @@ const listener = async (e: any) => {
             returnError(awsRequestId, err);
           });
 
-        if (!isSent && (typeof eventResponse?.then !== "function" || cbCalled)) {
+        eventQueue.async = typeof eventResponse?.then == "function";
+
+        if (!eventQueue.async && eventResponse) {
+          log.RED("Synchronous handler 'return' value is ignored. Consider marking your handler as 'async' or use callback(error, returnValue)");
+        }
+
+        if (!isSent && (!eventQueue.async || cbCalled)) {
           const returnCallback = () => {
-            [...eventQueue.values()].forEach((r) => {
-              // TODO create a method on eventQueue to destoryAll or keep the context for next invokation
-              // check in AWS
-              r.close?.();
-            });
+            eventQueue.storeContextTimers();
+
             if (cbCalled) {
               context.done(cbCalled.error, cbCalled.res);
             } else {
@@ -330,10 +247,18 @@ const listener = async (e: any) => {
 
           if (eventQueue.isEmpty()) {
             returnCallback();
-          } else if (!cbCalled || callbackWaitsForEmptyEventLoop) {
-            if (cbCalled && callbackWaitsForEmptyEventLoop) {
+          } else if (!cbCalled || eventQueue.callbackWaitsForEmptyEventLoop) {
+            if (cbCalled && eventQueue.callbackWaitsForEmptyEventLoop) {
               log.BLUE("callbackWaitsForEmptyEventLoop...");
+              const events = [...eventQueue.values()];
+              const last = events[events.length - 1];
+              const stack = formatStack(last.stack);
+              if (stack) {
+                log.RED("Blocked by:");
+                log.PINK(stack);
+              }
             }
+
             eventQueue.onEmpty = () => {
               returnCallback();
             };
@@ -341,7 +266,6 @@ const listener = async (e: any) => {
             returnCallback();
           }
         }
-        // TODO: destroy all event queue resources after function is returned
       } catch (err) {
         resIsSent();
         returnError(awsRequestId, err);

@@ -181,6 +181,7 @@ export class LambdaMock implements ILambdaMock {
   }
 
   handleErrorDestination(event: any, info: any, error: any, awsRequestId: string) {
+    this.runner.onComplete(awsRequestId);
     console.error(error);
 
     this.invokeErrorSub.forEach((x) => {
@@ -208,6 +209,7 @@ export class LambdaMock implements ILambdaMock {
   }
 
   handleSuccessDestination(event: any, info: any, response: any, awsRequestId: string) {
+    this.runner.onComplete(awsRequestId);
     if (this.onSuccess && isAsync(info)) {
       callSuccessDest({
         destination: this.onSuccess,
@@ -238,11 +240,11 @@ export class LambdaMock implements ILambdaMock {
 
     try {
       const eventResponse = await new Promise(async (resolve, reject) => {
-        let tm;
+        let tm: NodeJS.Timeout | undefined;
         if (LambdaMock.ENABLE_TIMEOUT) {
           tm = setTimeout(() => {
             response?.destroy();
-            this.runner.unmount(awsRequestId);
+            this.runner.onComplete(awsRequestId, true);
             log.RED(`'${this.outName}' | ${awsRequestId}: Request failed`);
             reject({
               errorType: "Unhandled",
@@ -278,7 +280,7 @@ export class LambdaMock implements ILambdaMock {
   #setLifetime = () => {
     clearTimeout(this.#_tmLifetime);
     this.#_tmLifetime = setTimeout(() => {
-      this.runner.unmount();
+      this.runner.unmount(true);
     }, runtimeLifetime);
   };
   #printStart = (awsRequestId: string, event: any, info?: any) => {
@@ -311,13 +313,5 @@ export class LambdaMock implements ILambdaMock {
     }, 400);
   };
 }
-
-process.on("unhandledRejection", (er) => {
-  console.log("er", er);
-});
-
-process.on("uncaughtException", (er) => {
-  console.log("er", er);
-});
 
 export type { ISnsEvent, IS3Event, ISqs, IDdbEvent, IDestination, LambdaEndpoint, IDocumentDbEvent, IKinesisEvent };

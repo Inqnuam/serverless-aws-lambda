@@ -5,6 +5,7 @@ import { watchFile } from "fs";
 import { access } from "fs/promises";
 import type { Runner } from "../index";
 
+const cwd = process.cwd();
 export class PythonRunner implements Runner {
   invoke: Runner["invoke"];
   mount: Runner["mount"];
@@ -15,33 +16,38 @@ export class PythonRunner implements Runner {
   memorySize: number;
   environment: { [key: string]: any };
   handlerPath: string;
+  pyModulePath: string;
   handlerDir: string;
   handlerName: string;
   runtime: string;
   bin?: string;
   python?: ChildProcessWithoutNullStreams;
+  emitRebuild: Function;
   static wrapper = __dirname.replace("/dist", "/src/lib/runtime/runners/python/index.py");
   static DELIMITER = "__|response|__";
   static ERR_RESPONSE = "__|error|__";
-  constructor({
-    name,
-    outName,
-    timeout,
-    memorySize,
-    environment,
-    handlerPath,
-    handlerName,
-    runtime,
-  }: {
-    name: string;
-    outName: string;
-    handlerPath: string;
-    handlerName: string;
-    runtime: string;
-    timeout: number;
-    memorySize: number;
-    environment: { [key: string]: any };
-  }) {
+  constructor(
+    {
+      name,
+      outName,
+      timeout,
+      memorySize,
+      environment,
+      handlerPath,
+      handlerName,
+      runtime,
+    }: {
+      name: string;
+      outName: string;
+      handlerPath: string;
+      handlerName: string;
+      runtime: string;
+      timeout: number;
+      memorySize: number;
+      environment: { [key: string]: any };
+    },
+    emitRebuild: Function
+  ) {
     this.name = name;
     this.outName = outName;
     this.timeout = timeout;
@@ -49,10 +55,12 @@ export class PythonRunner implements Runner {
     this.environment = environment;
     this.handlerName = handlerName;
     this.runtime = runtime;
+    this.emitRebuild = emitRebuild;
+
     const tp = path.resolve(handlerPath);
     this.handlerDir = path.dirname(tp);
     this.handlerPath = path.basename(tp, `.${this.handlerName}`);
-
+    this.pyModulePath = `${this.handlerDir}/${this.handlerPath}`.replace(cwd, "").replace(/\/|\\/g, ".").slice(1);
     this.mount = async () => {
       if (this.python) {
         return;
@@ -62,19 +70,24 @@ export class PythonRunner implements Runner {
       try {
         await access(_handlerPath);
         this.load();
-        watchFile(_handlerPath, this.load);
+        watchFile(_handlerPath, { interval: 1000 }, () => {
+          this.load();
+          this.emitRebuild();
+        });
       } catch (error) {
         console.error(`Can not find ${this.name}'s handler at: "${_handlerPath}"`);
         process.exit(1);
       }
     };
-    this.unmount = () => {
-      this.python?.kill();
-      this.python = undefined;
+    this.unmount = (lifecycleEnds) => {
+      if (lifecycleEnds) {
+        this.python?.kill();
+        this.python = undefined;
+      }
     };
     this.invoke = async ({ event, info, clientContext, awsRequestId }) => {
       return new Promise((resolve, reject) => {
-        const content = JSON.stringify({ event, context: clientContext ?? "" });
+        const content = JSON.stringify({ event, awsRequestId, context: clientContext ?? "" });
 
         const pyListener = (chunk: Buffer) => {
           let result: any = null;
@@ -137,7 +150,7 @@ export class PythonRunner implements Runner {
       this.bin = this.runtime.includes(".") ? this.runtime.split(".")[0] : this.runtime;
     }
 
-    this.python = spawn(this.bin, ["-u", PythonRunner.wrapper, this.handlerDir, this.handlerPath, this.handlerName, this.name, String(this.timeout)], {
+    this.python = spawn(this.bin, ["-u", PythonRunner.wrapper, this.pyModulePath, this.handlerName, this.name, String(this.timeout)], {
       env: this.environment,
     });
 
@@ -146,4 +159,5 @@ export class PythonRunner implements Runner {
       process.exit(1);
     }
   };
+  onComplete = (awsRequestId: string) => {};
 }

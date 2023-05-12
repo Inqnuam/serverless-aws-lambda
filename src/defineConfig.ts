@@ -56,6 +56,7 @@ export interface OfflineRequest {
 
 export interface SlsAwsLambdaPlugin {
   name: string;
+  pluginData?: any;
   buildCallback?: (this: ClientConfigParams, result: BuildResult, isRebuild: boolean) => Promise<void> | void;
   onInit?: (this: ClientConfigParams) => Promise<void> | void;
   onExit?: (this: ClientConfigParams, code: string | number) => void;

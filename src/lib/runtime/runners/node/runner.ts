@@ -67,9 +67,8 @@ export class NodeRunner extends EventEmitter implements Runner {
         await this.importHandler();
       }
     };
-    this.unmount = (awsRequestId?: string) => {
+    this.unmount = () => {
       this._worker?.terminate();
-
       this._isLoaded = false;
       this._isLoading = false;
     };
@@ -178,4 +177,8 @@ export class NodeRunner extends EventEmitter implements Runner {
       this._worker.postMessage({ channel: "import" });
     });
   }
+
+  onComplete = (awsRequestId: string, timeout?: boolean) => {
+    this._worker?.postMessage({ channel: "complete", awsRequestId, timeout });
+  };
 }

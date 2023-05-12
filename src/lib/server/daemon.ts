@@ -31,6 +31,14 @@ if (debuggerIsAttached) {
   LambdaMock.ENABLE_TIMEOUT = false;
 }
 
+const fakeBuildResult = {
+  errors: [],
+  warnings: [],
+  outputFiles: [],
+  metafile: { inputs: {}, outputs: {} },
+  mangleCache: {},
+};
+
 interface IDaemonConfig {
   debug: boolean;
 }
@@ -43,6 +51,7 @@ export class Daemon extends Handlers {
     filter: RegExp | string;
     callback: (req: any, res: any) => Promise<any> | any | undefined;
   }[] = [];
+  customBuildCallback?: Function;
   onReady?: (port: number, ip: string) => any;
   stop(cb: (err?: any) => void) {
     this.#server.close(cb);
@@ -183,9 +192,20 @@ export class Daemon extends Handlers {
     }
   }
 
+  fakeRebuildEmitter = async () => {
+    if (this.customBuildCallback) {
+      try {
+        await this.customBuildCallback(fakeBuildResult, true);
+      } catch (error) {
+        console.log(error);
+      }
+    }
+    log.GREEN(`${new Date().toLocaleString()} 🔄✅ Rebuild`);
+    process.send?.({ rebuild: true });
+  };
   async load(lambdaDefinitions: ILambdaMock[]) {
     for (const lambda of lambdaDefinitions) {
-      lambda.runner = lambda.runtime.charAt(0) == "n" ? new NodeRunner(lambda) : new PythonRunner(lambda);
+      lambda.runner = lambda.runtime.charAt(0) == "n" ? new NodeRunner(lambda) : new PythonRunner(lambda, this.fakeRebuildEmitter);
       const lambdaController = new LambdaMock(lambda);
 
       this.addHandler(lambdaController);
