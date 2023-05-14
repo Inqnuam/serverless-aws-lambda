@@ -39,7 +39,43 @@ functions:
       - sns: InsertUserTopic
 ```
 
-Publish a Notification with aws-sdk SNS Client when a new user is added into a database
+### Example of supported SNS declarations
+
+```yaml
+- sns: InsertUserTopic
+```
+
+```yaml
+- sns: arn:aws:sns:us-east-1:00000000000:InsertUserTopic
+```
+
+```yaml
+- sns:
+    arn: arn:aws:sns:us-east-1:00000000000:InsertUserTopic
+```
+
+```yaml
+- sns:
+    topicName: InsertUserTopic-account-1-us-east-1
+```
+
+```yaml
+- sns:
+    arn: arn:aws:sns:us-east-1:00000000000:InsertUserTopic
+    filterPolicyScope: MessageBody
+    filterPolicy:
+      pet:
+        - dog
+        - cat
+```
+
+\+ `Fn::GetAtt`, `Ref`, `Fn::Join`, `Fn::ImportValue` variants.
+
+---
+
+## Publish a Notification
+
+### with aws-sdk SNS Client
 
 ```js
 // src/insertUser.js
@@ -95,6 +131,12 @@ export default async (event) => {
 };
 ```
 
+### with AWS CLI
+
+```bash
+aws sns --region eu-west-1 --endpoint http://localhost:9999/@sns publish --topic-arn "arn:aws:sns:eu-west-3:123456789012:InsertUserTopic" --message "Hello World"
+```
+
 Handle the Insert user Notification
 
 ```js
@@ -104,37 +146,3 @@ export default async (snsEvent) => {
   console.log(snsEvent);
 };
 ```
-
----
-
-### Example of supported SNS declarations
-
-```yaml
-- sns: InsertUserTopic
-```
-
-```yaml
-- sns: arn:aws:sns:us-east-1:00000000000:InsertUserTopic
-```
-
-```yaml
-- sns:
-    arn: arn:aws:sns:us-east-1:00000000000:InsertUserTopic
-```
-
-```yaml
-- sns:
-    topicName: InsertUserTopic-account-1-us-east-1
-```
-
-```yaml
-- sns:
-    arn: arn:aws:sns:us-east-1:00000000000:InsertUserTopic
-    filterPolicyScope: MessageBody
-    filterPolicy:
-      pet:
-        - dog
-        - cat
-```
-
-\+ `Fn::GetAtt`, `Ref`, `Fn::Join`, `Fn::ImportValue` variants.

@@ -390,9 +390,9 @@ export class ApgRequestHandler extends CommonEventGenerator {
 
     const contentType = typeof resContent;
     if (contentType == "number" || contentType == "boolean") {
-      resContent = String(resContent); // maybe use value normalizer
-    } else {
-      // TODO: check type
+      resContent = String(resContent);
+    } else if (resContent && contentType != "string") {
+      log.YELLOW("API Gateway payload v1 return body must be typeof string, number or boolean ");
     }
 
     const contentLengh = resContent ? String(Buffer.from(resContent).byteLength) : "0";

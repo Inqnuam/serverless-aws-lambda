@@ -20,7 +20,6 @@ const readFromPath = async (sourcefile: string) => {
     __filename: filename,
     __dirname: path.dirname(filename),
   };
-  console.log("sourcefile", sourcefile);
   const tt = await esbuild.build({
     write: false,
     entryPoints: [sourcefile],
