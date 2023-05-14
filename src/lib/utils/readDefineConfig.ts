@@ -5,6 +5,8 @@ import { createRequire } from "node:module";
 import vm from "vm";
 import { fileURLToPath, pathToFileURL } from "url";
 
+const jsExt = ["js", "mjs", "cjs", "ts", "cts", "mts"];
+
 const readFromPath = async (sourcefile: string) => {
   const { href } = pathToFileURL(sourcefile);
   const filename = fileURLToPath(href);
@@ -18,7 +20,7 @@ const readFromPath = async (sourcefile: string) => {
     __filename: filename,
     __dirname: path.dirname(filename),
   };
-
+  console.log("sourcefile", sourcefile);
   const tt = await esbuild.build({
     write: false,
     entryPoints: [sourcefile],
@@ -54,7 +56,11 @@ export const readDefineConfig = async (config: string) => {
 
   const customFilePath = path.posix.join(parsed.dir, parsed.name);
   const configObjectName = parsed.ext.slice(1);
-  const configPath = path.posix.resolve(customFilePath);
+  let configPath = path.posix.resolve(customFilePath);
+
+  if (jsExt.includes(configObjectName)) {
+    configPath += `.${configObjectName}`;
+  }
 
   let exportedFunc;
 

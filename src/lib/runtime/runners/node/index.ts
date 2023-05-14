@@ -200,14 +200,13 @@ const listener = async (e: any) => {
             error: err,
             res,
           };
-          // TODO: set context cb called to true, if timeout then check if this was called if async func
         } else {
           log.RED("Invocation has already been reported as done. Cannot call complete more than once per invocation.");
         }
       };
-      eventQueue.enable();
 
       try {
+        eventQueue.enable();
         const eventResponse = eventHandler(event, context, callback);
         // NOTE: this is a workaround for async versus callback lambda different behaviour
         eventResponse
@@ -220,11 +219,12 @@ const listener = async (e: any) => {
             }
             resIsSent();
             returnResponse("return", awsRequestId, data);
+            eventQueue.disable();
           })
-
           ?.catch((err: any) => {
             resIsSent();
             returnError(awsRequestId, err);
+            eventQueue.disable();
           });
 
         eventQueue.async = typeof eventResponse?.then == "function";
@@ -236,7 +236,7 @@ const listener = async (e: any) => {
         if (!isSent && (!eventQueue.async || cbCalled)) {
           const returnCallback = () => {
             eventQueue.storeContextTimers();
-
+            eventQueue.disable();
             if (cbCalled) {
               context.done(cbCalled.error, cbCalled.res);
             } else {
@@ -269,6 +269,7 @@ const listener = async (e: any) => {
       } catch (err) {
         resIsSent();
         returnError(awsRequestId, err);
+        eventQueue.disable();
       }
     }
   }

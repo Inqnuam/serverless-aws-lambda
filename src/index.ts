@@ -240,31 +240,32 @@ class ServerlessAwsLambda extends Daemon {
             packageLambdas = [foundLambda];
           }
         }
-        // TODO: convert to promise all
-        // remove this filter ?
-        for (const l of packageLambdas.filter((x) => x.online)) {
-          const slsDeclaration = this.serverless.service.getFunction(l.name) as Serverless.FunctionDefinitionHandler;
 
-          if (typeof slsDeclaration.package?.artifact == "string") {
-            continue;
-          }
+        await Promise.all(
+          packageLambdas.map(async (l) => {
+            const slsDeclaration = this.serverless.service.getFunction(l.name) as Serverless.FunctionDefinitionHandler;
 
-          // @ts-ignore
-          const filesToInclude = slsDeclaration.files;
-          const zipableBundledFilePath = l.esOutputPath.slice(0, -3);
-          const zipOptions: IZipOptions = {
-            filePath: zipableBundledFilePath,
-            zipName: l.outName,
-            include: filesToInclude,
-            sourcemap: this.esBuildConfig.sourcemap,
-            format,
-          };
-          const zipOutputPath = await zip(zipOptions);
+            if (typeof slsDeclaration.package?.artifact == "string") {
+              return;
+            }
 
-          // @ts-ignore
-          slsDeclaration.package = { ...slsDeclaration.package, disable: true, artifact: zipOutputPath };
-          slsDeclaration.handler = path.basename(l.handlerPath);
-        }
+            // @ts-ignore
+            const filesToInclude = slsDeclaration.files;
+            const zipableBundledFilePath = l.esOutputPath.slice(0, -3);
+            const zipOptions: IZipOptions = {
+              filePath: zipableBundledFilePath,
+              zipName: l.outName,
+              include: filesToInclude,
+              sourcemap: this.esBuildConfig.sourcemap,
+              format,
+            };
+            const zipOutputPath = await zip(zipOptions);
+
+            // @ts-ignore
+            slsDeclaration.package = { ...slsDeclaration.package, disable: true, artifact: zipOutputPath };
+            slsDeclaration.handler = path.basename(l.handlerPath);
+          })
+        );
       } else {
         this.listen(ServerlessAwsLambda.PORT, async (port: number, localIp: string) => {
           Handlers.PORT = port;

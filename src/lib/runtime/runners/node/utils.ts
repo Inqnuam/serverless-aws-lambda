@@ -10,7 +10,8 @@ interface LambdaErrorResponse {
 }
 
 const root = process.cwd().split(path.sep).filter(Boolean)[0];
-const stackRegex = new RegExp(`(\/${root}|${root}).*(\\d+):(\\d+)`);
+const stackRegex = new RegExp(`\\((\/${root}|${root}).*(\\d+):(\\d+)`);
+const orgCT = clearTimeout.bind(clearTimeout);
 const { AWS_LAMBDA_FUNCTION_NAME } = process.env;
 
 const genSolution = (fn: string) => {
@@ -59,7 +60,7 @@ const getStackLine = (e: any) => {
     // @ts-ignore
     const line = stackRegex.exec(e.stack.split("at")[2])?.[0];
     if (typeof line == "string") {
-      stack = line;
+      stack = line.slice(1);
     }
   } catch (error) {}
   return stack;
@@ -95,7 +96,7 @@ export const formatStack = (_stack: string[]) => {
     .forEach((x) => {
       const line = stackRegex.exec(x)?.[0];
       if (line) {
-        stack += `${line}\n`;
+        stack += `${line}\n`.slice(1);
         indent++;
         stack += " ".repeat(indent);
       }
@@ -129,7 +130,12 @@ export class EventQueue extends Map {
       if (x.took) {
         x.stack = x.stack
           .reverse()
-          .map((s: string) => stackRegex.exec(s)?.[0])
+          .map((s: string) => {
+            const fPath = stackRegex.exec(s)?.[0];
+            if (fPath) {
+              return fPath.slice(1);
+            }
+          })
           .filter((s: string) => s && !s.includes(__dirname));
 
         if (x.stack.length) {
@@ -141,7 +147,11 @@ export class EventQueue extends Map {
     }, []);
 
     stacks = stacks.filter((x: any, i: number) => {
-      return x.stack.every((s: string) => stacks.find((e: any, ii: number) => i != ii && e.took > x.took && e.stack.includes(s))) ? false : true;
+      if (x.took > 0.01) {
+        return x.stack.every((s: string) => stacks.find((e: any, ii: number) => i != ii && (e.took > x.took || x.stack.length < e.stack.length) && e.stack.includes(s)))
+          ? false
+          : true;
+      }
     });
     if (stacks.length) {
       const msg = inspect(stacks, { colors: true });
@@ -182,11 +192,14 @@ export class EventQueue extends Map {
         return;
       }
       const { _idleTimeout, _idleStart, _onTimeout, _repeat } = timer.resource;
+
       const timerValue = _idleTimeout - _idleStart;
-      EventQueue.context[this.requestId].timers.set(id, { timerValue, _onTimeout, interval: _repeat });
+      if (timerValue > -1 || _repeat) {
+        EventQueue.context[this.requestId].timers.set(id, { timerValue, _onTimeout, interval: _repeat });
+      }
+
       clearTimeout(timer.resource);
     });
-    // ;
   };
   isEmpty = () => {
     const resources = [...this.values()].filter((r) => {
@@ -240,6 +253,15 @@ export class EventQueue extends Map {
   };
   enable = () => {
     EventQueue.restoreContext();
+    // in async funtions destroy() hook is called once promise is resolved which is not sufficient to call storeContextTimers safely
+    const self = this;
+    //@ts-ignore
+    const customCT = function clearTimeout(timer) {
+      orgCT(timer);
+      self.destroy(Number(timer));
+    };
+    global.clearTimeout = customCT;
+    global.clearInterval = customCT;
     this.hook = createHook({
       init: this.add,
       destroy: this.destroy,
@@ -247,6 +269,7 @@ export class EventQueue extends Map {
     }).enable();
   };
   disable = () => {
-    return this.hook?.disable();
+    this.hook?.disable();
+    delete this.hook;
   };
 }
