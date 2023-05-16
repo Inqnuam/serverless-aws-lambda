@@ -5,8 +5,7 @@ import { access } from "fs/promises";
 import type { Runner } from "../index";
 import type { ChildProcessWithoutNullStreams } from "child_process";
 
-const cwd = process.cwd();
-export class PythonRunner implements Runner {
+export class RubyRunner implements Runner {
   invoke: Runner["invoke"];
   mount: Runner["mount"];
   unmount: Runner["unmount"];
@@ -21,10 +20,10 @@ export class PythonRunner implements Runner {
   handlerName: string;
   runtime: string;
   bin?: string;
-  python?: ChildProcessWithoutNullStreams;
+  ruby?: ChildProcessWithoutNullStreams;
   isMounted: boolean = false;
   emitRebuild: Function;
-  static wrapper = __dirname.replace("/dist", "/src/lib/runtime/runners/python/index.py");
+  static wrapper = __dirname.replace("/dist", "/src/lib/runtime/runners/ruby/index.rb");
   static DELIMITER = "__|response|__";
   static ERR_RESPONSE = "__|error|__";
   constructor(
@@ -61,13 +60,13 @@ export class PythonRunner implements Runner {
     const tp = path.resolve(handlerPath);
     this.handlerDir = path.dirname(tp);
     this.handlerPath = path.basename(tp, `.${this.handlerName}`);
-    this.pyModulePath = `${this.handlerDir}/${this.handlerPath}`.replace(cwd, "").replace(/\/|\\/g, ".").slice(1);
+    this.pyModulePath = `${this.handlerDir}/${this.handlerPath}.rb`;
     this.mount = async () => {
-      if (this.python) {
+      if (this.ruby) {
         return;
       }
 
-      const _handlerPath = `${this.handlerDir}/${this.handlerPath}.py`;
+      const _handlerPath = `${this.handlerDir}/${this.handlerPath}.rb`;
       try {
         await access(_handlerPath);
         this.load();
@@ -84,8 +83,8 @@ export class PythonRunner implements Runner {
     };
     this.unmount = (lifecycleEnds) => {
       if (lifecycleEnds) {
-        this.python?.kill();
-        this.python = undefined;
+        this.ruby?.kill();
+        this.ruby = undefined;
         this.isMounted = false;
       }
     };
@@ -98,8 +97,8 @@ export class PythonRunner implements Runner {
           const data = chunk.toString();
 
           try {
-            if (data.includes(PythonRunner.DELIMITER)) {
-              const output = data.split(PythonRunner.DELIMITER);
+            if (data.includes(RubyRunner.DELIMITER)) {
+              const output = data.split(RubyRunner.DELIMITER);
               const res = output[output.length - 1];
 
               if (output.length > 1) {
@@ -112,57 +111,56 @@ export class PythonRunner implements Runner {
               if (res) {
                 result = JSON.parse(res);
               }
-              this.python!.stdout.removeListener("data", pyListener);
-              this.python!.stderr.removeListener("data", errorHandler);
+              this.ruby!.stdout.removeListener("data", pyListener);
+              this.ruby!.stderr.removeListener("data", errorHandler);
               resolve(result);
             } else if (data.trim()) {
               console.log(data);
             }
           } catch (error) {
-            console.log("err", error);
             // maybe remove listener ?
             reject(error);
           }
         };
-        this.python!.stdout.on("data", pyListener);
+        this.ruby!.stdout.on("data", pyListener);
 
         const errorHandler = (data: Buffer) => {
           let err: any = data.toString();
 
-          if (err.includes(PythonRunner.ERR_RESPONSE)) {
+          if (err.includes(RubyRunner.ERR_RESPONSE)) {
             try {
-              err = JSON.parse(err.split(PythonRunner.ERR_RESPONSE)[1]);
+              err = JSON.parse(err.split(RubyRunner.ERR_RESPONSE)[1]);
               err.requestId = awsRequestId;
             } catch (error) {
             } finally {
-              this.python!.stdout.removeListener("data", pyListener);
-              this.python!.stderr.removeListener("data", errorHandler);
+              this.ruby!.stdout.removeListener("data", pyListener);
+              this.ruby!.stderr.removeListener("data", errorHandler);
               reject(err);
             }
           } else {
             console.log(err);
           }
         };
-        this.python!.stderr.on("data", errorHandler);
-        this.python!.stdin.write(`${content}\n`);
+        this.ruby!.stderr.on("data", errorHandler);
+        this.ruby!.stdin.write(`${content}\n`);
       });
     };
   }
 
   load = () => {
     if (!this.bin) {
-      this.bin = this.runtime.includes(".") ? this.runtime.split(".")[0] : this.runtime;
+      this.bin = process.platform === "win32" ? "ruby.exe" : "ruby";
     }
 
-    this.python = spawn(this.bin, ["-u", PythonRunner.wrapper, this.pyModulePath, this.handlerName, this.name, String(this.timeout)], {
+    this.ruby = spawn(this.bin, [RubyRunner.wrapper, this.pyModulePath, this.handlerName, this.name, String(this.timeout)], {
       env: this.environment,
+      shell: true,
     });
 
-    if (!this.python.pid) {
+    if (!this.ruby.pid) {
       console.error(`Can not find ${this.bin} in your PATH`);
       process.exit(1);
     }
-
     this.isMounted = true;
   };
   onComplete = (awsRequestId: string) => {};

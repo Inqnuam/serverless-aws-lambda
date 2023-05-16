@@ -12,6 +12,7 @@ import { CommonEventGenerator } from "../../plugins/lambda/events/common";
 import { defaultServer } from "../../plugins/lambda/defaultServer";
 import { NodeRunner } from "../runtime/runners/node/runner";
 import { PythonRunner } from "../runtime/runners/python/runner";
+import { RubyRunner } from "../runtime/runners/ruby/runner";
 
 let localIp: string;
 if (networkInterfaces) {
@@ -205,7 +206,8 @@ export class Daemon extends Handlers {
   };
   async load(lambdaDefinitions: ILambdaMock[]) {
     for (const lambda of lambdaDefinitions) {
-      lambda.runner = lambda.runtime.charAt(0) == "n" ? new NodeRunner(lambda) : new PythonRunner(lambda, this.fakeRebuildEmitter);
+      const r = lambda.runtime.charAt(0);
+      lambda.runner = r == "n" ? new NodeRunner(lambda) : r == "p" ? new PythonRunner(lambda, this.fakeRebuildEmitter) : new RubyRunner(lambda, this.fakeRebuildEmitter);
       const lambdaController = new LambdaMock(lambda);
 
       this.addHandler(lambdaController);

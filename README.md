@@ -8,6 +8,12 @@
 - Offline server uses NodeJS `http` module
 - Packaging is made by [node-archiver](https://github.com/archiverjs/node-archiver)
 
+### Supported Runtimes
+
+- NodeJS
+- Python
+- Ruby
+
 # Installation
 
 ```bash

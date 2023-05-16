@@ -8,6 +8,7 @@ interface IRunnerInvoke {
 }
 
 export interface Runner {
+  isMounted: boolean;
   mount: () => Promise<any> | any;
   unmount: (lifecycleEnds?: boolean) => Promise<any> | any;
   invoke: (request: IRunnerInvoke) => Promise<any>;

@@ -229,7 +229,11 @@ export class LambdaMock implements ILambdaMock {
   }
 
   async invoke(event: any, info?: any, clientContext?: any, response?: ServerResponse) {
-    await this.runner.mount();
+    if (!this.runner.isMounted) {
+      log.BR_BLUE(`❄️ Cold start '${this.outName}'`);
+      await this.runner.mount();
+    }
+
     const awsRequestId = randomUUID();
     const hrTimeStart = this.#printStart(awsRequestId, event, info);
     this.invokeSub.forEach((x) => {

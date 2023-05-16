@@ -8,7 +8,7 @@ import { BufferedStreamResponse } from "../../bufferedStreamResponse";
 
 export class NodeRunner extends EventEmitter implements Runner {
   _worker?: Worker;
-  _isLoaded: boolean = false;
+  isMounted: boolean = false;
   _isLoading: boolean = false;
   invoke: (request: any) => Promise<any>;
   mount: () => any;
@@ -61,15 +61,14 @@ export class NodeRunner extends EventEmitter implements Runner {
             }
           });
         });
-      } else if (!this._isLoaded) {
+      } else if (!this.isMounted) {
         this._isLoading = true;
-        log.BR_BLUE(`❄️ Cold start '${this.outName}'`);
         await this.importHandler();
       }
     };
     this.unmount = () => {
       this._worker?.terminate();
-      this._isLoaded = false;
+      this.isMounted = false;
       this._isLoading = false;
     };
 
@@ -140,7 +139,7 @@ export class NodeRunner extends EventEmitter implements Runner {
       this._worker.setMaxListeners(0);
 
       const errorHandler = (err: any) => {
-        this._isLoaded = false;
+        this.isMounted = false;
         this._isLoading = false;
         log.RED("Lambda execution fatal error");
         console.error(err);
@@ -154,13 +153,13 @@ export class NodeRunner extends EventEmitter implements Runner {
           this._worker!.setMaxListeners(55);
           this.setMaxListeners(10);
           this._worker!.removeListener("error", errorHandler);
-          this._isLoaded = true;
+          this.isMounted = true;
           this._isLoading = false;
           this.emit("loaded", true);
           resolve(undefined);
         } else if (channel == "uncaught") {
           this._worker!.terminate();
-          this._isLoaded = false;
+          this.isMounted = false;
           this._isLoading = false;
           log.RED(`${type} Uncaught exceptions`);
 
