@@ -517,7 +517,7 @@ class ServerlessAwsLambda extends Daemon {
     });
     let exportedObject: any = {};
 
-    const definedConfig = await readDefineConfig(this.pluginConfig.configPath);
+    const definedConfig = await readDefineConfig(this.pluginConfig?.configPath);
     if (definedConfig && definedConfig.exportedFunc) {
       const { exportedFunc, configObjectName, configPath } = definedConfig;
 

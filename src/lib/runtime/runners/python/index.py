@@ -69,6 +69,12 @@ class LambdaContext(object):
 module = import_module(handlerPath)
 handler = getattr(module, handlerName)
 
+_mods = [m.__name__ for m in sys.modules.values() if m]
+
+watchFiles = json.dumps([x for x in _mods if x.startswith("src")])
+sys.stdout.write(f"__|watch|__{watchFiles}")
+sys.stdout.flush()
+
 for line in sys.stdin:
     input = json.loads(line)
     context = LambdaContext(input["awsRequestId"])  # input["context"]

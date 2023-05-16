@@ -4,6 +4,7 @@ import { watch } from "fs";
 import { access } from "fs/promises";
 import type { Runner } from "../index";
 import type { ChildProcessWithoutNullStreams } from "child_process";
+import type { FSWatcher } from "fs";
 
 const cwd = process.cwd();
 export class PythonRunner implements Runner {
@@ -23,10 +24,14 @@ export class PythonRunner implements Runner {
   bin?: string;
   python?: ChildProcessWithoutNullStreams;
   isMounted: boolean = false;
+  watchers: FSWatcher[] = [];
+  filesTime: Map<string, number> = new Map();
+  watcherListener: (event: "rename" | "change", filename: string | Buffer) => void;
   emitRebuild: Function;
   static wrapper = __dirname.replace("/dist", "/src/lib/runtime/runners/python/index.py");
   static DELIMITER = "__|response|__";
   static ERR_RESPONSE = "__|error|__";
+  static WATCH = "__|watch|__";
   constructor(
     {
       name,
@@ -71,12 +76,6 @@ export class PythonRunner implements Runner {
       try {
         await access(_handlerPath);
         this.load();
-        watch(_handlerPath, { persistent: false }, () => {
-          if (this.isMounted) {
-            this.unmount(true);
-            this.emitRebuild();
-          }
-        });
       } catch (error) {
         console.error(`Can not find ${this.name}'s handler at: "${_handlerPath}"`);
         process.exit(1);
@@ -98,7 +97,9 @@ export class PythonRunner implements Runner {
           const data = chunk.toString();
 
           try {
-            if (data.includes(PythonRunner.DELIMITER)) {
+            if (data.includes(PythonRunner.WATCH)) {
+              this.setWatchFiles(data);
+            } else if (data.includes(PythonRunner.DELIMITER)) {
               const output = data.split(PythonRunner.DELIMITER);
               const res = output[output.length - 1];
 
@@ -147,8 +148,33 @@ export class PythonRunner implements Runner {
         this.python!.stdin.write(`${content}\n`);
       });
     };
+
+    this.watcherListener = () => {
+      if (this.isMounted) {
+        this.unmount(true);
+        this.watchers.forEach((x) => x.close());
+        this.watchers = [];
+        this.emitRebuild();
+      }
+    };
   }
 
+  setWatchFiles = async (data: string) => {
+    try {
+      const output = data.split(PythonRunner.WATCH);
+      const rawFiles = output[output.length - 1];
+      const files = JSON.parse(rawFiles).map((x: string) => `${x.replace(/\./g, path.sep)}.py`);
+
+      for (const f of files) {
+        try {
+          await access(f);
+          this.watchers.push(watch(f, { persistent: false }, this.watcherListener));
+        } catch (error) {}
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
   load = () => {
     if (!this.bin) {
       this.bin = this.runtime.includes(".") ? this.runtime.split(".")[0] : this.runtime;
