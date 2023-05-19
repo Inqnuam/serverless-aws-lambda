@@ -54,7 +54,7 @@ export class Daemon extends Handlers {
   }[] = [];
   customBuildCallback?: Function;
   onReady?: (port: number, ip: string) => any;
-  stop(cb: (err?: any) => void) {
+  stop(cb?: (err?: any) => void) {
     this.#server.close(cb);
   }
   constructor(config: IDaemonConfig = { debug: false }) {
@@ -155,7 +155,7 @@ export class Daemon extends Handlers {
   }
   async #requestListener(req: IncomingMessage, res: ServerResponse) {
     const { url, method } = req;
-    const parsedURL = new URL(url as string, "http://localhost:3003");
+    const parsedURL = new URL(url as string, CommonEventGenerator.dummyHost);
 
     const customCallback = this.#findRequestHandler(method!, parsedURL.pathname);
 

@@ -3,7 +3,6 @@ import type { LambdaEndpoint } from "../../../lib/parseEvents/endpoints";
 import { CommonEventGenerator } from "./common";
 import { log } from "../../../lib/utils/colorize";
 import { randomUUID } from "crypto";
-import { BufferedStreamResponse } from "../../../lib/runtime/bufferedStreamResponse";
 import { capitalize } from "../utils";
 
 interface CommonApgEvent {
@@ -287,20 +286,34 @@ export class ApgRequestHandler extends CommonEventGenerator {
 
     return event;
   };
-  returnError = () => {
+  returnError = (err?: any) => {
     if (this.res.writableFinished) {
       return true;
     }
-    this.res.shouldKeepAlive = false;
-    this.res.writeHead(500, [
-      ["Date", new Date().toUTCString()],
-      ["Content-Type", "application/json"],
-      ["Content-Length", "35"],
-      ["Connection", "keep-alive"],
-      ["Apigw-Requestid", "ETuSEj-PiGYEJdQ="],
-    ]);
 
-    return this.res.end(BufferedStreamResponse.httpErrMsg);
+    let code = 500;
+    let body = ApgRequestHandler.httpErrMsg;
+
+    if (err && ApgRequestHandler.isEndpointTimeoutError(err.errorMessage)) {
+      if (this.mockEvent.proxy == "httpApi") {
+        code = 503;
+        body = ApgRequestHandler.unavailable;
+      } else {
+        code = 504;
+        body = ApgRequestHandler.apgTimeoutMsg;
+      }
+    }
+    const headers = [
+      ["Date", new Date().toUTCString()],
+      ["Content-Type", ApgRequestHandler.contentType.json],
+      ["Content-Length", String(body.length)],
+      ApgRequestHandler.keepAlive,
+      ["Apigw-Requestid", "ETuSEj-PiGYEJdQ="],
+    ];
+    this.res.shouldKeepAlive = false;
+    this.res.writeHead(code, headers);
+
+    return this.res.end(body);
   };
 
   static #normalizeHeaderKey = (key: string) => {
@@ -321,11 +334,7 @@ export class ApgRequestHandler extends CommonEventGenerator {
     return value;
   };
   sendV1Response = (output?: any) => {
-    const headers = [
-      ["Date", new Date().toUTCString()],
-      ["Apigw-Requestid", Buffer.from(randomUUID()).toString("base64").slice(0, 16)],
-      ["Connection", "keep-alive"],
-    ];
+    const headers = [["Date", new Date().toUTCString()], ["Apigw-Requestid", Buffer.from(randomUUID()).toString("base64").slice(0, 16)], ApgRequestHandler.keepAlive];
     let code = 200;
 
     if (!output || isNaN(output.statusCode)) {
@@ -380,7 +389,7 @@ export class ApgRequestHandler extends CommonEventGenerator {
     const contentTypeIndex = headers.findIndex((x) => x[0].toLowerCase() == "content-type");
 
     if (contentTypeIndex == -1 && resContent) {
-      headers.push(["Content-Type", "text/plain; charset=utf-8"]);
+      headers.push(["Content-Type", ApgRequestHandler.contentType.json]);
     }
 
     const contentLengthIndex = headers.findIndex((x) => x[0].toLowerCase() == "content-length");
@@ -449,10 +458,10 @@ export class ApgRequestHandler extends CommonEventGenerator {
       }
     }
     if (typeof output == "string") {
-      this.res.setHeader("Content-Type", "application/json");
+      this.res.setHeader("Content-Type", ApgRequestHandler.contentType.json);
       resContent = output;
     } else if (typeof output == "object" && !output.statusCode) {
-      this.res.setHeader("Content-Type", "application/json");
+      this.res.setHeader("Content-Type", ApgRequestHandler.contentType.json);
       resContent = JSON.stringify(output);
     }
 

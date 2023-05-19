@@ -4,6 +4,7 @@ import { watch } from "fs";
 import { access } from "fs/promises";
 import type { Runner } from "../index";
 import type { ChildProcessWithoutNullStreams } from "child_process";
+import type { FSWatcher } from "fs";
 
 export class RubyRunner implements Runner {
   invoke: Runner["invoke"];
@@ -15,7 +16,7 @@ export class RubyRunner implements Runner {
   memorySize: number;
   environment: { [key: string]: any };
   handlerPath: string;
-  pyModulePath: string;
+  modulePath: string;
   handlerDir: string;
   handlerName: string;
   runtime: string;
@@ -23,9 +24,12 @@ export class RubyRunner implements Runner {
   ruby?: ChildProcessWithoutNullStreams;
   isMounted: boolean = false;
   emitRebuild: Function;
+  watcherListener: (event: "rename" | "change", filename: string | Buffer) => void;
+  watchers: FSWatcher[] = [];
   static wrapper = __dirname.replace("/dist", "/src/lib/runtime/runners/ruby/index.rb");
   static DELIMITER = "__|response|__";
   static ERR_RESPONSE = "__|error|__";
+  static WATCH = "__|watch|__";
   constructor(
     {
       name,
@@ -60,24 +64,17 @@ export class RubyRunner implements Runner {
     const tp = path.resolve(handlerPath);
     this.handlerDir = path.dirname(tp);
     this.handlerPath = path.basename(tp, `.${this.handlerName}`);
-    this.pyModulePath = `${this.handlerDir}/${this.handlerPath}.rb`;
+    this.modulePath = `${this.handlerDir}/${this.handlerPath}.rb`;
     this.mount = async () => {
       if (this.ruby) {
         return;
       }
 
-      const _handlerPath = `${this.handlerDir}/${this.handlerPath}.rb`;
       try {
-        await access(_handlerPath);
+        await access(this.modulePath);
         this.load();
-        watch(_handlerPath, { persistent: false }, () => {
-          if (this.isMounted) {
-            this.unmount(true);
-            this.emitRebuild();
-          }
-        });
       } catch (error) {
-        console.error(`Can not find ${this.name}'s handler at: "${_handlerPath}"`);
+        console.error(`Can not find ${this.name}'s handler at: "${this.modulePath}"`);
         process.exit(1);
       }
     };
@@ -97,7 +94,9 @@ export class RubyRunner implements Runner {
           const data = chunk.toString();
 
           try {
-            if (data.includes(RubyRunner.DELIMITER)) {
+            if (data.includes(RubyRunner.WATCH)) {
+              this.setWatchFiles(data);
+            } else if (data.includes(RubyRunner.DELIMITER)) {
               const output = data.split(RubyRunner.DELIMITER);
               const res = output[output.length - 1];
 
@@ -145,14 +144,41 @@ export class RubyRunner implements Runner {
         this.ruby!.stdin.write(`${content}\n`);
       });
     };
+
+    this.watcherListener = () => {
+      if (this.isMounted) {
+        this.unmount(true);
+        this.watchers.forEach((x) => x.close());
+        this.watchers = [];
+        this.emitRebuild();
+      }
+    };
   }
 
+  setWatchFiles = async (data: string) => {
+    try {
+      const output = data.split(RubyRunner.WATCH);
+      const rawFiles = output[output.length - 1];
+
+      const files = JSON.parse(rawFiles);
+      files.push(this.modulePath);
+
+      for (const f of files) {
+        try {
+          await access(f);
+          this.watchers.push(watch(f, { persistent: false }, this.watcherListener));
+        } catch (error) {}
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
   load = () => {
     if (!this.bin) {
       this.bin = process.platform === "win32" ? "ruby.exe" : "ruby";
     }
 
-    this.ruby = spawn(this.bin, [RubyRunner.wrapper, this.pyModulePath, this.handlerName, this.name, String(this.timeout)], {
+    this.ruby = spawn(this.bin, [RubyRunner.wrapper, this.modulePath, this.handlerName, this.name, String(this.timeout)], {
       env: this.environment,
       shell: true,
     });

@@ -82,7 +82,7 @@ class ServerlessAwsLambda extends Daemon {
       properties: {
         virtualEnvs: { type: "object" },
         online: { anyOf: [{ type: "array", items: { type: "string" } }, { type: "boolean" }, { type: "string" }] },
-        files: { type: "array" },
+        files: { type: "array", items: { type: "string" } },
       },
     });
 
@@ -98,7 +98,7 @@ class ServerlessAwsLambda extends Daemon {
         lifecycleEvents: ["run"],
         options: {
           port: {
-            usage: "Specify the server port (default: 3000)",
+            usage: "Specify the server port (default: random free port)",
             shortcut: "p",
             required: false,
             type: "number",
@@ -120,6 +120,7 @@ class ServerlessAwsLambda extends Daemon {
       "before:deploy:function:packageFunction": this.init.bind(this, true),
       "before:invoke:local:invoke": this.invokeLocal.bind(this),
       "after:aws:deploy:finalize:cleanup": this.afterDeploy.bind(this),
+      "after:invoke:local:invoke": process.exit,
     };
 
     this.resources = getResources(this.serverless);
@@ -127,6 +128,7 @@ class ServerlessAwsLambda extends Daemon {
 
   async invokeLocal() {
     this.invokeName = this.options.function;
+    this.watch = false;
     await this.init(false);
   }
 
@@ -227,7 +229,7 @@ class ServerlessAwsLambda extends Daemon {
         const slsDeclaration = this.serverless.service.getFunction(this.invokeName);
         const foundLambda = this.#lambdas.find((x) => x.name == this.invokeName);
 
-        if (foundLambda) {
+        if (foundLambda && foundLambda.runtime.startsWith("n")) {
           (slsDeclaration as Serverless.FunctionDefinitionHandler).handler = foundLambda.esOutputPath.replace(`${cwd}/`, "").replace(".js", `.${foundLambda.handlerName}`);
         }
       } else if (this.isDeploying || this.isPackaging) {
@@ -242,29 +244,31 @@ class ServerlessAwsLambda extends Daemon {
         }
 
         await Promise.all(
-          packageLambdas.map(async (l) => {
-            const slsDeclaration = this.serverless.service.getFunction(l.name) as Serverless.FunctionDefinitionHandler;
+          packageLambdas
+            .filter((x) => x.runtime.startsWith("n"))
+            .map(async (l) => {
+              const slsDeclaration = this.serverless.service.getFunction(l.name) as Serverless.FunctionDefinitionHandler;
 
-            if (typeof slsDeclaration.package?.artifact == "string") {
-              return;
-            }
+              if (typeof slsDeclaration.package?.artifact == "string") {
+                return;
+              }
 
-            // @ts-ignore
-            const filesToInclude = slsDeclaration.files;
-            const zipableBundledFilePath = l.esOutputPath.slice(0, -3);
-            const zipOptions: IZipOptions = {
-              filePath: zipableBundledFilePath,
-              zipName: l.outName,
-              include: filesToInclude,
-              sourcemap: this.esBuildConfig.sourcemap,
-              format,
-            };
-            const zipOutputPath = await zip(zipOptions);
+              // @ts-ignore
+              const filesToInclude = slsDeclaration.files;
+              const zipableBundledFilePath = l.esOutputPath.slice(0, -3);
+              const zipOptions: IZipOptions = {
+                filePath: zipableBundledFilePath,
+                zipName: l.outName,
+                include: filesToInclude,
+                sourcemap: this.esBuildConfig.sourcemap,
+                format,
+              };
+              const zipOutputPath = await zip(zipOptions);
 
-            // @ts-ignore
-            slsDeclaration.package = { ...slsDeclaration.package, disable: true, artifact: zipOutputPath };
-            slsDeclaration.handler = path.basename(l.handlerPath);
-          })
+              // @ts-ignore
+              slsDeclaration.package = { ...slsDeclaration.package, disable: true, artifact: zipOutputPath };
+              slsDeclaration.handler = path.basename(l.handlerPath);
+            })
         );
       } else {
         this.listen(ServerlessAwsLambda.PORT, async (port: number, localIp: string) => {
@@ -492,7 +496,7 @@ class ServerlessAwsLambda extends Daemon {
   }
   async #setCustomEsBuildConfig() {
     const customConfigArgs = {
-      stop: async (cb: (err?: any) => void) => {
+      stop: async (cb?: (err?: any) => void) => {
         if (this.buildContext.stop) {
           await this.buildContext.stop();
         }

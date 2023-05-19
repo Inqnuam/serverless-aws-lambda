@@ -12,7 +12,7 @@ import type { IKinesisEvent } from "../parseEvents/kinesis";
 import type { IDocumentDbEvent } from "../parseEvents/documentDb";
 import type { Runner } from "./runners/index";
 
-type InvokeSub = (event: any, info?: any) => void;
+type InvokeSub = (event: any, info?: any) => void | { [key: string]: any };
 type InvokeSuccessSub = (input: any, output: any, info?: any) => void;
 type InvokeErrorSub = InvokeSuccessSub;
 export interface ILambdaMock {
@@ -28,10 +28,10 @@ export interface ILambdaMock {
    * Deploy Lambda or not to AWS.
    */
   online: boolean | string | string[];
+  runtime: string;
   /**
    * API Gateway and Application Load balancer events.
    */
-  runtime: string;
   endpoints: LambdaEndpoint[];
   s3: IS3Event[];
   sns: ISnsEvent[];
@@ -235,12 +235,18 @@ export class LambdaMock implements ILambdaMock {
     }
 
     const awsRequestId = randomUUID();
-    const hrTimeStart = this.#printStart(awsRequestId, event, info);
+
+    // forEach is used to not slow down invokation with async subsribers
     this.invokeSub.forEach((x) => {
       try {
-        x(event, info);
+        const editedEvent = x(event, info);
+        if (editedEvent && typeof editedEvent.then != "function") {
+          event = editedEvent;
+        }
       } catch (error) {}
     });
+
+    const hrTimeStart = this.#printStart(awsRequestId, event, info);
 
     try {
       const eventResponse = await new Promise(async (resolve, reject) => {

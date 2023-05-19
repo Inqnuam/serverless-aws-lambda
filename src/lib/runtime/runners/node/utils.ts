@@ -9,7 +9,9 @@ interface LambdaErrorResponse {
   trace?: string[];
 }
 
-const root = process.cwd().split(path.sep).filter(Boolean)[0];
+const cwd = process.cwd();
+const router = `/dist/lambda/router.`;
+const root = cwd.split(path.sep).filter(Boolean)[0];
 const stackRegex = new RegExp(`\\((\/${root}|${root}).*(\\d+):(\\d+)`);
 const orgCT = clearTimeout.bind(clearTimeout);
 const { AWS_LAMBDA_FUNCTION_NAME } = process.env;
@@ -92,7 +94,7 @@ export const formatStack = (_stack: string[]) => {
   _stack
     .slice()
     .reverse()
-    .filter((s: string) => s && !s.includes(__dirname))
+    .filter((s: string) => s && !s.includes(__dirname) && !s.includes(router))
     .forEach((x) => {
       const line = stackRegex.exec(x)?.[0];
       if (line) {
@@ -136,7 +138,7 @@ export class EventQueue extends Map {
               return fPath.slice(1);
             }
           })
-          .filter((s: string) => s && !s.includes(__dirname));
+          .filter((s: string) => s && !s.includes(__dirname) && !s.includes(router));
 
         if (x.stack.length) {
           delete x.start;

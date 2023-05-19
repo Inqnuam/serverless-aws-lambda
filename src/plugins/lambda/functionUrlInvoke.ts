@@ -31,7 +31,7 @@ const createStreamResponseHandler = (res: ServerResponse, foundHandler: any) => 
           res.writeHead(code, headers);
         } catch (error: any) {
           res.writeHead(500, error.headers);
-          res.end?.(BufferedStreamResponse.amzMsgNull);
+          res.end?.(CommonEventGenerator.amzMsgNull);
           delete error.headers;
         }
       } else {
@@ -42,7 +42,7 @@ const createStreamResponseHandler = (res: ServerResponse, foundHandler: any) => 
       if (name.toLowerCase() == "content-type") {
         if (value == "application/vnd.awslambda.http-integration-response") {
           isHttpIntegrationResponse = true;
-          return originalSetHeader("Content-Type", "application/json");
+          return originalSetHeader("Content-Type", CommonEventGenerator.contentType.json);
         } else {
           contentType = value;
         }
@@ -68,7 +68,7 @@ const createStreamResponseHandler = (res: ServerResponse, foundHandler: any) => 
             collectChunks(chunk);
           }
         } else {
-          if (contentType == "application/json") {
+          if (contentType == CommonEventGenerator.contentType.json) {
             // AMZ checks if the first write() is parsable
             try {
               const chunkString = BufferedStreamResponse.codec.decode(chunk);
@@ -85,7 +85,7 @@ const createStreamResponseHandler = (res: ServerResponse, foundHandler: any) => 
               return internalServerError(res);
             }
           }
-          const headers = { "Content-Type": contentType ?? "application/octet-stream" };
+          const headers = { "Content-Type": contentType ?? CommonEventGenerator.contentType.octet };
           serverRes.writeHead(200, headers);
           return originalWrite(chunk, encoding, cb);
         }
@@ -116,10 +116,10 @@ const handleInvokeResponse = (result: any, res: ServerResponse, invokeResponseSt
         res.writeHead(500, error.headers);
         delete error.headers;
         console.error(error);
-        return res.end(BufferedStreamResponse.amzMsgNull);
+        return res.end(CommonEventGenerator.amzMsgNull);
       }
     } else {
-      res.writeHead(code, { "Content-Type": "application/json" });
+      res.writeHead(code, { "Content-Type": CommonEventGenerator.contentType.json });
     }
 
     if (!invokeResponseStream) {
@@ -127,18 +127,18 @@ const handleInvokeResponse = (result: any, res: ServerResponse, invokeResponseSt
         finalResponse = response.body;
       }
       if (!res.headersSent) {
-        res.setHeader("Content-Type", streamifyResponse ? "application/octet-stream" : "application/json");
+        res.setHeader("Content-Type", streamifyResponse ? CommonEventGenerator.contentType.octet : CommonEventGenerator.contentType.json);
       }
     } else {
       finalResponse = response;
     }
   } else {
-    res.writeHead(200, { "Content-Type": "application/json" });
+    res.writeHead(200, { "Content-Type": CommonEventGenerator.contentType.json });
     finalResponse = response;
   }
 
   if (!res.headersSent && !invokeResponseStream && streamifyResponse) {
-    res.setHeader("Content-Type", "application/octet-stream");
+    res.setHeader("Content-Type", CommonEventGenerator.contentType.octet);
   }
 
   if (invokeResponseStream) {
@@ -166,7 +166,7 @@ export const functionUrlInvoke: OfflineRequest = {
     if (unsupportedMethod(res, method!)) {
       return;
     }
-    const parsedURL = new URL(url as string, "http://localhost:3003");
+    const parsedURL = new URL(url as string, CommonEventGenerator.dummyHost);
 
     const requestId = setRequestId(res);
     const requestedName = Handlers.parseNameFromUrl(parsedURL.pathname);

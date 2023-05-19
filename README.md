@@ -1,3 +1,5 @@
+[![NPM](https://nodei.co/npm/serverless-aws-lambda.png?compact=true)](https://nodei.co/npm/serverless-aws-lambda/)
+
 ## Description
 
 > AWS Lambda dev tool for Serverless. Allows Express synthax in handlers. Supports packaging, local invoking and offline Application Load Balancer and API Gateway lambda server mocking.
@@ -48,7 +50,7 @@ This will overwrite serverless.yml custom > serverless-aws-lambda values if they
 
 ### Invoke
 
-Offline server supports Application Load Balancer and API Gateway endponts.  
+Offline server supports Application Load Balancer and API Gateway and Function URL endpoints (see [plugins](#plugins) for more triggers).  
 Appropriate `event` object is sent to the handler based on your lambda declaration.
 
 ```yaml
@@ -71,19 +73,18 @@ However if your declare both `alb` and `http` or `httpApi` inside a single lambd
 - header with `X-Mock-Type`.
 - or in query string with `x_mock_type`.
 
-Please note that invoking a lambda from sls CLI (`sls invoke local -f myFunction`) will not trigger the offline server. But you are still able to inject any event with `-d 'someData'` sls CLI option.
+Please note that invoking a lambda from sls CLI (`sls invoke local -f myFunction`) will not trigger the offline server. But will still make your handler ready to be invoked.
 
-You can also invoke your Lambdas with a custom `event` object by making a POST request to:  
-http://localhost:3000/@invoke/myAwsomeLambda  
-for `aws-sdk` Lambda client compatibility it is also possible to request to:  
-http://localhost:3000/2015-03-31/functions/myAwsomeLambda/invocations
+To invoke your Lambda like with AWS Console's `Test` button prefix your Lambda name by `@invoke/`.  
+Example:  
+http://localhost:3000/@invoke/myAwsomeLambda
 
 Example with with `aws-sdk` Lambda Client:
 
 ```js
 const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
 
-const client = new LambdaClient({ region: "PARADISE", endpoint: "http://localhost:3000" });
+const client = new LambdaClient({ region: "us-east-1", endpoint: "http://localhost:3000" });
 const DryRun = "DryRun";
 const Event = "Event";
 const RequestResponse = "RequestResponse";

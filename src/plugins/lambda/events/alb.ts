@@ -58,13 +58,7 @@ export class AlbRequestHandler extends CommonEventGenerator {
     }
 
     this.res.shouldKeepAlive = false;
-    this.res.writeHead(502, [
-      ["Server", "awselb/2.0"],
-      ["Date", new Date().toUTCString()],
-      ["Content-Type", "text/html"],
-      ["Content-Length", "127"],
-      ["Connection", "keep-alive"],
-    ]);
+    this.res.writeHead(502, [["Server", "awselb/2.0"], ["Date", new Date().toUTCString()], ["Content-Type", "text/html"], ["Content-Length", "127"], AlbRequestHandler.keepAlive]);
 
     return this.res.end(html502);
   };
@@ -154,7 +148,7 @@ export class AlbRequestHandler extends CommonEventGenerator {
     }
     const contentTypeIndex = customHeaders.findIndex((x) => x[0].toLowerCase() == "content-type");
     if (contentTypeIndex == -1) {
-      headers.push(["Content-Type", "application/octet-stream"]);
+      headers.push(["Content-Type", AlbRequestHandler.contentType.octet]);
     } else {
       headers.push(["Content-Type", customHeaders[contentTypeIndex][1]]);
       customHeaders.splice(contentTypeIndex, 1);
@@ -165,7 +159,7 @@ export class AlbRequestHandler extends CommonEventGenerator {
     if (contentLengthIndex != -1) {
       customHeaders.splice(contentLengthIndex, 1);
     }
-    headers.push(["Content-Length", contentLengh], ["Connection", "keep-alive"], ...customHeaders);
+    headers.push(["Content-Length", contentLengh], AlbRequestHandler.keepAlive, ...customHeaders);
     this.res.shouldKeepAlive = false;
     if (statusMessage) {
       this.res.writeHead(code, statusMessage, headers);
@@ -193,7 +187,7 @@ export class AlbRequestHandler extends CommonEventGenerator {
   }) {
     const { method, headers, url } = req;
 
-    const parsedURL = new URL(url as string, "http://localhost:3003");
+    const parsedURL = new URL(url as string, AlbRequestHandler.dummyHost);
     parsedURL.searchParams.delete("x_mock_type");
 
     let event: AlbPayload = {

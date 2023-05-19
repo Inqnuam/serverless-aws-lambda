@@ -1,3 +1,4 @@
+import { CommonEventGenerator } from "../../plugins/lambda/events/common";
 import type { LambdaEndpoint } from "../parseEvents/endpoints";
 import { log } from "../utils/colorize";
 
@@ -11,8 +12,6 @@ export class BufferedStreamResponse {
   _ct?: any;
   _isStreamResponse = true;
   #mockEvent?: LambdaEndpoint;
-  static httpErrMsg = '{"message":"Internal Server Error"}';
-  static amzMsgNull = '{"message":null}';
   static codec = new TextDecoder();
   static splitMessage = (buffer?: Uint8Array, metaDelimiter?: number) => {
     if (!buffer) {
@@ -101,9 +100,9 @@ export class BufferedStreamResponse {
       return {
         statusCode: 500,
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": CommonEventGenerator.contentType.json,
         },
-        body: BufferedStreamResponse.httpErrMsg,
+        body: CommonEventGenerator.httpErrMsg,
       };
     } else if (this.buffer) {
       const responseData = this.#parseResponseData(this.buffer);

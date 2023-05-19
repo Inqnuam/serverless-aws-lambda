@@ -1,6 +1,8 @@
 import type { ServerResponse } from "http";
 import { EventStreamCodec } from "@aws-sdk/eventstream-codec";
+
 import type { MessageHeaders } from "@aws-sdk/eventstream-codec";
+import { CommonEventGenerator } from "./events/common";
 
 interface ErrorMessage {
   errorType: string;
@@ -30,7 +32,7 @@ export class StreamEncoder {
   write(chunk: any, encoding: BufferEncoding, cb?: (error: Error | null | undefined) => void) {
     this.res.write(
       codec.encode({
-        headers: this.#getStreamHeaders("PayloadChunk", "application/octet-stream"),
+        headers: this.#getStreamHeaders("PayloadChunk", CommonEventGenerator.contentType.octet),
         body: chunk,
       }),
       encoding,
@@ -66,7 +68,7 @@ export class StreamEncoder {
 
     this.res.end(
       codec.encode({
-        headers: this.#getStreamHeaders("InvokeComplete", "application/json"),
+        headers: this.#getStreamHeaders("InvokeComplete", CommonEventGenerator.contentType.json),
         body: new Uint8Array(body),
       })
     );
@@ -76,7 +78,7 @@ export class StreamEncoder {
 
     this.res.write(
       codec.encode({
-        headers: this.#getStreamHeaders("PayloadChunk", "application/octet-stream"),
+        headers: this.#getStreamHeaders("PayloadChunk", CommonEventGenerator.contentType.octet),
         body: new Uint8Array(body),
       }),
       () => {

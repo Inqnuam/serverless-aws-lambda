@@ -63,7 +63,7 @@ export const defaultServer = async (req: IncomingMessage, res: ServerResponse, p
     checkHeaders(headers, mockEvent.kind);
   } catch (error: any) {
     res.statusCode = 400;
-    res.setHeader("Content-Type", "text/html");
+    res.setHeader("Content-Type", CommonEventGenerator.contentType.text);
     return res.end(error.message);
   }
   if (mockEvent.async) {
@@ -84,7 +84,7 @@ export const defaultServer = async (req: IncomingMessage, res: ServerResponse, p
     }
     requestHandler.sendResponse(handlerOutput);
   } catch (error) {
-    return requestHandler.returnError();
+    return requestHandler.returnError(error);
   }
 
   return true;

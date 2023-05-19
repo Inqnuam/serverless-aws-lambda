@@ -35,6 +35,10 @@ end
 handler_method, handler_class = handler_name.split('.').reverse
 handler_class ||= "Kernel"
 
+cwd = Dir.pwd
+watchFiles = JSON.generate($LOADED_FEATURES.select { |s| s.start_with?(cwd) })
+puts "__|watch|__#{watchFiles}"
+$stdout.flush
 
 input = ""
 while (line = STDIN.gets)

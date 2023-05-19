@@ -8,6 +8,19 @@ export class CommonEventGenerator {
   static accountId: string = "";
   static port: number = 3000;
   static serve: any;
+  static contentType = {
+    json: "application/json",
+    text: "text/plain; charset=utf-8",
+    octet: "application/octet-stream",
+  };
+  static keepAlive = ["Connection", "keep-alive"];
+  static dummyHost = "http://localhost:3003";
+  static httpErrMsg = '{"message":"Internal Server Error"}';
+  static amzMsgNull = '{"message":null}';
+  static apgTimeoutMsg = '{"message": "Endpoint request timed out"}';
+  static unavailable = '{"message":"Service Unavailable"}';
+  static timeoutRegex = /after.\d+.*seconds/;
+  static apgRequestTimeout = 30;
   static getMultiValueHeaders = (rawHeaders: string[]) => {
     let multiValueHeaders: any = {};
     const multiKeys = rawHeaders.filter((x, i) => i % 2 == 0).map((x) => x.toLowerCase());
@@ -104,5 +117,17 @@ export class CommonEventGenerator {
       multiValueQueryStringParameters[k] = searchParams.getAll(k).map(encodeURI);
     }
     return multiValueQueryStringParameters;
+  };
+  static isEndpointTimeoutError = (errorMessage?: string) => {
+    if (!errorMessage) {
+      return;
+    }
+    const secondsStr = errorMessage.match(this.timeoutRegex)?.[0];
+    if (secondsStr) {
+      const sec = secondsStr.split(" ")[1];
+      if (!isNaN(sec as unknown as number)) {
+        return Number(sec) >= CommonEventGenerator.apgRequestTimeout;
+      }
+    }
   };
 }

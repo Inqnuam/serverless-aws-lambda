@@ -1,6 +1,6 @@
 {
   "name": "serverless-aws-lambda",
-  "version": "4.5.4",
+  "version": "4.5.5",
   "description": "AWS Application Load Balancer and API Gateway - Lambda dev tool for Serverless. Allows Express synthax in handlers. Supports packaging, local invoking and offline ALB, APG, S3, SNS, SQS, DynamoDB Stream server mocking.",
   "author": "Inqnuam",
   "license": "MIT",
@@ -8,6 +8,9 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/inqnuam/serverless-aws-lambda.git"
+  },
+  "bugs": {
+    "url": "https://github.com/inqnuam/serverless-aws-lambda/issues"
   },
   "main": "./dist/index.js",
   "typings": "./dist/config.d.ts",
@@ -83,7 +86,9 @@
     "bundle",
     "esbuild",
     "nodejs",
-    "node"
+    "node",
+    "python",
+    "ruby"
   ],
   "scripts": {
     "dev": "DEV=true node ./build.mjs",

@@ -1,7 +1,6 @@
 import type { OfflineRequest } from "../../defineConfig";
 import { errorType, parseBody, parseClientContext, collectBody, InvokationType, isStreamResponse, setRequestId, invalidPayloadErrorMsg, base64ErorMsg, notFound } from "./utils";
 import { Handlers } from "../../lib/server/handlers";
-import { log } from "../../lib/utils/colorize";
 import { BufferedStreamResponse } from "../../lib/runtime/bufferedStreamResponse";
 
 export const invokeRequests: OfflineRequest = {

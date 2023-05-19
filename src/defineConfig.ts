@@ -17,9 +17,17 @@ export type ILambda = {
   };
   /**
    * Be notified when this lambda is invoked.
+   *
+   * Can be used to edit (local) input payload before invokation.
    */
-  onInvoke: (callback: (event: any, info?: any) => void) => void;
+  onInvoke: (callback: (event: any, info?: any) => void) => void | { [key: string]: any };
+  /**
+   * Called when handler throws an error.
+   */
   onInvokeError: (callback: (input: any, error: any, info?: any) => void) => void;
+  /**
+   * Called when handler returns successfully.
+   */
   onInvokeSuccess: (callback: (input: any, output: any, info?: any) => void) => void;
 } & Omit<ILambdaMock, "invokeSub" | "invokeSuccessSub" | "invokeErrorSub" | "runner">;
 
@@ -50,12 +58,18 @@ export interface OfflineRequest {
    * @default "ANY"
    */
   method?: HttpMethod | HttpMethod[];
+  /**
+   * Filter for request path.
+   */
   filter: string | RegExp;
   callback: (this: ClientConfigParams, req: IncomingMessage, res: ServerResponse) => Promise<any | void> | any | void;
 }
 
 export interface SlsAwsLambdaPlugin {
   name: string;
+  /**
+   * Share any data with other plugins
+   */
   pluginData?: any;
   buildCallback?: (this: ClientConfigParams, result: BuildResult, isRebuild: boolean) => Promise<void> | void;
   onInit?: (this: ClientConfigParams) => Promise<void> | void;
