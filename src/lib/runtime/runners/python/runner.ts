@@ -28,10 +28,12 @@ export class PythonRunner implements Runner {
   filesTime: Map<string, number> = new Map();
   watcherListener: (event: "rename" | "change", filename: string | Buffer) => void;
   emitRebuild: Function;
-  static wrapper = __dirname.replace("/dist", "/src/lib/runtime/runners/python/index.py");
+  static wrapper = __dirname.replace(`${path.sep}dist`, "/src/lib/runtime/runners/python/index.py");
   static DELIMITER = "__|response|__";
+  static DELIMITEREND = "__|responseEnd|__";
   static ERR_RESPONSE = "__|error|__";
   static WATCH = "__|watch|__";
+  static WATCHEND = "__|watchEnd|__";
   constructor(
     {
       name,
@@ -97,14 +99,22 @@ export class PythonRunner implements Runner {
           const data = chunk.toString();
 
           try {
-            if (data.includes(PythonRunner.WATCH)) {
+            const hasWatchFiles = data.includes(PythonRunner.WATCH);
+            if (hasWatchFiles) {
               this.setWatchFiles(data);
-            } else if (data.includes(PythonRunner.DELIMITER)) {
+            }
+
+            if (data.includes(PythonRunner.DELIMITER)) {
               const output = data.split(PythonRunner.DELIMITER);
-              const res = output[output.length - 1];
+              const res = output[output.length - 1].split(PythonRunner.DELIMITEREND)[0];
 
               if (output.length > 1) {
-                const printable = output.slice(0, -1).join("\n");
+                let printable;
+                if (hasWatchFiles) {
+                  printable = output[0].split(PythonRunner.WATCHEND)[1];
+                } else {
+                  printable = output.slice(0, -1).join("\n");
+                }
                 if (printable.trim()) {
                   console.log(printable);
                 }
@@ -117,7 +127,15 @@ export class PythonRunner implements Runner {
               this.python!.stderr.removeListener("data", errorHandler);
               resolve(result);
             } else if (data.trim()) {
-              console.log(data);
+              let printable;
+              if (hasWatchFiles) {
+                printable = data.split(PythonRunner.WATCHEND)[1];
+              } else {
+                printable = data;
+              }
+              if (printable.trim()) {
+                console.log(printable);
+              }
             }
           } catch (error) {
             console.log("err", error);
@@ -161,8 +179,10 @@ export class PythonRunner implements Runner {
 
   setWatchFiles = async (data: string) => {
     try {
-      const output = data.split(PythonRunner.WATCH);
-      const rawFiles = output[output.length - 1];
+      const rawOutput = data.split(PythonRunner.WATCH);
+      const output = rawOutput[rawOutput.length - 1].split(PythonRunner.WATCHEND);
+      const rawFiles = output[0];
+
       const files = JSON.parse(rawFiles).map((x: string) => `${x.replace(/\./g, path.sep)}.py`);
 
       for (const f of files) {
@@ -177,10 +197,10 @@ export class PythonRunner implements Runner {
   };
   load = () => {
     if (!this.bin) {
-      this.bin = this.runtime.includes(".") ? this.runtime.split(".")[0] : this.runtime;
+      this.bin = process.platform === "win32" ? "python" : this.runtime.includes(".") ? this.runtime.split(".")[0] : this.runtime;
     }
 
-    this.python = spawn(this.bin, ["-u", PythonRunner.wrapper, this.pyModulePath, this.handlerName, this.name, String(this.timeout)], {
+    this.python = spawn(this.bin, [PythonRunner.wrapper, this.pyModulePath, this.handlerName, String(this.timeout)], {
       env: this.environment,
     });
 

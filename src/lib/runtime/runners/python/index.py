@@ -17,14 +17,13 @@ def decimal_serializer(o):
 
 handlerPath = sys.argv[1]
 handlerName = sys.argv[2]
-lambdaName = sys.argv[3]
-timeout = int(sys.argv[4])
+timeout = int(sys.argv[3])
 sys.path.append(".")
 
 
 class LambdaContext(object):
     def __init__(self, reqId="1234567890"):
-        self.name = lambdaName
+        self.name = os.environ["AWS_LAMBDA_FUNCTION_NAME"]
         self.version = "$LATEST"
         self.created = time()
         self.timeout = timeout
@@ -72,7 +71,7 @@ handler = getattr(module, handlerName)
 _mods = [m.__name__ for m in sys.modules.values() if m]
 
 watchFiles = json.dumps([x for x in _mods if x.startswith("src")])
-sys.stdout.write(f"__|watch|__{watchFiles}")
+print(f"__|watch|__{watchFiles}__|watchEnd|__", flush=True)
 sys.stdout.flush()
 
 for line in sys.stdin:
@@ -82,7 +81,7 @@ for line in sys.stdin:
         response = handler(input["event"], context)
         jsonRes = json.dumps(response, default=decimal_serializer)
         sys.stdout.flush()
-        sys.stdout.write(f"__|response|__{jsonRes}")
+        print(f"__|response|__{jsonRes}__|responseEnd|__", flush=True)
         sys.stdout.flush()
     except:
         error, ex_value, ex_traceback = sys.exc_info()

@@ -328,7 +328,7 @@ class ServerlessAwsLambda extends Daemon {
       const handlerPath = (lambda as Serverless.FunctionDefinitionHandler).handler;
       const ext = path.extname(handlerPath);
       const handlerName = ext.slice(1);
-      const esEntryPoint = path.posix.resolve(handlerPath.replace(ext, ""));
+      const esEntryPoint = path.resolve(handlerPath.replace(ext, ""));
 
       const region = this.runtimeConfig.environment.AWS_REGION ?? this.runtimeConfig.environment.REGION;
       const slsDeclaration: any = this.serverless.service.getFunction(funcName);

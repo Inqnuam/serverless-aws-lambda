@@ -26,7 +26,7 @@ export class RubyRunner implements Runner {
   emitRebuild: Function;
   watcherListener: (event: "rename" | "change", filename: string | Buffer) => void;
   watchers: FSWatcher[] = [];
-  static wrapper = __dirname.replace("/dist", "/src/lib/runtime/runners/ruby/index.rb");
+  static wrapper = __dirname.replace(`${path.sep}dist`, "/src/lib/runtime/runners/ruby/index.rb");
   static DELIMITER = "__|response|__";
   static ERR_RESPONSE = "__|error|__";
   static WATCH = "__|watch|__";
