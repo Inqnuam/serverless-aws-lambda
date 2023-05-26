@@ -2,8 +2,7 @@ import path from "path";
 import { Daemon } from "./lib/server/daemon";
 import { ILambdaMock } from "./lib/runtime/rapidApi";
 import { log } from "./lib/utils/colorize";
-import { zip } from "./lib/utils/zip";
-import type { IZipOptions } from "./lib/utils/zip";
+import { Zipper } from "./lib/utils/zip";
 import esbuild from "esbuild";
 import type { BuildOptions, BuildResult, Metafile } from "esbuild";
 import type Serverless from "serverless";
@@ -16,6 +15,7 @@ import { mergeEsbuildConfig } from "./lib/esbuild/mergeEsbuildConfig";
 import { parseFuncUrl } from "./lib/parseEvents/funcUrl";
 import { LambdaRequests } from "./plugins/lambda/index";
 import { readDefineConfig } from "./lib/utils/readDefineConfig";
+import { patchSchema } from "./lib/utils/schema";
 
 const cwd = process.cwd();
 const DEFAULT_LAMBDA_TIMEOUT = 6;
@@ -38,6 +38,7 @@ class ServerlessAwsLambda extends Daemon {
   serverless: Serverless;
   options: any;
   stage: string;
+  region: string;
   pluginConfig: any;
   commands: any;
   hooks: any;
@@ -57,6 +58,7 @@ class ServerlessAwsLambda extends Daemon {
   constructor(serverless: any, options: any, pluginUtils: PluginUtils) {
     super({ debug: process.env.SLS_DEBUG == "*" });
 
+    patchSchema(serverless);
     this.#lambdas = [];
     this.serverless = serverless;
     this.options = options;
@@ -65,6 +67,8 @@ class ServerlessAwsLambda extends Daemon {
     // @ts-ignore
     this.isDeploying = this.serverless.processedInput.commands.includes("deploy");
     this.stage = this.options.stage ?? this.serverless.service.provider.stage ?? "dev";
+    this.region = this.serverless.service.provider.region;
+
     if (!this.serverless.service.provider.runtime) {
       throw new Error("Please provide 'runtime' inside your serverless.yml > provider > runtime");
     } else if (this.serverless.service.provider.runtime.startsWith("node")) {
@@ -78,13 +82,6 @@ class ServerlessAwsLambda extends Daemon {
     } else {
       log.BR_BLUE("Launching serverless-aws-lambda...");
     }
-    serverless.configSchemaHandler.defineFunctionProperties("aws", {
-      properties: {
-        virtualEnvs: { type: "object" },
-        online: { anyOf: [{ type: "array", items: { type: "string" } }, { type: "boolean" }, { type: "string" }] },
-        files: { type: "array", items: { type: "string" } },
-      },
-    });
 
     if (this.serverless.service.custom) {
       this.pluginConfig = this.serverless.service.custom["serverless-aws-lambda"];
@@ -185,13 +182,14 @@ class ServerlessAwsLambda extends Daemon {
       external: ["esbuild"],
     };
 
+    const isLocal = !this.isDeploying && !this.isPackaging;
     if (typeof this.nodeVersion == "string" && !isNaN(Number(this.nodeVersion))) {
       this.nodeVersion = Number(this.nodeVersion);
       if (Number(process.versions.node.slice(0, 2)) < this.nodeVersion) {
         log.RED(`You are running on NodeJS ${process.version} which is lower than '${this.nodeVersion}' found in serverless.yml.`);
       }
       esBuildConfig.target = `node${this.nodeVersion}`;
-      esBuildConfig.plugins?.push(buildOptimizer({ isLocal: !this.isDeploying && !this.isPackaging, nodeVersion: this.nodeVersion, buildCallback: this.buildCallback }));
+      esBuildConfig.plugins?.push(buildOptimizer({ isLocal, nodeVersion: this.nodeVersion, buildCallback: this.buildCallback }));
     }
 
     if (this.customEsBuildConfig) {
@@ -199,6 +197,13 @@ class ServerlessAwsLambda extends Daemon {
     }
 
     this.esBuildConfig = esBuildConfig;
+    if (isLocal && this.esBuildConfig.publicPath && this.customEsBuildConfig) {
+      const { sourcemap } = this.customEsBuildConfig;
+      if (sourcemap == "inline") {
+        return;
+      }
+      this.esBuildConfig.sourcemap = ["external", "both"].includes(sourcemap) ? "both" : "inline";
+    }
   };
 
   async buildAndWatch() {
@@ -211,7 +216,7 @@ class ServerlessAwsLambda extends Daemon {
     }
   }
 
-  buildCallback = async (result: BuildResult, isRebuild: boolean, format: string) => {
+  buildCallback = async (result: BuildResult, isRebuild: boolean, format: string, outdir: string) => {
     if (isRebuild) {
       await this.#onRebuild(result);
     } else {
@@ -243,33 +248,14 @@ class ServerlessAwsLambda extends Daemon {
           }
         }
 
-        await Promise.all(
-          packageLambdas
-            .filter((x) => x.runtime.startsWith("n"))
-            .map(async (l) => {
-              const slsDeclaration = this.serverless.service.getFunction(l.name) as Serverless.FunctionDefinitionHandler;
+        const zipper = new Zipper(this.serverless, format, this.esBuildConfig.sourcemap, outputs, outdir);
 
-              if (typeof slsDeclaration.package?.artifact == "string") {
-                return;
-              }
-
-              // @ts-ignore
-              const filesToInclude = slsDeclaration.files;
-              const zipableBundledFilePath = l.esOutputPath.slice(0, -3);
-              const zipOptions: IZipOptions = {
-                filePath: zipableBundledFilePath,
-                zipName: l.outName,
-                include: filesToInclude,
-                sourcemap: this.esBuildConfig.sourcemap,
-                format,
-              };
-              const zipOutputPath = await zip(zipOptions);
-
-              // @ts-ignore
-              slsDeclaration.package = { ...slsDeclaration.package, disable: true, artifact: zipOutputPath };
-              slsDeclaration.handler = path.basename(l.handlerPath);
-            })
-        );
+        try {
+          await Promise.all(packageLambdas.filter((x) => x.runtime.startsWith("n")).map(zipper.zipHandler));
+        } catch (error) {
+          console.error(error);
+          process.exit(1);
+        }
       } else {
         this.listen(ServerlessAwsLambda.PORT, async (port: number, localIp: string) => {
           Handlers.PORT = port;
@@ -508,7 +494,8 @@ class ServerlessAwsLambda extends Daemon {
       setEnv: (n: string, k: string, v: string) => {
         this.setEnv(n, k, v);
       },
-      stage: this.options.stage ?? this.serverless.service.provider.stage ?? "dev",
+      stage: this.stage,
+      region: this.region,
       esbuild: esbuild,
       serverless: this.serverless,
       resources: this.resources,

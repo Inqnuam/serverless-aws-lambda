@@ -158,5 +158,13 @@ export const parseCustomEsbuild = (customConfig: BuildOptions) => {
     customEsBuild.inject = customConfig.inject;
   }
 
+  if (typeof customConfig.keepNames == "boolean") {
+    customEsBuild.keepNames = customConfig.keepNames;
+  }
+
+  if (customConfig.supported && typeof customConfig.supported == "object") {
+    customEsBuild.supported = customConfig.supported;
+  }
+
   return customEsBuild;
 };

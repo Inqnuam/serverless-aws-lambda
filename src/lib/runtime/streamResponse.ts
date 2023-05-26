@@ -13,9 +13,6 @@ const invalidArg = (type: string, messages?: string[], cause?: any) => {
   }
   return err;
 };
-const invalidContentType = new TypeError('Invalid value "undefined" for header "Content-Type"');
-
-const multipleEnd = new Error("write after end");
 
 type writeCb = (error: Error | null | undefined) => void;
 // custom Writable interace to exclude AWS's undefined properties
@@ -97,6 +94,8 @@ export class ResponseStream extends Writable {
   #isSent = false;
   #isEnd = false;
   #__write;
+  #invalidContentType = new TypeError('Invalid value "undefined" for header "Content-Type"');
+  #multipleEnd = new Error("write after end");
   _onBeforeFirstWrite?: (write: Writable["write"]) => any;
   constructor(opts: Partial<WritableOptions>) {
     super({ highWaterMark: opts.highWaterMark, write: opts.write });
@@ -121,7 +120,7 @@ export class ResponseStream extends Writable {
     // @ts-ignore
     this.end = (chunk: any) => {
       if (this.#isEnd) {
-        throw multipleEnd;
+        throw this.#multipleEnd;
       }
       // simple if(chunk) will not work as 0 must throw an error
       const typeofChunk = typeof chunk;
@@ -150,7 +149,7 @@ export class ResponseStream extends Writable {
   };
   setContentType = (contentType: any) => {
     if (!contentType) {
-      throw invalidContentType;
+      throw this.#invalidContentType;
     }
     this.emit("ct", contentType);
   };

@@ -159,5 +159,13 @@ export const mergeEsbuildConfig = (esBuildConfig: BuildOptions, customEsBuildCon
     esBuildConfig.preserveSymlinks = customEsBuildConfig.preserveSymlinks;
   }
 
+  if (typeof customEsBuildConfig.keepNames == "boolean") {
+    esBuildConfig.keepNames = customEsBuildConfig.keepNames;
+  }
+
+  if (customEsBuildConfig.supported && typeof customEsBuildConfig.supported == "object") {
+    esBuildConfig.supported = customEsBuildConfig.supported;
+  }
+
   return esBuildConfig;
 };

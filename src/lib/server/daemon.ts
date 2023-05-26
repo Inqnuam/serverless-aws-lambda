@@ -10,9 +10,16 @@ import serveStatic from "serve-static";
 import { randomUUID } from "crypto";
 import { CommonEventGenerator } from "../../plugins/lambda/events/common";
 import { defaultServer } from "../../plugins/lambda/defaultServer";
+import { UnsupportedRuntime } from "../runtime/runners/index";
 import { NodeRunner } from "../runtime/runners/node/runner";
 import { PythonRunner } from "../runtime/runners/python/runner";
 import { RubyRunner } from "../runtime/runners/ruby/runner";
+
+enum runners {
+  node = "n",
+  python = "p",
+  ruby = "r",
+}
 
 let localIp: string;
 if (networkInterfaces) {
@@ -207,7 +214,14 @@ export class Daemon extends Handlers {
   async load(lambdaDefinitions: ILambdaMock[]) {
     for (const lambda of lambdaDefinitions) {
       const r = lambda.runtime.charAt(0);
-      lambda.runner = r == "n" ? new NodeRunner(lambda) : r == "p" ? new PythonRunner(lambda, this.fakeRebuildEmitter) : new RubyRunner(lambda, this.fakeRebuildEmitter);
+      lambda.runner =
+        r == runners.node
+          ? new NodeRunner(lambda)
+          : r == runners.python
+          ? new PythonRunner(lambda, this.fakeRebuildEmitter)
+          : r == runners.ruby
+          ? new RubyRunner(lambda, this.fakeRebuildEmitter)
+          : new UnsupportedRuntime(lambda.runtime);
       const lambdaController = new LambdaMock(lambda);
 
       this.addHandler(lambdaController);

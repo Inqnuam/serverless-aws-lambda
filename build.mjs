@@ -30,6 +30,7 @@ const esBuildConfig = {
   outdir: "dist",
   format: "cjs",
   plugins: [watchPlugin],
+  drop: shouldWatch ? [] : ["debugger"],
   external,
 };
 

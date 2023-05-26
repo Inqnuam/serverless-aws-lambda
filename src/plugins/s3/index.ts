@@ -29,7 +29,7 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
         callableLambdas = this.lambdas.filter((x) => x.s3.length);
 
         try {
-          const persistence = await readFile(persisitencePath, { encoding: "utf-8" });
+          const persistence = await readFile(persisitencePath, "utf-8");
           items = JSON.parse(persistence);
         } catch (error) {}
       }
@@ -37,7 +37,7 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
     onExit: function () {
       if (!this.isDeploying && !this.isPackaging) {
         try {
-          writeFileSync(persisitencePath, JSON.stringify(items), { encoding: "utf-8" });
+          writeFileSync(persisitencePath, JSON.stringify(items), "utf-8");
         } catch (error) {}
       }
     },
@@ -130,6 +130,7 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
               const savingFile = createWriteStream(filePath);
               res.setHeader("status", 100);
               res.setHeader("Server", "AmazonS3");
+              res.setHeader("x-amzn-requestid", requestId);
 
               req.on("end", async () => {
                 res.end();

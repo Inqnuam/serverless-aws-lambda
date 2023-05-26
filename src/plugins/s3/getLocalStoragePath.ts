@@ -1,6 +1,7 @@
 import { statSync } from "fs";
 import path from "path";
 
+// will be called synchronously at process.exit
 export const getLocalStoragePath = (storagePath?: string) => {
   let localStoragePath = typeof storagePath == "string" ? storagePath : "localS3/";
 
@@ -11,10 +12,10 @@ export const getLocalStoragePath = (storagePath?: string) => {
   }
 
   try {
-    const stat = statSync(localStoragePath);
+    const f = statSync(localStoragePath);
 
     // TODO: check also for isSymbolicLink
-    if (stat.isDirectory()) {
+    if (f.isDirectory()) {
       return localStoragePath;
     } else {
       throw new Error(`Provided localStorageDir '${storagePath}' is not a directory`);

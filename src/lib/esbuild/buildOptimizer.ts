@@ -18,7 +18,7 @@ export const buildOptimizer = ({
 }: {
   isLocal: boolean;
   nodeVersion: number;
-  buildCallback: (result: BuildResult, isRebuild: boolean, format: string) => void | Promise<void>;
+  buildCallback: (result: BuildResult, isRebuild: boolean, format: string, outdir: string) => void | Promise<void>;
 }): Plugin => {
   return {
     name: "build-optimizer-plugin",
@@ -38,7 +38,7 @@ export const buildOptimizer = ({
           });
         }
         try {
-          await buildCallback(result, isRebuild, build.initialOptions.format!);
+          await buildCallback(result, isRebuild, build.initialOptions.format!, build.initialOptions.outdir!);
         } catch (error) {
           console.log(error);
         }

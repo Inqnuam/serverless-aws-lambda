@@ -11,7 +11,7 @@ export const parseFuncUrl = (lambda: any) => {
     methods: ["ANY"],
     paths: ["/*"],
     pathsRegex: [],
-    stream: typeof lambda.url == "object" && lambda.url.invoke == "response_stream",
+    stream: typeof lambda.url == "object" && lambda.url.invokeMode == "RESPONSE_STREAM",
   };
   return url;
 };

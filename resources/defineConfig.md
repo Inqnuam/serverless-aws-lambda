@@ -10,13 +10,20 @@
 
 ### Usage
 
+```yaml
+# serverless.yml
+custom:
+  serverless-aws-lambda:
+    configPath: ./config.ts
+```
+
 To get Type definitions please set `"moduleResolution": "NodeNext"` inside your `tsconfig.json`.
 
-```js
-// config.js
-const { defineConfig } = require("serverless-aws-lambda/defineConfig");
+```ts
+// config.ts
+import { defineConfig } from "serverless-aws-lambda/defineConfig";
 
-module.exports = defineConfig({
+export default defineConfig({
   esbuild: {
     target: "es2020",
   },

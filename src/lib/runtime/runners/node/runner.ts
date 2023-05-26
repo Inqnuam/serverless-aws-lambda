@@ -122,7 +122,9 @@ export class NodeRunner extends EventEmitter implements Runner {
 
   async importHandler() {
     await new Promise((resolve, reject) => {
-      this._worker = new Worker(path.resolve(__dirname, "./lib/runtime/runners/node/index.js"), {
+      const opt: WorkerOptions = {
+        // @ts-ignore
+        name: this.name,
         env: this.environment,
         execArgv: ["--enable-source-maps"],
         workerData: {
@@ -134,8 +136,9 @@ export class NodeRunner extends EventEmitter implements Runner {
           handlerName: this.handlerName,
           debug: log.getDebug(),
         },
-      } as WorkerOptions);
+      };
 
+      this._worker = new Worker(path.resolve(__dirname, "./lib/runtime/runners/node/index.js"), opt);
       this._worker.setMaxListeners(0);
 
       const errorHandler = (err: any) => {
