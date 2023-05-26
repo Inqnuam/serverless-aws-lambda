@@ -270,7 +270,7 @@ To preserve your project directories structure inside the archive set `preserveD
 ```yaml
 package:
   individually: true
-  preserveDir: true # default false
+  preserveDir: true # default true
 
 functions:
   myAwsomeLambda:

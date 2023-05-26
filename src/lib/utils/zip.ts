@@ -165,7 +165,7 @@ export class Zipper {
       return;
     }
     const outputPath = l.esOutputPath.replace(`${cwd}${path.sep}`, "");
-
+    const normalizedPath = path.win32.normalize(outputPath).replace(/\\/g, "/");
     let inheritFiles = true;
     if (slsDeclaration.package && "inheritFiles" in slsDeclaration.package) {
       inheritFiles = slsDeclaration.package.inheritFiles;
@@ -180,7 +180,7 @@ export class Zipper {
     const includeAssets = this.isValidAssetsType(slsDeclaration.package?.assets) ? slsDeclaration.package.assets : this.defaultAssets;
 
     if (includeAssets) {
-      const assets = this.getAssets(outputPath, handlerRoot);
+      const assets = this.getAssets(normalizedPath, handlerRoot);
       const tIncludeAssets = typeof includeAssets;
 
       if (tIncludeAssets == "boolean") {
