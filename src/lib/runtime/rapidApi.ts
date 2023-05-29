@@ -276,6 +276,7 @@ export class LambdaMock implements ILambdaMock {
       return eventResponse;
     } catch (error) {
       this.handleErrorDestination(event, info, error, awsRequestId);
+      this.runner.unmount(true);
       throw error;
     } finally {
       this.#setLifetime();

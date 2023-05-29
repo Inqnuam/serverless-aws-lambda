@@ -166,5 +166,37 @@ export const parseCustomEsbuild = (customConfig: BuildOptions) => {
     customEsBuild.supported = customConfig.supported;
   }
 
+  if (Array.isArray(customConfig.entryPoints)) {
+    customEsBuild.entryPoints = customConfig.entryPoints;
+  }
+
+  if (Array.isArray(customConfig.conditions)) {
+    customEsBuild.conditions = customConfig.conditions;
+  }
+
+  if (typeof customConfig.absWorkingDir == "string") {
+    customEsBuild.absWorkingDir = customConfig.absWorkingDir;
+  }
+
+  if (customConfig.mangleProps instanceof RegExp) {
+    customEsBuild.mangleProps = customConfig.mangleProps;
+  }
+
+  if (customConfig.reserveProps instanceof RegExp) {
+    customEsBuild.reserveProps = customConfig.reserveProps;
+  }
+
+  if (typeof customConfig.mangleQuoted == "boolean") {
+    customEsBuild.mangleQuoted = customConfig.mangleQuoted;
+  }
+
+  if (customConfig.mangleCache && typeof customConfig.mangleCache == "object") {
+    customEsBuild.mangleCache = customConfig.mangleCache;
+  }
+
+  if (typeof customConfig.packages == "string") {
+    customEsBuild.packages = customConfig.packages;
+  }
+
   return customEsBuild;
 };

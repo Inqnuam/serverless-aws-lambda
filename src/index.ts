@@ -182,6 +182,16 @@ class ServerlessAwsLambda extends Daemon {
       external: ["esbuild"],
     };
 
+    if (typeof process.env.NODE_ENV == "string") {
+      esBuildConfig.logOverride = {
+        "assign-to-define": "silent",
+      };
+
+      esBuildConfig.define = {
+        "process.env.NODE_ENV": `"${process.env.NODE_ENV}"`,
+      };
+    }
+
     const isLocal = !this.isDeploying && !this.isPackaging;
     if (typeof this.nodeVersion == "string" && !isNaN(Number(this.nodeVersion))) {
       this.nodeVersion = Number(this.nodeVersion);
@@ -197,12 +207,17 @@ class ServerlessAwsLambda extends Daemon {
     }
 
     this.esBuildConfig = esBuildConfig;
-    if (isLocal && this.esBuildConfig.publicPath && this.customEsBuildConfig) {
+    if (isLocal && this.customEsBuildConfig) {
       const { sourcemap } = this.customEsBuildConfig;
-      if (sourcemap == "inline") {
+      if (this.esBuildConfig.publicPath) {
+        if (sourcemap == "inline" || sourcemap == "both") {
+          return;
+        }
+      } else if (sourcemap != "external") {
         return;
       }
-      this.esBuildConfig.sourcemap = ["external", "both"].includes(sourcemap) ? "both" : "inline";
+
+      this.esBuildConfig.sourcemap = sourcemap == "inline" ? "inline" : "both";
     }
   };
 

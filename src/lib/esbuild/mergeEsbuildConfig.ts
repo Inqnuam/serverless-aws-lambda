@@ -9,6 +9,10 @@ export const mergeEsbuildConfig = (esBuildConfig: BuildOptions, customEsBuildCon
     esBuildConfig.external!.push(...customEsBuildConfig.external);
   }
 
+  if (Array.isArray(customEsBuildConfig.entryPoints)) {
+    (esBuildConfig.entryPoints as any[]).push(...customEsBuildConfig.entryPoints);
+  }
+
   if ("sourcemap" in customEsBuildConfig) {
     esBuildConfig.sourcemap = customEsBuildConfig.sourcemap;
   }
@@ -118,7 +122,11 @@ export const mergeEsbuildConfig = (esBuildConfig: BuildOptions, customEsBuildCon
   }
 
   if (customEsBuildConfig.define && typeof customEsBuildConfig.define == "object") {
-    esBuildConfig.define = customEsBuildConfig.define;
+    if (esBuildConfig.define) {
+      esBuildConfig.define = { ...esBuildConfig.define, ...customEsBuildConfig.define };
+    } else {
+      esBuildConfig.define = customEsBuildConfig.define;
+    }
   }
 
   if (customEsBuildConfig.banner && typeof customEsBuildConfig.banner == "object") {
@@ -165,6 +173,34 @@ export const mergeEsbuildConfig = (esBuildConfig: BuildOptions, customEsBuildCon
 
   if (customEsBuildConfig.supported && typeof customEsBuildConfig.supported == "object") {
     esBuildConfig.supported = customEsBuildConfig.supported;
+  }
+
+  if (Array.isArray(customEsBuildConfig.conditions)) {
+    esBuildConfig.conditions = customEsBuildConfig.conditions;
+  }
+
+  if (typeof customEsBuildConfig.absWorkingDir == "string") {
+    esBuildConfig.absWorkingDir = customEsBuildConfig.absWorkingDir;
+  }
+
+  if (customEsBuildConfig.mangleProps instanceof RegExp) {
+    esBuildConfig.mangleProps = customEsBuildConfig.mangleProps;
+  }
+
+  if (customEsBuildConfig.reserveProps instanceof RegExp) {
+    esBuildConfig.reserveProps = customEsBuildConfig.reserveProps;
+  }
+
+  if (typeof customEsBuildConfig.mangleQuoted == "boolean") {
+    esBuildConfig.mangleQuoted = customEsBuildConfig.mangleQuoted;
+  }
+
+  if (customEsBuildConfig.mangleCache && typeof customEsBuildConfig.mangleCache == "object") {
+    esBuildConfig.mangleCache = customEsBuildConfig.mangleCache;
+  }
+
+  if (typeof customEsBuildConfig.packages == "string") {
+    esBuildConfig.packages = customEsBuildConfig.packages;
   }
 
   return esBuildConfig;

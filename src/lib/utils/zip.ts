@@ -34,9 +34,9 @@ export interface IZipOptions {
 
 export class Zipper {
   serverless: Serverless;
-  defaultPreserveDir: boolean;
-  defaultFiles: IZipOptions["include"];
-  defaultAssets: boolean | string | string[];
+  defaultPreserveDir: boolean = true;
+  defaultFiles: IZipOptions["include"] = [];
+  defaultAssets: boolean | string | string[] = false;
   format: string;
   sourcemap: IZipOptions["sourcemap"];
   outputs: Metafile["outputs"];
@@ -47,14 +47,25 @@ export class Zipper {
     this.sourcemap = sourcemap;
     this.outputs = outputs;
     this.outdir = path.resolve(outdir);
-    this.defaultPreserveDir = this.serverless.service.package.preserveDir;
-    this.defaultFiles = Array.isArray(this.serverless.service.package.files) ? this.serverless.service.package.files : [];
 
-    const assets = this.serverless.service.package.assets;
-    const validAssetsType = this.isValidAssetsType(assets);
+    if (this.serverless.service.package) {
+      if (typeof this.serverless.service.package.preserveDir == "boolean") {
+        this.defaultPreserveDir = this.serverless.service.package.preserveDir;
+      }
+      if (Array.isArray(this.serverless.service.package.files)) {
+        this.defaultFiles = this.serverless.service.package.files;
+      }
 
-    this.defaultAssets = validAssetsType ? assets : false;
+      const assets = this.serverless.service.package.assets;
+
+      if (this.isValidAssetsType(assets)) {
+        this.defaultAssets = assets;
+      }
+    }
   }
+  normalizePath = (p: string) => {
+    return path.win32.normalize(p).replace(/\\/g, "/");
+  };
   isValidAssetsType(assets: any) {
     return ["string", "boolean"].includes(typeof assets) || (Array.isArray(assets) && assets.every((x) => typeof x == "string"));
   }
@@ -151,9 +162,12 @@ export class Zipper {
     }
 
     imports.forEach((x) => {
+      if (x.external) {
+        return;
+      }
       files.push({
         at: x.path,
-        as: path.join(handlerRoot, path.basename(x.path)),
+        as: path.join(handlerRoot, ...this.normalizePath(x.path).split("/").slice(1)),
       });
     });
     return files;
@@ -165,7 +179,7 @@ export class Zipper {
       return;
     }
     const outputPath = l.esOutputPath.replace(`${cwd}${path.sep}`, "");
-    const normalizedPath = path.win32.normalize(outputPath).replace(/\\/g, "/");
+    const normalizedPath = this.normalizePath(outputPath);
     let inheritFiles = true;
     if (slsDeclaration.package && "inheritFiles" in slsDeclaration.package) {
       inheritFiles = slsDeclaration.package.inheritFiles;

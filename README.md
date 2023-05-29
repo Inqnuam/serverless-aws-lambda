@@ -36,7 +36,6 @@
 
 - [Advanced configuration](#advanced-configuration)
 - [Plugins](#plugins)
-- [Benchmarks](#benchmarks)
 
 ### Installation
 
@@ -68,7 +67,8 @@ SLS_DEBUG="*" sls aws-lambda -s dev
 
 It is also possible to passe port from the CLI with `--port` or `-p`.
 
-This will overwrite serverless.yml custom > serverless-aws-lambda > port value if it is set.
+This will overwrite serverless.yml custom > serverless-aws-lambda > port value if it is set.  
+for more options see [advanced configuration](#advanced-configuration).
 
 ### Invoke
 
@@ -420,10 +420,6 @@ See [defineConfig](resources/defineConfig.md) for advanced configuration.
 - [DynamoDB Local Streams](https://github.com/Inqnuam/serverless-aws-lambda-ddb-streams)
 - [Jest](https://github.com/Inqnuam/serverless-aws-lambda-jest)
 - [Vitest](https://github.com/Inqnuam/serverless-aws-lambda-vitest)
-
----
-
-### Benchmarks
 
 ---
 

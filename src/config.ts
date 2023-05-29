@@ -14,7 +14,7 @@ export interface OfflineConfig {
 }
 
 export interface Config {
-  esbuild?: Omit<BuildOptions, "entryPoints" | "outExtension" | "outfile" | "bundle" | "splitting" | "stdin" | "platforme" | "metafile" | "format"> & { format?: "cjs" | "esm" };
+  esbuild?: Omit<BuildOptions, "outExtension" | "outfile" | "bundle" | "splitting" | "stdin" | "platforme" | "metafile" | "format"> & { format?: "cjs" | "esm" };
   offline?: OfflineConfig;
   buildCallback?: (result: BuildResult, isRebuild: boolean) => Promise<void> | void;
   afterDeployCallbacks?: (() => Promise<void> | void)[];
