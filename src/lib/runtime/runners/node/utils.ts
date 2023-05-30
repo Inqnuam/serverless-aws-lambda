@@ -68,8 +68,30 @@ const getStackLine = (e: any) => {
   return stack;
 };
 export const patchConsole = () => {
+  const org: any = {
+    assert: console.assert.bind(console.assert),
+    clear: console.clear.bind(console.clear),
+    count: console.count.bind(console.count),
+    countReset: console.countReset.bind(console.countReset),
+    debug: console.debug.bind(console.debug),
+    dir: console.dir.bind(console.dir),
+    dirxml: console.dirxml.bind(console.dirxml),
+    error: console.error.bind(console.error),
+    group: console.group.bind(console.group),
+    groupCollapsed: console.groupCollapsed.bind(console.groupCollapsed),
+    groupEnd: console.groupEnd.bind(console.groupEnd),
+    info: console.info.bind(console.info),
+    log: console.log.bind(console.log),
+    table: console.table.bind(console.table),
+    time: console.time.bind(console.time),
+    timeEnd: console.timeEnd.bind(console.timeEnd),
+    timeLog: console.timeLog.bind(console.timeLog),
+    timeStamp: console.timeStamp.bind(console.timeStamp),
+    trace: console.trace.bind(console.trace),
+    warn: console.warn.bind(console.warn),
+  };
   console = new Proxy(console, {
-    get(self: any, prop: string) {
+    get(self: any, prop: keyof Console) {
       if (typeof self[prop] == "function") {
         return (...params: any) => {
           const e = {};
@@ -77,13 +99,13 @@ export const patchConsole = () => {
           const stack = getStackLine(e);
           process.stdout.write(`\x1b[90m${new Date().toISOString()}\t${prop.toUpperCase()}\t${AWS_LAMBDA_FUNCTION_NAME}\t${stack}\x1b[0m\n`);
           if (prop == "log") {
-            self.log(...params.map((x: any) => inspect(x, { colors: true })));
+            org.log(...params.map((x: any) => inspect(x, { colors: true })));
           } else {
-            self[prop](...params);
+            org[prop](...params);
           }
         };
       }
-      return self[prop];
+      return org[prop];
     },
   });
 };
