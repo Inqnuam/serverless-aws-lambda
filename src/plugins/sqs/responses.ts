@@ -1,4 +1,20 @@
 import { parseAttributes } from "./parser";
+
+const xmlVersion = `<?xml version="1.0"?>`;
+const xmlns = `xmlns="http://queue.amazonaws.com/doc/2012-11-05/"`;
+
+const reqId = (RequestId: string) => `<RequestId>${RequestId}</RequestId>`;
+const ResponseMetadata = (RequestId: string) => `<ResponseMetadata>${reqId(RequestId)}</ResponseMetadata>`;
+const ErrorResponse = (RequestId: string, Error: { Type?: string; Code: string; Message: string; Detail?: string }) => `${xmlVersion}<ErrorResponse ${xmlns}>
+<Error>
+<Type>Sender</Type>
+<Code>${Error.Code}</Code>
+<Message>${Error.Message}</Message>
+<Detail/>
+</Error>
+${reqId(RequestId)}
+</ErrorResponse>`;
+
 export const SendMessageResponse = (record: any, RequestId: string) => {
   let SendMessageResult = `<MD5OfMessageBody>${record.md5OfBody}</MD5OfMessageBody>\n`;
 
@@ -13,13 +29,11 @@ export const SendMessageResponse = (record: any, RequestId: string) => {
 
   SendMessageResult += `<MessageId>${record.messageId}</MessageId>`;
 
-  const body = `<?xml version="1.0"?><SendMessageResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
+  const body = `${xmlVersion}<SendMessageResponse ${xmlns}>
       <SendMessageResult>
          ${SendMessageResult}
       </SendMessageResult>
-      <ResponseMetadata>
-          <RequestId>${RequestId}</RequestId>
-      </ResponseMetadata>
+      ${ResponseMetadata(RequestId)}
   </SendMessageResponse>`;
 
   return body;
@@ -52,50 +66,26 @@ export const SendMessageBatchResponse = (success: any[], failures: any[], Reques
     SendMessageBatchResult += `</BatchResultErrorEntry>\n`;
   });
 
-  const body = `<?xml version="1.0"?><SendMessageBatchResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
+  const body = `${xmlVersion}<SendMessageBatchResponse ${xmlns}>
       <SendMessageBatchResult>
           ${SendMessageBatchResult}
       </SendMessageBatchResult>
-      <ResponseMetadata>
-          <RequestId>${RequestId}</RequestId>
-      </ResponseMetadata>
+      ${ResponseMetadata(RequestId)}
       </SendMessageBatchResponse>`;
   return body;
 };
 
 export const PurgeQueueResponse = (RequestId: string) => {
-  return `<?xml version="1.0"?><PurgeQueueResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
-  <ResponseMetadata>
-  <RequestId>${RequestId}</RequestId>
-  </ResponseMetadata>
+  return `${xmlVersion}<PurgeQueueResponse ${xmlns}>
+  ${ResponseMetadata(RequestId)}
   </PurgeQueueResponse>`;
 };
 
-export const PurgeQueueErrorResponse = (RequestId: string, queueName: string) => {
-  return `<?xml version="1.0"?>
-      <ErrorResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
-        <Error>
-          <Type>Sender</Type>
-          <Code>AWS.SimpleQueueService.PurgeQueueInProgress</Code>
-          <Message>Only one PurgeQueue operation on ${queueName} is allowed every 60 seconds.</Message>
-          <Detail/>
-        </Error>
-        <RequestId>${RequestId}</RequestId>
-      </ErrorResponse>`;
-};
+export const PurgeQueueErrorResponse = (RequestId: string, queueName: string) =>
+  ErrorResponse(RequestId, { Code: "AWS.SimpleQueueService.PurgeQueueInProgress", Message: `Only one PurgeQueue operation on ${queueName} is allowed every 60 seconds.` });
 
-export const queueNotFound = (RequestId: string) => {
-  return `<?xml version="1.0"?>
-    <ErrorResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
-      <Error>
-        <Type>Sender</Type>
-        <Code>AWS.SimpleQueueService.NonExistentQueue</Code>
-        <Message>The specified queue does not exist for this wsdl version.</Message>
-        <Detail/>
-      </Error>
-      <RequestId>${RequestId}</RequestId>
-    </ErrorResponse>`;
-};
+export const queueNotFound = (RequestId: string) =>
+  ErrorResponse(RequestId, { Code: "AWS.SimpleQueueService.NonExistentQueue", Message: `The specified queue does not exist for this wsdl version.` });
 
 export const ReceiveMessageResponse = (RequestId: string, records: any[], AttributeNames?: string[], MessageAttributeNames?: string[]) => {
   let ReceiveMessageResult = "<ReceiveMessageResult>\n";
@@ -196,33 +186,24 @@ export const ReceiveMessageResponse = (RequestId: string, records: any[], Attrib
     ReceiveMessageResult = "<ReceiveMessageResult/>\n";
   }
 
-  const body = `<?xml version="1.0"?>
-  <ReceiveMessageResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
+  const body = `${xmlVersion}
+  <ReceiveMessageResponse ${xmlns}>
      ${ReceiveMessageResult}  
-    <ResponseMetadata>
-      <RequestId>${RequestId}</RequestId>
-    </ResponseMetadata>
+     ${ResponseMetadata(RequestId)}
   </ReceiveMessageResponse>`;
 
   return body;
 };
 
-export const ChangeMessageVisibilityResponse = (RequestId: string) => `<?xml version="1.0"?><ChangeMessageVisibilityResponse>
-    <ResponseMetadata>
-        <RequestId>${RequestId}</RequestId>
-    </ResponseMetadata>
+export const ChangeMessageVisibilityResponse = (RequestId: string) => `${xmlVersion}<ChangeMessageVisibilityResponse>
+${ResponseMetadata(RequestId)}
   </ChangeMessageVisibilityResponse>`;
 
-export const ChangeMessageVisibilityError = (RequestId: string, receiptHandle: string) => `<?xml version="1.0"?>
-  <ErrorResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
-      <Error>
-          <Type>Sender</Type>
-          <Code>InvalidParameterValue</Code>
-          <Message>Value &quot;${receiptHandle}&quot; for parameter ReceiptHandle is invalid. Reason: Message does not exist or is not available for visibility timeout change.</Message>
-          <Detail/>
-      </Error>
-      <RequestId>${RequestId}</RequestId>
-  </ErrorResponse>`;
+export const ChangeMessageVisibilityError = (RequestId: string, receiptHandle: string) =>
+  ErrorResponse(RequestId, {
+    Code: "InvalidParameterValue",
+    Message: `Value &quot;${receiptHandle}&quot; for parameter ReceiptHandle is invalid. Reason: Message does not exist or is not available for visibility timeout change.`,
+  });
 
 export const ChangeMessageVisibilityBatchResponse = (success: any[], failures: any[], RequestId: string) => {
   let succeed = success
@@ -244,68 +225,35 @@ export const ChangeMessageVisibilityBatchResponse = (success: any[], failures: a
     )
     .join("\n");
 
-  const body = `<?xml version="1.0"?><ChangeMessageVisibilityBatchResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
+  const body = `${xmlVersion}<ChangeMessageVisibilityBatchResponse ${xmlns}>
     <ChangeMessageVisibilityBatchResult>
         ${succeed}
         ${fails}
     </ChangeMessageVisibilityBatchResult>
-    <ResponseMetadata>
-        <RequestId>${RequestId}</RequestId>
-    </ResponseMetadata>
+    ${ResponseMetadata(RequestId)}
 </ChangeMessageVisibilityBatchResponse>`;
 
   return body;
 };
 
-export const EmptyBatchRequest = (RequestId: string) => `<?xml version="1.0"?>
-<ErrorResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
-    <Error>
-        <Type>Sender</Type>
-        <Code>MissingParameter</Code>
-        <Message>The request must contain the parameter ChangeMessageVisibilityBatchRequestEntry.1.Id.</Message>
-        <Detail/>
-    </Error>
-    <RequestId>${RequestId}</RequestId>
-</ErrorResponse>
-`;
+// this weird message is copied from AWS :)
+export const EmptyBatchRequest = (RequestId: string) =>
+  ErrorResponse(RequestId, { Code: "MissingParameter", Message: `The request must contain the parameter ChangeMessageVisibilityBatchRequestEntry.1.Id.` });
 
-export const TooManyEntriesInBatchRequest = (RequestId: string, entryLenght: number) => `<?xml version="1.0"?>
-<ErrorResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
-    <Error>
-        <Type>Sender</Type>
-        <Code>AWS.SimpleQueueService.TooManyEntriesInBatchRequest</Code>
-        <Message>Maximum number of entries per request are 10. You have sent ${entryLenght}.</Message>
-        <Detail/>
-    </Error>
-    <RequestId>${RequestId}</RequestId>
-</ErrorResponse>`;
+export const TooManyEntriesInBatchRequest = (RequestId: string, entryLenght: number) =>
+  ErrorResponse(RequestId, { Code: "AWS.SimpleQueueService.TooManyEntriesInBatchRequest", Message: `Maximum number of entries per request are 10. You have sent ${entryLenght}.` });
 
-export const BatchEntryIdsNotDistinct = (RequestId: string, repetedId: string) => `<?xml version="1.0"?>
-<ErrorResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
-    <Error>
-        <Type>Sender</Type>
-        <Code>AWS.SimpleQueueService.BatchEntryIdsNotDistinct</Code>
-        <Message>Id ${repetedId} repeated.</Message>
-        <Detail/>
-    </Error>
-    <RequestId>${RequestId}</RequestId>
-</ErrorResponse>`;
+export const BatchEntryIdsNotDistinct = (RequestId: string, repetedId: string) =>
+  ErrorResponse(RequestId, { Code: "AWS.SimpleQueueService.BatchEntryIdsNotDistinct", Message: `Id ${repetedId} repeated.` });
 
-export const InvalidBatchEntryId = (RequestId: string) => `<?xml version="1.0"?>
-<ErrorResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
-    <Error>
-        <Type>Sender</Type>
-        <Code>AWS.SimpleQueueService.InvalidBatchEntryId</Code>
-        <Message>A batch entry id can only contain alphanumeric characters, hyphens and underscores. It can be at most 80 letters long.</Message>
-        <Detail/>
-    </Error>
-    <RequestId>${RequestId}</RequestId>
-</ErrorResponse>`;
+export const InvalidBatchEntryId = (RequestId: string) =>
+  ErrorResponse(RequestId, {
+    Code: "AWS.SimpleQueueService.InvalidBatchEntryId",
+    Message: `A batch entry id can only contain alphanumeric characters, hyphens and underscores. It can be at most 80 letters long.`,
+  });
 
-export const DeleteMessageResponse = (RequestId: string) => `<?xml version="1.0"?><DeleteMessageResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
-<ResponseMetadata>
-<RequestId>${RequestId}</RequestId>
-</ResponseMetadata>
+export const DeleteMessageResponse = (RequestId: string) => `${xmlVersion}<DeleteMessageResponse ${xmlns}>
+${ResponseMetadata(RequestId)}
 </DeleteMessageResponse>`;
 
 export const DeleteMessageBatchResponse = (success: any[], failures: any[], RequestId: string) => {
@@ -328,29 +276,23 @@ export const DeleteMessageBatchResponse = (success: any[], failures: any[], Requ
     )
     .join("\n");
 
-  const body = `<?xml version="1.0"?>
-  <DeleteMessageBatchResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
+  const body = `${xmlVersion}
+  <DeleteMessageBatchResponse ${xmlns}>
       <DeleteMessageBatchResult>
         ${succeed}
         ${fails}
       </DeleteMessageBatchResult>
-      <ResponseMetadata>
-        <RequestId>${RequestId}</RequestId>
-      </ResponseMetadata>
+      ${ResponseMetadata(RequestId)}
   </DeleteMessageBatchResponse>`;
 
   return body;
 };
 
-export const ReceiptHandleIsInvalid = (RequestId: string, receiptHandle: string) => `<?xml version="1.0"?><ErrorResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
-<Error>
-    <Type>Sender</Type>
-    <Code>AWS.SimpleQueueService.ReceiptHandleIsInvalid</Code>
-    <Message>The input receipt handle &quot;${receiptHandle}&quot; is not a valid receipt handle.</Message>
-    <Detail/>
-</Error>
-<RequestId>${RequestId}</RequestId>
-</ErrorResponse>`;
+export const ReceiptHandleIsInvalid = (RequestId: string, receiptHandle: string) =>
+  ErrorResponse(RequestId, {
+    Code: "AWS.SimpleQueueService.ReceiptHandleIsInvalid",
+    Message: `The input receipt handle &quot;${receiptHandle}&quot; is not a valid receipt handle.`,
+  });
 
 export const ListQueuesResponse = (RequestId: string, queues: any[], token?: string) => {
   let ListQueuesResult = `<ListQueuesResult>\n`;
@@ -361,12 +303,10 @@ export const ListQueuesResponse = (RequestId: string, queues: any[], token?: str
   }
 
   ListQueuesResult += "</ListQueuesResult>";
-  let body = `<?xml version="1.0"?>
-    <ListQueuesResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
+  let body = `${xmlVersion}
+    <ListQueuesResponse ${xmlns}>
         ${ListQueuesResult}
-        <ResponseMetadata>
-            <RequestId>${RequestId}</RequestId>
-        </ResponseMetadata>
+        ${ResponseMetadata(RequestId)}
     </ListQueuesResponse> `;
 
   return body;
@@ -389,46 +329,32 @@ export const ListQueueTagsResponse = (RequestId: string, tags: any) => {
   } else {
     ListQueueTagsResult = "<ListQueueTagsResult/>";
   }
-  const body = `<?xml version="1.0"?><ListQueueTagsResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
+  const body = `${xmlVersion}<ListQueueTagsResponse ${xmlns}>
   ${ListQueueTagsResult}
-  <ResponseMetadata>
-    <RequestId>${RequestId}</RequestId>
-  </ResponseMetadata>
+  ${ResponseMetadata(RequestId)}
 </ListQueueTagsResponse>`;
 
   return body;
 };
 
 export const TagQueueResponse = (RequestId: string) => {
-  return `<?xml version="1.0"?><TagQueueResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
-  <ResponseMetadata>
-    <RequestId>${RequestId}</RequestId>
-  </ResponseMetadata>
+  return `${xmlVersion}<TagQueueResponse ${xmlns}>
+  ${ResponseMetadata(RequestId)}
 </TagQueueResponse>`;
 };
 
 export const UntagQueueResponse = (RequestId: string) => {
-  return `<?xml version="1.0"?><UntagQueueResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
-  <ResponseMetadata>
-    <RequestId>${RequestId}</RequestId>
-  </ResponseMetadata>
+  return `${xmlVersion}<UntagQueueResponse ${xmlns}>
+  ${ResponseMetadata(RequestId)}
 </UntagQueueResponse>`;
 };
-export const DeleteQueueResponse = (RequestId: string) => `<?xml version="1.0"?><DeleteQueueResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
-  <ResponseMetadata>
-    <RequestId>${RequestId}</RequestId>
-  </ResponseMetadata>
+export const DeleteQueueResponse = (RequestId: string) => `${xmlVersion}<DeleteQueueResponse ${xmlns}>
+${ResponseMetadata(RequestId)}
 </DeleteQueueResponse>`;
 
-export const GetQueueUrlResponse = (
-  RequestId: string,
-  port: number,
-  QueueName: string
-) => `<?xml version="1.0"?><GetQueueUrlResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
+export const GetQueueUrlResponse = (RequestId: string, port: number, QueueName: string) => `${xmlVersion}<GetQueueUrlResponse ${xmlns}>
   <GetQueueUrlResult>
     <QueueUrl>http://localhost:${port}/123456789012/${QueueName}</QueueUrl>
   </GetQueueUrlResult>
-  <ResponseMetadata>
-    <RequestId>${RequestId}</RequestId>
-  </ResponseMetadata>
+  ${ResponseMetadata(RequestId)}
 </GetQueueUrlResponse> `;

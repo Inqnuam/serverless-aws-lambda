@@ -2,7 +2,6 @@ import type { BinaryLike } from "crypto";
 import type { ILambda } from "../../defineConfig";
 import type { QueueAttributes } from "./types";
 import { Queue } from "./queue";
-import { SqsError } from "./errors";
 import { createHash } from "crypto";
 export const md5 = (contents: string | BinaryLike): string => {
   return createHash("md5").update(contents).digest("hex");

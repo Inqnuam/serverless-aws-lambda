@@ -151,7 +151,7 @@ export const parseEndpoints = (event: any, httpApiPayload: LambdaEndpoint["versi
     }
 
     let ApgPathPartMatch = parsendEvent.paths[0];
-    ApgPathPartMatch.replace("*", ".*")
+    ApgPathPartMatch = ApgPathPartMatch.replace("*", ".*")
       .replace(/\{[\w.:-]+\+?\}/g, ".*")
       .replace(/\//g, "\\/");
 

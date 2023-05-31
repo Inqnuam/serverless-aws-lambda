@@ -27,6 +27,7 @@ const readFromPath = async (sourcefile: string) => {
     packages: "external",
     platform: "node",
     format: "cjs",
+    target: "ES2018",
     // supported: {
     //   "top-level-await": true, // TODO: esbuild ask for cjs + top-level-await support
     // },

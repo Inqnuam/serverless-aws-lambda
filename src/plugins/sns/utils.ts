@@ -10,7 +10,7 @@ export const parseSnsPublishBody = (encodedBody: string[]) => {
     let MessageAttributes: any = {};
     let entryMap: any = {};
     for (const s of encodedBody) {
-      const [k, v] = s.split("=");
+      const [k, v, ...restValues] = s.split("=");
       if (k.startsWith("MessageAttributes")) {
         const [_, __, entryNumber, entryType, aux] = k.split(".");
 
@@ -21,11 +21,11 @@ export const parseSnsPublishBody = (encodedBody: string[]) => {
           if (aux == "DataType") {
             MessageAttributes[entryMap[entryNumber]].Type = v;
           } else {
-            MessageAttributes[entryMap[entryNumber]].Value = v;
+            MessageAttributes[entryMap[entryNumber]].Value = [v, ...restValues].join("=");
           }
         }
       } else {
-        body[k] = v;
+        body[k] = [v, ...restValues].join("=");
       }
     }
     if (Object.keys(MessageAttributes).length) {
@@ -100,7 +100,7 @@ export const parseSnsPublishBatchBody = (encodedBody: string[]) => {
       }
     }
 
-    for (let v of memberMap.values()) {
+    for (const v of memberMap.values()) {
       let Sns: any = {
         Type: "Notification",
         MessageId: randomUUID(),

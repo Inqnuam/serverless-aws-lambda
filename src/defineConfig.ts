@@ -94,7 +94,14 @@ export interface Options {
     staticPath?: string;
     port?: number;
   };
-  plugins?: SlsAwsLambdaPlugin[];
+  /**
+   * Only SlsAwsLambdaPlugin type objects are considered as valid plugins.
+   *
+   * Others are ignored.
+   *
+   * This allows conditionnally ( true ?? customPlugin) plugin import.
+   */
+  plugins?: (SlsAwsLambdaPlugin | null | undefined | boolean)[];
 }
 
 let exiting = false;
@@ -125,7 +132,7 @@ function defineConfig(options: Options) {
 
   if (options.plugins) {
     options.plugins = options.plugins.filter((plugin, index) => {
-      if (!plugin) {
+      if (typeof plugin != "object" || !plugin || !("name" in plugin)) {
         return false;
       }
       if (!plugin.name || !plugin.name.length || typeof plugin.name != "string") {
@@ -170,7 +177,7 @@ function defineConfig(options: Options) {
     };
     if (options.plugins) {
       config.offline!.onReady = async (port, ip) => {
-        for (const plugin of options.plugins!) {
+        for (const plugin of options.plugins! as SlsAwsLambdaPlugin[]) {
           if (plugin.offline?.onReady) {
             try {
               await plugin.offline.onReady!.call(self, port, ip);
@@ -183,7 +190,7 @@ function defineConfig(options: Options) {
       };
 
       config.buildCallback = async (result, isRebuild) => {
-        for (const plugin of options.plugins!) {
+        for (const plugin of options.plugins! as SlsAwsLambdaPlugin[]) {
           if (plugin.buildCallback) {
             try {
               await plugin.buildCallback.call(self, result, isRebuild);
@@ -195,7 +202,7 @@ function defineConfig(options: Options) {
         }
       };
 
-      const pluginsRequests: OfflineConfig["request"] = options.plugins?.reduce((accum: OfflineConfig["request"], obj) => {
+      const pluginsRequests: OfflineConfig["request"] = (options.plugins as SlsAwsLambdaPlugin[]).reduce((accum: OfflineConfig["request"], obj) => {
         if (obj.offline?.request?.length) {
           accum!.push(...obj.offline.request);
         }
@@ -208,7 +215,7 @@ function defineConfig(options: Options) {
           return x;
         });
       }
-      for (const plugin of options.plugins!) {
+      for (const plugin of options.plugins! as SlsAwsLambdaPlugin[]) {
         if (plugin.onExit) {
           exitCallbacks.push(plugin.onExit.bind(self));
         }

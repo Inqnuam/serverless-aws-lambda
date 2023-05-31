@@ -74,9 +74,9 @@ for more options see [advanced configuration](#advanced-configuration).
 
 Lambda execution lifecycles.  
 Succefull execution:
-![lambda success](resources/invokeSuccess.png)
+![lambda success](https://github.com/Inqnuam/serverless-aws-lambda/blob/main/resources/invokeSuccess.png)
 Failed execution:
-![lambda error](resources/invokeError.png)
+![lambda error](https://github.com/Inqnuam/serverless-aws-lambda/blob/main/resources/invokeError.png)
 
 Offline server supports Application Load Balancer, API Gateway and Function URL endpoints (see [plugins](#plugins) for more triggers).  
 Appropriate `event` object is sent to the handler based on your lambda declaration.

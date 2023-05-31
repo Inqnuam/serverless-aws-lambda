@@ -18,12 +18,12 @@ export const parseSqsPublishBody = (encodedBody: string[]) => {
 
         if (entryType == "Name") {
           MessageAttribute[v] = { DataType: "", StringValue: "" };
-          entryMap[entryNumber] = v;
+          entryMap[entryNumber] = [v, ...restValues].join("=");
         } else if (entryType == "Value") {
           if (aux == "DataType") {
             MessageAttribute[entryMap[entryNumber]].DataType = v;
           } else {
-            MessageAttribute[entryMap[entryNumber]].StringValue = v;
+            MessageAttribute[entryMap[entryNumber]].StringValue = [v, ...restValues].join("=");
           }
         }
       } else if (k.startsWith("MessageSystemAttribute")) {
@@ -31,7 +31,7 @@ export const parseSqsPublishBody = (encodedBody: string[]) => {
 
         if (entryType == "Name") {
           MessageSystemAttribute[v] = { DataType: "", StringValue: "" };
-          systemEntryMap[entryNumber] = v;
+          systemEntryMap[entryNumber] = [v, ...restValues].join("=");
         } else if (entryType == "Value") {
           if (aux == "DataType") {
             MessageSystemAttribute[systemEntryMap[entryNumber]].DataType = v;
@@ -40,7 +40,7 @@ export const parseSqsPublishBody = (encodedBody: string[]) => {
           }
         }
       } else {
-        body[k] = v;
+        body[k] = [v, ...restValues].join("=");
       }
     }
     if (Object.keys(MessageAttribute).length) {
@@ -70,14 +70,14 @@ export const parseSqsPublishBatchBody = (encodedBody: string[]) => {
         const foundMember = memberMap.get(memberNumber);
         if (foundMember) {
           if (SQS_BATCH_MSG_TOP_LEVEL_KEYS.includes(entryType)) {
-            foundMember.value[entryType] = v;
+            foundMember.value[entryType] = [v, ...restValues].join("=");
           } else if (entryType == "MessageAttribute" || entryType == "MessageSystemAttribute") {
             const attribName = foundMember[entryType][entryNumber];
 
             if (attribName) {
-              foundMember.value[entryType][attribName][aux3 == "DataType" ? "DataType" : "StringValue"] = v;
+              foundMember.value[entryType][attribName][aux3 == "DataType" ? "DataType" : "StringValue"] = [v, ...restValues].join("=");
             } else {
-              foundMember[entryType][entryNumber] = v;
+              foundMember[entryType][entryNumber] = [v, ...restValues].join("=");
 
               if (foundMember.value[entryType]) {
                 foundMember.value[entryType][v] = {};
@@ -95,9 +95,9 @@ export const parseSqsPublishBatchBody = (encodedBody: string[]) => {
             value: {},
           };
           if (entryType == "MessageBody" || entryType == "Id") {
-            content.value[entryType] = v;
+            content.value[entryType] = [v, ...restValues].join("=");
           } else if (entryType == "MessageAttribute" || entryType == "MessageSystemAttribute") {
-            content[entryType][entryNumber] = v;
+            content[entryType][entryNumber] = [v, ...restValues].join("=");
             content.value[entryType] = {
               [v]: {},
             };
@@ -106,11 +106,11 @@ export const parseSqsPublishBatchBody = (encodedBody: string[]) => {
           memberMap.set(memberNumber, content);
         }
       } else {
-        request[k] = v;
+        request[k] = [v, ...restValues].join("=");
       }
     }
 
-    for (let v of memberMap.values()) {
+    for (const v of memberMap.values()) {
       request.Entries.push(v.value);
     }
   } catch (error) {
