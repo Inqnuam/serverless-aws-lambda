@@ -1,15 +1,9 @@
-import type { Plugin, OnResolveArgs, BuildResult } from "esbuild";
+import type { Plugin, BuildResult } from "esbuild";
 import { knownCjs } from "./knownCjs";
 
-const awsSdkV3 = { filter: /^@aws-sdk\//, namespace: "file" };
+const awsSdkV2 = "aws-sdk";
+const awsSdkV3 = "@aws-sdk/*";
 const awslambda = `${__dirname.slice(0, -5)}/src/lib/runtime/awslambda.ts`;
-
-const isExternal = (args: OnResolveArgs) => {
-  return {
-    path: args.path,
-    external: true,
-  };
-};
 
 export const buildOptimizer = ({
   isLocal,
@@ -53,14 +47,8 @@ export const buildOptimizer = ({
         }
 
         build.initialOptions.external!.push(...knownCjs);
-
-        build.onResolve(awsSdkV3, isExternal);
       } else {
-        if (nodeVersion < 18) {
-          build.initialOptions.external!.push("aws-sdk");
-        } else {
-          build.onResolve(awsSdkV3, isExternal);
-        }
+        build.initialOptions.external!.push(nodeVersion < 18 ? awsSdkV2 : awsSdkV3);
       }
     },
   };

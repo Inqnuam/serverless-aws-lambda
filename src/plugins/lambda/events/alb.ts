@@ -58,7 +58,7 @@ export class AlbRequestHandler extends CommonEventGenerator {
     }
 
     this.res.shouldKeepAlive = false;
-    this.res.writeHead(502, [["Server", "awselb/2.0"], ["Date", new Date().toUTCString()], ["Content-Type", "text/html"], ["Content-Length", "127"], AlbRequestHandler.keepAlive]);
+    this.res.writeHead(502, [["Server", "awselb/2.0"], ["Date", new Date().toUTCString()], ["Content-Type", "text/html"], ["Content-Length", "110"], AlbRequestHandler.keepAlive]);
 
     return this.res.end(html502);
   };

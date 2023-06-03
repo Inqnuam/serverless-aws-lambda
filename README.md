@@ -1,6 +1,8 @@
+# serverless-aws-lambda
+
 [![NPM](https://nodei.co/npm/serverless-aws-lambda.png?compact=true)](https://nodei.co/npm/serverless-aws-lambda/)
 
-## Description
+### Description
 
 > AWS Lambda dev tool for Serverless. Allows Express synthax in handlers. Supports packaging, local invoking and offline Application Load Balancer and API Gateway lambda server mocking.
 
@@ -65,7 +67,7 @@ Start the local server
 SLS_DEBUG="*" sls aws-lambda -s dev
 ```
 
-It is also possible to passe port from the CLI with `--port` or `-p`.
+It is also possible to set server port from the CLI with `--port` or `-p`.
 
 This will overwrite serverless.yml custom > serverless-aws-lambda > port value if it is set.  
 for more options see [advanced configuration](#advanced-configuration).
