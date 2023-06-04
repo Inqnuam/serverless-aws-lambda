@@ -30,6 +30,13 @@
 - [Installation](#installation)
 - [Usage](#usage)
 - [Invoke](#invoke)
+  - [Lifecycle](#lambda-execution-lifecycles)
+  - [Events](#events)
+  - [AWS Test button](#aws-console-test-button)
+  - [Function URL](#function-url)
+  - [Serverless Invoke local](#serverless-invoke-local)
+  - [AWS SDK Lambda Client](#aws-sdk)
+  - [Stream Response](#aws-lambda-response-stream)
 - [Package](#package)
   - [assets](#assets)
   - [preserveDir](#preservedir)
@@ -38,14 +45,19 @@
 
 - [Advanced configuration](#advanced-configuration)
 - [Plugins](#plugins)
+- [Benchmarks](#benchmarks)
 
-### Installation
+### **Installation**
+
+Usual node module installation...
 
 ```bash
 yarn add -D serverless-aws-lambda
 # or
 npm install -D serverless-aws-lambda
 ```
+
+Then add the plugin to your serverless plugins list
 
 ```yaml
 service: myapp
@@ -59,7 +71,7 @@ plugins:
 
 ---
 
-### Usage
+### **Usage**
 
 Start the local server
 
@@ -67,20 +79,27 @@ Start the local server
 SLS_DEBUG="*" sls aws-lambda -s dev
 ```
 
+During development the env variable `SLS_DEBUG="*"` is strongly recommanded as it will print a bunch of useful information.  
 It is also possible to set server port from the CLI with `--port` or `-p`.
 
 This will overwrite serverless.yml custom > serverless-aws-lambda > port value if it is set.  
-for more options see [advanced configuration](#advanced-configuration).
+For more options see [advanced configuration](#advanced-configuration).
 
-### Invoke
+---
 
-Lambda execution lifecycles.  
+### **Invoke**
+
+#### **Lambda execution lifecycles.**
+
 Succefull execution:
 ![lambda success](https://github.com/Inqnuam/serverless-aws-lambda/blob/main/resources/invokeSuccess.png)
 Failed execution:
 ![lambda error](https://github.com/Inqnuam/serverless-aws-lambda/blob/main/resources/invokeError.png)
 
-Offline server supports Application Load Balancer, API Gateway and Function URL endpoints (see [plugins](#plugins) for more triggers).  
+#### **Events**
+
+Offline server supports Application Load Balancer, API Gateway and Function URL endpoints out of box.
+See [plugins](#plugins) for more triggers (SNS, SQS, etc.).  
 Appropriate `event` object is sent to the handler based on your lambda declaration.
 
 ```yaml
@@ -96,6 +115,8 @@ functions:
             method: GET
 ```
 
+All available local endpoints will be printed to the console when `SLS_DEBUG="*"` is set.
+
 `myAwsomeLambda` is available at `http://localhost:PORT/paradise`
 
 However if your declare both `alb` and `http` or `httpApi` inside a single lambda `events` with the same `path` you have to specify desired server by setting `alb` or `apg` inside your request's:
@@ -105,6 +126,8 @@ However if your declare both `alb` and `http` or `httpApi` inside a single lambd
 
 Please note that invoking a lambda from sls CLI (`sls invoke local -f myFunction`) will not trigger the offline server. But will still make your handler ready to be invoked.
 
+#### **AWS Console `Test` button**
+
 To invoke your Lambda like with AWS Console's `Test` button, prefix your Lambda name by `@invoke/`.  
 Example:
 
@@ -112,14 +135,35 @@ Example:
 http://localhost:3000/@invoke/myAwsomeLambda
 ```
 
+#### **Function URL**
+
 Function URL is available with `@url/` prefix. (must be enabled inside lambda declaration).  
 Example:
+
+```yaml
+functions:
+  myAwsomeLambda:
+    handler: src/handlers/awsomeLambda.default
+    url: true
+```
 
 ```
 http://localhost:3000/@url/myAwsomeLambda
 ```
 
-Invoking with `aws-sdk` Lambda Client:
+#### **Serverless Invoke local**
+
+Works out of box.  
+[see options](https://www.serverless.com/framework/docs/providers/aws/cli-reference/invoke-local)  
+Example:
+
+`serverless invoke local -f myAwsomeLambda`
+
+#### **AWS SDK**
+
+Invoking with `aws-sdk` Lambda Client requires to set client endpoint to local server host.
+
+Example:
 
 ```js
 const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
@@ -147,7 +191,7 @@ client
   });
 ```
 
-### AWS Lambda Response Stream
+### **AWS Lambda Response Stream**
 
 Stream responses are supported out of box through Function URL invoke or AWS SDK invoke.  
 See example:
@@ -156,8 +200,8 @@ See example:
 functions:
   myAwsomeLambda:
     handler: src/handlers/awsomeLambda.default
-    url:
-      invokeMode: RESPONSE_STREAM # required only for Function URL invoke
+    url: # required only for Function URL invoke
+      invokeMode: RESPONSE_STREAM
 ```
 
 ```ts
@@ -210,7 +254,9 @@ Lambdas are executed in worker threads. Only variables declared in your `serverl
 
 ---
 
-### Package
+---
+
+### **Package**
 
 serverless-aws-lambda bundles every (nodejs) handler separetly (with esbuild) and creates the artifact zip archive.  
 Archive will include bundeled handler and sourcemap (if enabled in esbuild).
@@ -362,7 +408,7 @@ functions:
 
 ---
 
-### Deploy
+### **Deploy**
 
 Adding the param `online: false` will omit the deployement of your Lambda.
 
@@ -422,6 +468,48 @@ See [defineConfig](resources/defineConfig.md) for advanced configuration.
 - [DynamoDB Local Streams](https://github.com/Inqnuam/serverless-aws-lambda-ddb-streams)
 - [Jest](https://github.com/Inqnuam/serverless-aws-lambda-jest)
 - [Vitest](https://github.com/Inqnuam/serverless-aws-lambda-vitest)
+
+---
+
+### **Benchmarks**
+
+Hardware and software:
+
+- iMac Pro 2017 (10 cors, 32Gb RAM)
+- macOS Ventura (13.2.1)
+- NodeJS v18.16.0
+- Serverless 3.32.2
+- serverless-aws-lambda 4.5.9
+- serverless-offline 12.0.4
+- serverless-esbuild 1.45.1
+
+Handler:
+
+```js
+// src/handlers/visitor.js
+let count = 0;
+export const handler = async () => {
+  count++;
+
+  return {
+    statusCode: 200,
+    body: `Visit count ${count}`,
+  };
+};
+```
+
+```yaml
+functions:
+  visitor:
+    handler: src/handlers/visitor.handler
+    events:
+      - http: ANY /visitor
+```
+
+| 200 + 200 executions                                                                    | Time (in seconds)                        | Memory used (mb)          | CPU (core) usage           | last invoke response | info                                |
+| --------------------------------------------------------------------------------------- | ---------------------------------------- | ------------------------- | -------------------------- | -------------------- | ----------------------------------- |
+| serverless-aws-lambda <br/> cmd: `serverless aws-lambda`                                | sequential: 0.644<br/> concurrent: 0.414 | idle: 125<br/> peak: 169  | idle: 0,1%<br/> peak: 15%  | Visit count 400      |                                     |
+| serverless-offline + serverless-esbuild <br/> cmd: `serverless offline --reloadHandler` | sequential: 10.4<br/> concurrent: 2.8    | idle: 110<br/> peak: 3960 | idle: 0,1%<br/> peak: 537% | Visit count 1        | most of concurrent invocations fail |
 
 ---
 
