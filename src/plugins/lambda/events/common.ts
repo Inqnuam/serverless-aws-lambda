@@ -63,7 +63,7 @@ export class CommonEventGenerator {
     delete headers["x-mock-type"];
     delete headers.connection;
 
-    return { "X-Forwarded-For": req.socket.remoteAddress, "X-Forwarded-Proto": "http", "X-Forwarded-Port": CommonEventGenerator.port, ...headers };
+    return { "X-Forwarded-For": req.socket.remoteAddress, "X-Forwarded-Proto": "http", "X-Forwarded-Port": String(CommonEventGenerator.port), ...headers };
   }
   static getPathParameters(mockEvent: LambdaEndpoint, parsedURL: URL) {
     const paramDeclarations = mockEvent.paths[0].split("/");
