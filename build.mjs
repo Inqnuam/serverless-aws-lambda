@@ -46,6 +46,7 @@ const buildIndex = bundle.bind(null, {
     "./src/plugins/sns/index.ts",
     "./src/plugins/sqs/index.ts",
     "./src/plugins/s3/index.ts",
+    "./src/plugins/kinesis/index.ts",
     "./src/lambda/body-parser.ts",
   ],
 });
@@ -60,6 +61,7 @@ const buildRouterESM = bundle.bind(null, {
     "./src/plugins/sns/index.ts",
     "./src/plugins/sqs/index.ts",
     "./src/plugins/s3/index.ts",
+    "./src/plugins/kinesis/index.ts",
   ],
   format: "esm",
   outExtension: { ".js": ".mjs" },

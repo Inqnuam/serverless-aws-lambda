@@ -55,6 +55,11 @@
       "types": "./dist/plugins/s3/index.d.ts",
       "require": "./dist/plugins/s3/index.js",
       "import": "./dist/plugins/s3/index.mjs"
+    },
+    "./kinesis": {
+      "types": "./dist/plugins/kinesis/index.d.ts",
+      "require": "./dist/plugins/kinesis/index.js",
+      "import": "./dist/plugins/kinesis/index.mjs"
     }
   },
   "dependencies": {
