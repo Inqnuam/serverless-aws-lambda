@@ -23,6 +23,7 @@ const DEFAULT_LAMBDA_MEMORY_SIZE = 1024;
 const isLocalEnv = {
   IS_OFFLINE: true,
   IS_LOCAL: true,
+  AWS_SAM_LOCAL: true,
 };
 
 interface PluginUtils {
@@ -282,8 +283,12 @@ class ServerlessAwsLambda extends Daemon {
             output += ` | http://${localIp}:${port}`;
           }
 
-          // @ts-ignore
-          this.#lambdas.forEach((x) => x.setEnv("LOCAL_PORT", port));
+          this.#lambdas.forEach((x) => {
+            // @ts-ignore
+            x.setEnv("LOCAL_PORT", port);
+            // @ts-ignore
+            x.setEnv("AWS_LAMBDA_RUNTIME_API", `127.0.0.1:${port}`);
+          });
           log.GREEN(output);
         });
       }
