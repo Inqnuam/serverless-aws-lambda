@@ -215,7 +215,7 @@ export class AlbRequestHandler extends CommonEventGenerator {
       event.headers = {
         "x-forwarded-for": req.socket.remoteAddress,
         "x-forwarded-proto": "http",
-        "x-forwarded-port": CommonEventGenerator.port,
+        "x-forwarded-port": String(CommonEventGenerator.port),
         ...headers,
       };
       event.queryStringParameters = AlbRequestHandler.#paramsToAlbObject(url as string);
