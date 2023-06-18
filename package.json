@@ -59,9 +59,9 @@
   },
   "dependencies": {
     "@aws-sdk/eventstream-codec": "^3.347.0",
-    "@types/serverless": "^3.12.11",
+    "@types/serverless": "^3.12.12",
     "archiver": "^5.3.1",
-    "esbuild": "^0.18.0",
+    "esbuild": "^0.18.4",
     "serve-static": "^1.15.0"
   },
   "devDependencies": {

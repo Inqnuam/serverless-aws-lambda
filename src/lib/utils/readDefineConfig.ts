@@ -66,10 +66,11 @@ export const readDefineConfig = async (config: string) => {
 
   try {
     exportedFunc = await readFromPath(configPath);
-  } catch (error) {}
-
-  if (!exportedFunc) {
+  } catch (error) {
     log.YELLOW(`Can not read 'defineConfig' from ${config}`);
+    console.error(error);
+    process.exit(1);
   }
+
   return { exportedFunc, configObjectName, configPath };
 };

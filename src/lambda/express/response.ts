@@ -114,7 +114,8 @@ export class _Response implements IResponse {
     this.#fail(error);
   }
   #sendResponse() {
-    if (!this.responseObject.headers["Content-Type"]) {
+    const hasCt = Object.keys(this.responseObject.headers).find((x) => x.toLowerCase() == "content-type");
+    if (!hasCt) {
       if (this.#req.requestContext?.elb) {
         this.type("text/html; charset=utf-8");
       } else {

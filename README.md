@@ -37,6 +37,7 @@
   - [Serverless Invoke local](#serverless-invoke-local)
   - [AWS SDK Lambda Client](#aws-sdk)
   - [Stream Response](#aws-lambda-response-stream)
+- [Environment variables](#environment-variables)
 - [Package](#package)
   - [assets](#assets)
   - [preserveDir](#preservedir)
@@ -248,11 +249,17 @@ for await (const x of data.EventStream) {
 
 ---
 
-### Environment variable
+### Environment variables
 
-Lambdas are executed in worker threads. Only variables declared in your `serverless.yml` are injected into `process.env` except `IS_LOCAL`, `LOCAL_PORT` and `NODE_ENV`.
+Lambdas are executed in worker threads. \*Only variables declared in your `serverless.yml` are injected into `process.env`.
 
----
+\*In local mode following env variables are set for `sls invoke`, serverless-offline and AWS SAM compatibility.
+
+- IS_LOCAL
+- IS_OFFLINE
+- AWS_SAM_LOCAL
+
+If `NODE_ENV` is present it will be injected in both local mode, while deploying also during bundle process for optimized output.
 
 ---
 
