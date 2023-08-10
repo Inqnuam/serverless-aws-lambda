@@ -513,7 +513,7 @@ functions:
       - http: ANY /visitor
 ```
 
-| 200 + 200 executions                                                                    | Time (in seconds)                        | Memory used (mb)          | CPU (core) usage           | last invoke response | info                                |
+| 200 + 200 executions                                                                    | Time (in seconds)                        | Memory used (mb)          | CPU (core) usage           | last invoke response | note                                |
 | --------------------------------------------------------------------------------------- | ---------------------------------------- | ------------------------- | -------------------------- | -------------------- | ----------------------------------- |
 | serverless-aws-lambda <br/> cmd: `serverless aws-lambda`                                | sequential: 0.644<br/> concurrent: 0.414 | idle: 125<br/> peak: 169  | idle: 0,1%<br/> peak: 15%  | Visit count 400      |                                     |
 | serverless-offline + serverless-esbuild <br/> cmd: `serverless offline --reloadHandler` | sequential: 10.4<br/> concurrent: 2.8    | idle: 110<br/> peak: 3960 | idle: 0,1%<br/> peak: 537% | Visit count 1        | most of concurrent invocations fail |

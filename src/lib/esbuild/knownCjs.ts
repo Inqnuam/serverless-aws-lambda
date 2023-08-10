@@ -7,6 +7,7 @@ export const knownCjs: string[] = [
   "@middy/*",
   "@hapi/joi",
   "@opensearch-project/opensearch",
+  "@smithy/*",
   "axios",
   "axios-retry",
   "axios-cache-interceptor",

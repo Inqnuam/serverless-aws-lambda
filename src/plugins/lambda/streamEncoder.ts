@@ -1,7 +1,7 @@
 import type { ServerResponse } from "http";
-import { EventStreamCodec } from "@aws-sdk/eventstream-codec";
+import { EventStreamCodec } from "@smithy/eventstream-codec";
 
-import type { MessageHeaders } from "@aws-sdk/eventstream-codec";
+import type { MessageHeaders } from "@smithy/eventstream-codec";
 import { CommonEventGenerator } from "./events/common";
 
 interface ErrorMessage {

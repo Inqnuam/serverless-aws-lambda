@@ -25,6 +25,9 @@ const isLocalEnv = {
   IS_LOCAL: true,
   AWS_SAM_LOCAL: true,
 };
+const osRootPath = cwd.split(path.sep)[0];
+const NsReg = new RegExp(`^.*:${osRootPath}`);
+const isNamespacedPath = (p: string) => NsReg.test(p);
 
 interface PluginUtils {
   log: Function;
@@ -446,20 +449,31 @@ class ServerlessAwsLambda extends Daemon {
     const outputNames = Object.keys(outputs)
       .filter((x) => !x.endsWith(".map") && outputs[x].entryPoint)
       .map((x) => {
-        const element = outputs[x];
-        if (element.entryPoint) {
-          const lastPointIndex = element.entryPoint.lastIndexOf(".");
-          const entryPoint = path.join(cwd, element.entryPoint.slice(0, lastPointIndex));
-          const esOutputPath = path.join(cwd, x);
+        const element = outputs[x] as Metafile["outputs"]["happy typescript"] & { entryPoint: string };
 
-          const ext = path.extname(element.entryPoint);
+        let actuelEntryPoint = element.entryPoint;
+        let ext = "";
 
-          return {
-            esOutputPath,
-            entryPoint,
-            ext,
-          };
+        if (isNamespacedPath(actuelEntryPoint)) {
+          actuelEntryPoint = actuelEntryPoint.split(":").slice(1).join(":");
         }
+
+        if (!path.isAbsolute(actuelEntryPoint)) {
+          actuelEntryPoint = path.resolve(actuelEntryPoint);
+        }
+
+        const lastPointIndex = actuelEntryPoint.lastIndexOf(".");
+
+        if (lastPointIndex != -1) {
+          ext = path.extname(actuelEntryPoint);
+          actuelEntryPoint = actuelEntryPoint.slice(0, lastPointIndex);
+        }
+
+        return {
+          esOutputPath: path.join(cwd, x),
+          entryPoint: actuelEntryPoint,
+          ext,
+        };
       });
 
     this.#lambdas.forEach((x) => {

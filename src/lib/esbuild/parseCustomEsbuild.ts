@@ -198,5 +198,8 @@ export const parseCustomEsbuild = (customConfig: BuildOptions) => {
     customEsBuild.packages = customConfig.packages;
   }
 
+  if (customConfig.logOverride && typeof customConfig.logOverride == "object") {
+    customEsBuild.logOverride = customConfig.logOverride;
+  }
   return customEsBuild;
 };

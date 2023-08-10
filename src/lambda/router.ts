@@ -22,8 +22,8 @@ const getMiddleware = (controllers: (RouteController | RouteMiddleware | Functio
     return controllers[0]?.length < 4 ? controllers[0] : undefined;
   }
 };
-const { IS_LOCAL, NODE_ENV } = process.env;
-const isProd = NODE_ENV == "production";
+const { IS_LOCAL } = process.env;
+const isProd = process.env.NODE_ENV == "production";
 
 class Route extends Function {
   controllers: (RouteController | RouteMiddleware | Function)[] = [];

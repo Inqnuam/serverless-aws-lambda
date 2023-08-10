@@ -2,7 +2,7 @@ import type { BuildOptions } from "esbuild";
 
 export const mergeEsbuildConfig = (esBuildConfig: BuildOptions, customEsBuildConfig: BuildOptions) => {
   if (Array.isArray(customEsBuildConfig.plugins)) {
-    esBuildConfig.plugins!.push(...customEsBuildConfig.plugins);
+    esBuildConfig.plugins!.unshift(...customEsBuildConfig.plugins);
   }
 
   if (Array.isArray(customEsBuildConfig.external)) {
@@ -201,6 +201,14 @@ export const mergeEsbuildConfig = (esBuildConfig: BuildOptions, customEsBuildCon
 
   if (typeof customEsBuildConfig.packages == "string") {
     esBuildConfig.packages = customEsBuildConfig.packages;
+  }
+
+  if (customEsBuildConfig.logOverride && typeof customEsBuildConfig.logOverride == "object") {
+    if (esBuildConfig.logOverride) {
+      esBuildConfig.logOverride = { ...esBuildConfig.logOverride, ...customEsBuildConfig.logOverride };
+    } else {
+      esBuildConfig.logOverride = customEsBuildConfig.logOverride;
+    }
   }
 
   return esBuildConfig;

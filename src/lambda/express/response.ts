@@ -24,6 +24,7 @@ export interface IResponse {
   sendStatus: (code: number) => void;
   send: (content?: string | Buffer) => void;
   end: (rawContent: any) => void;
+  type(contentType: string): this;
   json: (content: Stringifiable) => void;
   set: (header: string | { [key: string]: string }, value?: string) => this;
   setHeader: (header: string | { [key: string]: string }, value?: string) => this;
@@ -218,7 +219,7 @@ export class _Response implements IResponse {
     let resContent = undefined;
     if (Array.isArray(rawContent)) {
       resContent = [...rawContent];
-    } else if (typeof rawContent == "object") {
+    } else if (rawContent && typeof rawContent == "object") {
       resContent = { ...rawContent };
     } else {
       resContent = rawContent;

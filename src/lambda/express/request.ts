@@ -1,4 +1,4 @@
-type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "ANY";
+type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
 
 export interface RawAPIResponseContent {
   cookies?: string[];
@@ -13,7 +13,7 @@ export interface RawResponseContent {
   [key: string]: any;
 }
 
-interface KnownRequestProperties {
+export interface KnownRequestProperties {
   requestContext: { [key: string]: any };
   httpMethod: HttpMethod;
   queryStringParameters: { [key: string]: string };
