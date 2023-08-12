@@ -1,0 +1,28 @@
+service: my-project
+
+plugins:
+  - serverless-aws-lambda
+
+package:
+  individually: true
+
+provider:
+  name: aws
+  stage: ${opt:stage, 'dev'}
+  region: eu-west-3
+  runtime: nodejs18.x
+  architecture: arm64
+  memorySize: 512
+  versionFunctions: false
+
+custom:
+  serverless-aws-lambda:
+    configPath: config/sls.ts
+
+functions:
+  helloWorld:
+    handler: src/lambda/helloWorld.default
+    events:
+      - httpApi:
+          method: GET
+          path: /sayhello

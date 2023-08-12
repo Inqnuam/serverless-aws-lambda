@@ -1,0 +1,20 @@
+{
+  "name": "my-project",
+  "license": "UNLICENSED",
+  "type": "module",
+  "devDependencies": {
+    "prettier": "3.0.1",
+    "serverless": "^3.34.0",
+    "serverless-aws-lambda": "^4.6.2",
+    "serverless-aws-lambda-vitest": "^1.2.5",
+    "typescript": "^5.1.6"
+  },
+  "scripts": {
+    "sls": "sls",
+    "tsc": "tsc",
+    "start": "SLS_DEBUG=* sls aws-lambda -s dev",
+    "test": "sls aws-lambda -s dev vitest",
+    "deploy": "SLS_DEBUG=* sls deploy -s dev",
+    "format": "prettier --write ."
+  }
+}

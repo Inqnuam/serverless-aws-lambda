@@ -1,0 +1,5 @@
+node_modules
+.aws_lambda
+.serverless
+.DS_Store
+/**/*/.DS_Store

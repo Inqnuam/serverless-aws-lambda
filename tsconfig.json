@@ -12,5 +12,5 @@
     "declarationDir": "./dist/",
     "rootDir": "./src/"
   },
-  "exclude": ["./dist/**/*"]
+  "exclude": ["./dist/**/*", "./templates/**/*"]
 }
