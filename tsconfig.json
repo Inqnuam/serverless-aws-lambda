@@ -2,13 +2,15 @@
   "compilerOptions": {
     "declaration": true,
     "target": "es2022",
-    "module": "NodeNext",
+    "module": "ES2022",
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "emitDeclarationOnly": true,
-    "moduleResolution": "nodenext",
+    "moduleResolution": "Bundler",
     "removeComments": false,
     "strict": true,
+    "verbatimModuleSyntax": true,
+    "forceConsistentCasingInFileNames": true,
     "declarationDir": "./dist/",
     "rootDir": "./src/"
   },

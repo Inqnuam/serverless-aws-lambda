@@ -1,4 +1,4 @@
-import { HttpMethod } from "../server/handlers";
+import type { HttpMethod } from "../server/handlers";
 import { log } from "../utils/colorize";
 
 const pathPartsRegex = /^(\{[\w.:-]+\+?\}|[a-zA-Z0-9.:_-]+)$/;

@@ -70,4 +70,5 @@ export class Server {
   }
 }
 
-export { ServerConfig, exitEvents };
+export type { ServerConfig,  };
+export {exitEvents}

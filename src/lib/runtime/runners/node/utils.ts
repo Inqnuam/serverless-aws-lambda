@@ -215,10 +215,10 @@ export class EventQueue extends Map {
       if (timer.type != "Timeout") {
         return;
       }
-      const { _idleTimeout, _idleStart, _onTimeout, _repeat } = timer.resource;
+      const { _idleTimeout, _idleStart, _onTimeout, _repeat, _destroyed } = timer.resource;
 
       const timerValue = _idleTimeout - _idleStart;
-      if (timerValue > -1 || _repeat) {
+      if (!_destroyed && (timerValue > -1 || _repeat)) {
         EventQueue.context[this.requestId].timers.set(id, { timerValue, _onTimeout, interval: _repeat });
       }
 

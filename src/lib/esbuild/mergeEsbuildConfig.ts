@@ -84,9 +84,7 @@ export const mergeEsbuildConfig = (esBuildConfig: BuildOptions, customEsBuildCon
     esBuildConfig.tsconfig = customEsBuildConfig.tsconfig;
   }
 
-  // @ts-ignore
-  if (typeof customEsBuildConfig.tsconfigRaw == "string") {
-    // @ts-ignore
+  if (customEsBuildConfig.tsconfigRaw && ["string", "object"].includes(typeof customEsBuildConfig.tsconfigRaw)) {
     esBuildConfig.tsconfigRaw = customEsBuildConfig.tsconfigRaw;
   }
 
@@ -100,6 +98,10 @@ export const mergeEsbuildConfig = (esBuildConfig: BuildOptions, customEsBuildCon
 
   if (Array.isArray(customEsBuildConfig.drop)) {
     esBuildConfig.drop = customEsBuildConfig.drop;
+  }
+
+  if (Array.isArray(customEsBuildConfig.dropLabels)) {
+    esBuildConfig.dropLabels!.push(...customEsBuildConfig.dropLabels);
   }
 
   if (Array.isArray(customEsBuildConfig.resolveExtensions)) {

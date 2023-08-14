@@ -32,7 +32,7 @@ export interface KnownRequestProperties {
    *
    * Tries to parse with JSON.parse().
    *
-   * Use `body-parser` middleware from `serverless-aws-lambda/body-parser` to parse Form-Data.
+   * Use `body-parser` middleware from `serverless-aws-lambda/body-parser` to parse Form-Data and x-www-form-urlencoded.
    */
   body: any;
   method: HttpMethod;

@@ -1,4 +1,3 @@
-import { IncomingMessage, IncomingHttpHeaders, ServerResponse } from "http";
 import { CommonEventGenerator } from "../events/common";
 import { Handlers } from "../../../lib/server/handlers";
 import { BufferedStreamResponse } from "../../../lib/runtime/bufferedStreamResponse";
@@ -8,7 +7,7 @@ import { ApgRequestHandler } from "../events/apg";
 import { randomUUID } from "crypto";
 import type { HttpMethod } from "../../../lib/server/handlers";
 import type { LambdaEndpoint } from "../../../lib/parseEvents/endpoints";
-
+import type { IncomingMessage, IncomingHttpHeaders, ServerResponse } from "http";
 const getRequestMockType = (searchParams: URLSearchParams, headers: IncomingHttpHeaders) => {
   if (searchParams.get("x_mock_type") !== null) {
     return searchParams.get("x_mock_type");

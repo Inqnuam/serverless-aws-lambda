@@ -1,8 +1,9 @@
 import http, { Server, IncomingMessage, ServerResponse } from "http";
-import { AddressInfo } from "net";
+import type { AddressInfo } from "net";
 import { networkInterfaces } from "os";
 import { Handlers } from "./handlers";
-import { ILambdaMock, LambdaMock } from "../runtime/rapidApi";
+import type { ILambdaMock,  } from "../runtime/rapidApi";
+import {  LambdaMock } from "../runtime/rapidApi";
 import { log } from "../utils/colorize";
 import inspector from "inspector";
 import { html404 } from "../../plugins/lambda/htmlStatusMsg";

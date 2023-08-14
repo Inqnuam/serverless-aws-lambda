@@ -1,4 +1,4 @@
-import { IncomingMessage, IncomingHttpHeaders } from "http";
+import type { IncomingMessage, IncomingHttpHeaders } from "http";
 import type { LambdaEndpoint } from "../../../lib/parseEvents/endpoints";
 
 export type normalizedSearchParams = { toString: () => string } & { [key: string]: string[] | undefined };

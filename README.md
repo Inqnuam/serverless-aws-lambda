@@ -50,6 +50,16 @@
 
 ### **Installation**
 
+**Quick start**
+
+```bash
+npx degit github:inqnuam/serverless-aws-lambda/templates/simple my-project
+cd my-project && yarn install
+yarn start
+```
+
+**Manual installation**
+
 Usual node module installation...
 
 ```bash

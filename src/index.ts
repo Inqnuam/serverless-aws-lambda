@@ -1,6 +1,6 @@
 import path from "path";
 import { Daemon } from "./lib/server/daemon";
-import { ILambdaMock } from "./lib/runtime/rapidApi";
+import type { ILambdaMock } from "./lib/runtime/rapidApi";
 import { log } from "./lib/utils/colorize";
 import { Zipper } from "./lib/utils/zip";
 import esbuild from "esbuild";
@@ -184,6 +184,7 @@ class ServerlessAwsLambda extends Daemon {
       outbase: "src",
       plugins: [],
       external: ["esbuild"],
+      dropLabels: [],
     };
 
     if (typeof process.env.NODE_ENV == "string") {
@@ -205,7 +206,9 @@ class ServerlessAwsLambda extends Daemon {
       esBuildConfig.target = `node${this.nodeVersion}`;
       esBuildConfig.plugins?.push(buildOptimizer({ isLocal, nodeVersion: this.nodeVersion, buildCallback: this.buildCallback }));
     }
-
+    if (!isLocal) {
+      esBuildConfig.dropLabels!.push("LOCAL");
+    }
     if (this.customEsBuildConfig) {
       esBuildConfig = mergeEsbuildConfig(esBuildConfig, this.customEsBuildConfig);
     }
@@ -331,6 +334,8 @@ class ServerlessAwsLambda extends Daemon {
 
     // @ts-ignore
     const Outputs = this.serverless.service.resources?.Outputs;
+    const region = this.runtimeConfig.environment.AWS_REGION ?? this.runtimeConfig.environment.REGION;
+
     const lambdas = functionsNames.reduce((accum: any[], funcName: string) => {
       const lambda = funcs[funcName];
 
@@ -339,7 +344,6 @@ class ServerlessAwsLambda extends Daemon {
       const handlerName = ext.slice(1);
       const esEntryPoint = path.resolve(handlerPath.replace(ext, ""));
 
-      const region = this.runtimeConfig.environment.AWS_REGION ?? this.runtimeConfig.environment.REGION;
       const slsDeclaration: any = this.serverless.service.getFunction(funcName);
       const runtime = slsDeclaration.runtime ?? defaultRuntime;
 
@@ -493,9 +497,11 @@ class ServerlessAwsLambda extends Daemon {
     this.runtimeConfig.timeout = timeout;
     this.runtimeConfig.environment = environment ?? {};
 
-    if (process.env.AWS_PROFILE) {
-      this.runtimeConfig.environment.AWS_PROFILE = process.env.AWS_PROFILE;
-    }
+    const awsEnvKeys = Object.keys(process.env).filter((x) => x.startsWith("AWS_"));
+
+    awsEnvKeys.forEach((x: string) => {
+      this.runtimeConfig.environment[x] = process.env[x] as string;
+    });
   }
 
   setEnv(lambdaName: string, key: string, value: string) {
@@ -511,7 +517,7 @@ class ServerlessAwsLambda extends Daemon {
         slsDeclaration.environment[key] = value;
       }
     } else {
-      log.RED(`Can not set env var on '${lambdaName}'`);
+      log.RED(`Can not set env variable '${key}' on '${lambdaName}'`);
     }
   }
   async #setCustomEsBuildConfig() {

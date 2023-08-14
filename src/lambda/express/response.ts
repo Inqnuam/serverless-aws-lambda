@@ -1,6 +1,6 @@
-import { RawResponseContent } from "./request";
-import { cookie, CookieOptions } from "./cookies";
-
+import type { RawResponseContent } from "./request";
+import { cookie } from "./cookies";
+import type { CookieOptions } from "./cookies";
 export type RedirectOptions = [code: number, path: string];
 type Stringifiable = [] | { [key: string]: any } | null | boolean;
 export interface IResponse {

@@ -1,5 +1,7 @@
-import { HttpResponseStream, StreamableHandler } from "./streamResponse";
+import type { StreamableHandler } from "./streamResponse";
 import type { IHttpResponseStream } from "./streamResponse";
+import { HttpResponseStream } from "./streamResponse";
+
 type HandlerMetadata = {
   highWaterMark?: number;
 };

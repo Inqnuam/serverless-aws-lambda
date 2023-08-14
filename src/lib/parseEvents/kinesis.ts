@@ -1,5 +1,6 @@
 import { log } from "../utils/colorize";
-import { IDestination, parseDestination } from "./index";
+import { parseDestination } from "./index";
+import type { IDestination } from "./index";
 
 export interface IKinesisEvent {
   StreamName: string;

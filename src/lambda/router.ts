@@ -1,8 +1,11 @@
 import EventEmitter from "events";
-import { _buildUniversalEvent, IRequest } from "./express/request";
-import { _Response, IResponse } from "./express/response";
+import { _buildUniversalEvent } from "./express/request";
+import { _Response } from "./express/response";
 
-export { IRequest, IResponse };
+import type { IRequest } from "./express/request";
+import type { IResponse } from "./express/response";
+export type { IRequest, IResponse };
+
 export type NextFunction = (error?: any) => void;
 export type RouteMiddleware = (error: any, req: IRequest, res: IResponse, next: NextFunction) => Promise<void> | void;
 export type RouteController = (req: IRequest, res: IResponse, next: NextFunction) => Promise<void> | void;

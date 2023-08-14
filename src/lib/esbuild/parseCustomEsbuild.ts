@@ -81,9 +81,8 @@ export const parseCustomEsbuild = (customConfig: BuildOptions) => {
   if (typeof customConfig.tsconfig == "string") {
     customEsBuild.tsconfig = customConfig.tsconfig;
   }
-  // @ts-ignore
-  if (typeof customConfig.tsconfigRaw == "string") {
-    // @ts-ignore
+
+  if (customConfig.tsconfigRaw && ["string", "object"].includes(typeof customConfig.tsconfigRaw)) {
     customEsBuild.tsconfigRaw = customConfig.tsconfigRaw;
   }
 
@@ -97,6 +96,10 @@ export const parseCustomEsbuild = (customConfig: BuildOptions) => {
 
   if (Array.isArray(customConfig.drop)) {
     customEsBuild.drop = customConfig.drop;
+  }
+
+  if (Array.isArray(customConfig.dropLabels)) {
+    customEsBuild.dropLabels = customConfig.dropLabels;
   }
 
   if (Array.isArray(customConfig.resolveExtensions)) {

@@ -1,4 +1,4 @@
-import { ILambdaMock, LambdaEndpoint } from "../runtime/rapidApi";
+import type { ILambdaMock, LambdaEndpoint } from "../runtime/rapidApi";
 import { log } from "../utils/colorize";
 import type { normalizedSearchParams } from "../../plugins/lambda/events/common";
 
