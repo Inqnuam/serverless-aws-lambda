@@ -495,8 +495,7 @@ class ServerlessAwsLambda extends Daemon {
 
     this.runtimeConfig.memorySize = memorySize;
     this.runtimeConfig.timeout = timeout;
-    this.runtimeConfig.environment = environment ?? {};
-
+    this.runtimeConfig.environment = environment ? {...environment} : {};
     const awsEnvKeys = Object.keys(process.env).filter((x) => x.startsWith("AWS_"));
 
     awsEnvKeys.forEach((x: string) => {
