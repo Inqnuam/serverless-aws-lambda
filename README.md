@@ -20,14 +20,16 @@
 
 ### Minimum requirements
 
-- Node v14.17.0
-- Serverless 2.0.0
+- Node v14.17.0+
+- Serverless 2.0.0+
 
 ---
 
 ## Table of Contents
 
 - [Installation](#installation)
+  - [Quick start](#quick-start)
+  - [Manual installation](#manual-installation)
 - [Usage](#usage)
 - [Invoke](#invoke)
   - [Lifecycle](#lambda-execution-lifecycles)
@@ -50,7 +52,7 @@
 
 ### **Installation**
 
-**Quick start**
+#### **Quick start**
 
 ```bash
 npx degit github:inqnuam/serverless-aws-lambda/templates/simple my-project
@@ -58,7 +60,7 @@ cd my-project && yarn install
 yarn start
 ```
 
-**Manual installation**
+#### **Manual installation**
 
 Usual node module installation...
 

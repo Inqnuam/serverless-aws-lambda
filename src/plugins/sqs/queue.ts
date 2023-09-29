@@ -310,6 +310,11 @@ export class Queue implements IQueueConfig {
       .replace(/=/g, "");
   }
   static createRecord({ MessageBody, MessageAttribute, MessageSystemAttribute }: any, QueueName: string) {
+    if (!MessageBody) {
+      // if doesnt exists or is an empty string
+      throw new SqsError({ Code: "MissingParameter", Message: "The request must contain the parameter MessageBody." });
+    }
+
     const record: any = {
       messageId: randomUUID(),
       receiptHandle: "",

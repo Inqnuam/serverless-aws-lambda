@@ -20,10 +20,19 @@ export interface IResponse {
   invokedFunctionArn: string;
   awsRequestId: string;
   getRemainingTimeInMillis: Function;
+  /**
+   * set response status code.
+   */
   status: (code: number) => this;
   sendStatus: (code: number) => void;
   send: (content?: string | Buffer) => void;
+  /**
+   * equivalent to handler `return value`. Ignores all previous set values
+   */
   end: (rawContent: any) => void;
+  /**
+   * set response Content-Type.
+   */
   type(contentType: string): this;
   json: (content: Stringifiable) => void;
   set: (header: string | { [key: string]: string }, value?: string) => this;
@@ -34,6 +43,14 @@ export interface IResponse {
   location(url: string): this;
   links(links: any): this;
   cookie: (name: string, value: string, options?: CookieOptions) => this;
+  /**
+   * cookies set by res.cookie();
+   */
+  cookies: string[];
+  /**
+   * headers set by res.set() / res.setHeader();
+   */
+  headers: string[];
   clearCookie(name: string, options?: CookieOptions): this;
 }
 
@@ -255,5 +272,12 @@ export class _Response implements IResponse {
           })
           .join(", ")
     );
+  }
+
+  public get cookies(): string[] {
+    return this.responseObject.cookies;
+  }
+  public get headers(): string[] {
+    return this.responseObject.headers;
   }
 }
