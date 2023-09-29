@@ -102,7 +102,7 @@ class Route extends Function {
             await (foundHandler as RouteController)(req, res, next);
           }
         } catch (error) {
-          await handleError(error, res, res, next);
+          await handleError(error, req, res, next);
         }
 
         if (!response && !controllers.length) {
@@ -130,7 +130,7 @@ class Route extends Function {
         try {
           await (foundHandler as RouteController)(req, res, next);
         } catch (error) {
-          await handleError(error, res, res, next);
+          await handleError(error, req, res, next);
           resolve(undefined);
         }
       } else {
