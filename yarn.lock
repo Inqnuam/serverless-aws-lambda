@@ -145,20 +145,27 @@
   resolved "https://registry.yarnpkg.com/@esbuild/win32-x64/-/win32-x64-0.19.4.tgz#d46a6e220a717f31f39ae80f49477cc3220be0f0"
   integrity sha512-HP0GDNla1T3ZL8Ko/SHAS2GgtjOg+VmWnnYLhuTksr++EnduYB0f3Y2LzHsUwb2iQ13JGoY6G3R8h6Du/WG6uA==
 
-"@smithy/eventstream-codec@^2.0.3":
-  version "2.0.3"
-  resolved "https://registry.yarnpkg.com/@smithy/eventstream-codec/-/eventstream-codec-2.0.3.tgz#cb4403497feadf99213762940ac1e825c1f78372"
-  integrity sha512-3l/uKZBsV/6uMe2qXvh1C8ut/w6JHKgy7ic7N2QPR1SSuNWKNQBX0iVBqJpPtQz0UDeQYM4cNmwDBX+hw74EEw==
+"@smithy/eventstream-codec@^2.0.10":
+  version "2.0.10"
+  resolved "https://registry.yarnpkg.com/@smithy/eventstream-codec/-/eventstream-codec-2.0.10.tgz#dbd46d0ed13abc61b1f08ab249f3097602752933"
+  integrity sha512-3SSDgX2nIsFwif6m+I4+ar4KDcZX463Noes8ekBgQHitULiWvaDZX8XqPaRQSQ4bl1vbeVXHklJfv66MnVO+lw==
   dependencies:
     "@aws-crypto/crc32" "3.0.0"
-    "@smithy/types" "^2.2.0"
+    "@smithy/types" "^2.3.4"
     "@smithy/util-hex-encoding" "^2.0.0"
     tslib "^2.5.0"
 
-"@smithy/types@^2.1.0", "@smithy/types@^2.2.0":
+"@smithy/types@^2.1.0":
   version "2.2.0"
   resolved "https://registry.yarnpkg.com/@smithy/types/-/types-2.2.0.tgz#52fa236967729f5a4e2c6c334f1a03930fa86f67"
   integrity sha512-Ahpt9KvD0mWeWiyaGo5EBE7KOByLl3jl4CD9Ps/r8qySgzVzo/4qsa+vvstOU3ZEriALmrPqUKIhqHt0Rn+m6g==
+  dependencies:
+    tslib "^2.5.0"
+
+"@smithy/types@^2.3.4":
+  version "2.3.4"
+  resolved "https://registry.yarnpkg.com/@smithy/types/-/types-2.3.4.tgz#3b9bc15000af0a0b1f4fda741f78c1580ba15e92"
+  integrity sha512-D7xlM9FOMFyFw7YnMXn9dK2KuN6+JhnrZwVt1fWaIu8hCk5CigysweeIT/H/nCo4YV+s8/oqUdLfexbkPZtvqw==
   dependencies:
     tslib "^2.5.0"
 
@@ -203,19 +210,19 @@
   dependencies:
     "@types/node" "*"
 
-"@types/serve-static@^1.15.2":
-  version "1.15.2"
-  resolved "https://registry.yarnpkg.com/@types/serve-static/-/serve-static-1.15.2.tgz#3e5419ecd1e40e7405d34093f10befb43f63381a"
-  integrity sha512-J2LqtvFYCzaj8pVYKw8klQXrLLk7TBZmQ4ShlcdkELFKGwGMfevMLneMMRkMgZxotOD9wg497LpC7O8PcvAmfw==
+"@types/serve-static@^1.15.3":
+  version "1.15.3"
+  resolved "https://registry.yarnpkg.com/@types/serve-static/-/serve-static-1.15.3.tgz#2cfacfd1fd4520bbc3e292cca432d5e8e2e3ee61"
+  integrity sha512-yVRvFsEMrv7s0lGhzrggJjNOSmZCdgCjw9xWrPr/kNNLp6FaDfMC1KaYl3TSJ0c58bECwNBMoQrZJ8hA8E1eFg==
   dependencies:
     "@types/http-errors" "*"
     "@types/mime" "*"
     "@types/node" "*"
 
-"@types/serverless@^3.12.13":
-  version "3.12.13"
-  resolved "https://registry.yarnpkg.com/@types/serverless/-/serverless-3.12.13.tgz#7d0c0cfc12bc04ce0896071957704831dc2187f0"
-  integrity sha512-acPSowKIGA2IUsxCqp7Z2Nj/ULZ4jUYHU0TaLByDmHxG6cee6+L+E4LK2eDRDsOIrI/EdeJLVrV5asDoWCQHBw==
+"@types/serverless@^3.12.16":
+  version "3.12.16"
+  resolved "https://registry.yarnpkg.com/@types/serverless/-/serverless-3.12.16.tgz#31e4cd5f756509981b211a468a8f1ee6696ca08d"
+  integrity sha512-viQtewF8HGUVOIiv+SwdD/kA7H8krpaDM+qN0lIqKcknvAzgVGohZGj6+6iM8vnHgOehapwQqb41z44OkrJ2xg==
 
 archiver-utils@^2.1.0:
   version "2.1.0"
