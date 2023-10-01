@@ -3,6 +3,7 @@ import type { ILambda } from "../../defineConfig";
 import type { QueueAttributes } from "./types";
 import { Queue } from "./queue";
 import { createHash } from "crypto";
+import { SqsError } from "./errors";
 export const md5 = (contents: string | BinaryLike): string => {
   return createHash("md5").update(contents).digest("hex");
 };
@@ -123,7 +124,18 @@ const isValidMessageId = (id: string) => {
   return id.length < 81 && id.replace(alphaNumAndHyphens, "") == "";
 };
 export const validateIds = (entries: any[]) => {
-  return entries.every((x) => x.Id && isValidMessageId(x.Id));
+  const foundMissingIdIndex = entries.findIndex((x) => !("Id" in x));
+
+  if (foundMissingIdIndex != -1) {
+    throw new SqsError({ Code: "MissingParameter", Message: `The request must contain the parameter SendMessageBatchRequestEntry.${foundMissingIdIndex + 1}.Id.` });
+  }
+
+  if (!entries.every((x) => isValidMessageId(x.Id))) {
+    throw new SqsError({
+      Code: "AWS.SimpleQueueService.InvalidBatchEntryId",
+      Message: `A batch entry id can only contain alphanumeric characters, hyphens and underscores. It can be at most 80 letters long.`,
+    });
+  }
 };
 
 const invalidAttribValue: { [key: string]: Function } = {

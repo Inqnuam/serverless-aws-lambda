@@ -17,27 +17,26 @@ export const parseSqsPublishBody = (encodedBody: string[]) => {
         const [_, entryNumber, entryType, aux] = k.split(".");
 
         if (entryType == "Name") {
-          MessageAttribute[v] = { DataType: "", StringValue: "" };
+          MessageAttribute[v] = {};
           entryMap[entryNumber] = [v, ...restValues].join("=");
         } else if (entryType == "Value") {
-          if (aux == "DataType") {
-            MessageAttribute[entryMap[entryNumber]].DataType = v;
-          } else {
-            MessageAttribute[entryMap[entryNumber]].StringValue = [v, ...restValues].join("=");
-          }
+          const val = [v, ...restValues].join("=");
+
+          // DataType = val (String, Number or Binary)
+          // or
+          // StringValue or BinaryValue = val
+          MessageAttribute[entryMap[entryNumber]][aux] = val;
         }
       } else if (k.startsWith("MessageSystemAttribute")) {
         const [_, entryNumber, entryType, aux] = k.split(".");
 
         if (entryType == "Name") {
-          MessageSystemAttribute[v] = { DataType: "", StringValue: "" };
+          MessageSystemAttribute[v] = {};
           systemEntryMap[entryNumber] = [v, ...restValues].join("=");
         } else if (entryType == "Value") {
-          if (aux == "DataType") {
-            MessageSystemAttribute[systemEntryMap[entryNumber]].DataType = v;
-          } else {
-            MessageSystemAttribute[systemEntryMap[entryNumber]].StringValue = [v, ...restValues].join("=");
-          }
+          // same as for MessageAttribute
+          const val = [v, ...restValues].join("=");
+          MessageSystemAttribute[systemEntryMap[entryNumber]][aux] = val;
         }
       } else {
         body[k] = [v, ...restValues].join("=");
@@ -75,7 +74,7 @@ export const parseSqsPublishBatchBody = (encodedBody: string[]) => {
             const attribName = foundMember[entryType][entryNumber];
 
             if (attribName) {
-              foundMember.value[entryType][attribName][aux3 == "DataType" ? "DataType" : "StringValue"] = [v, ...restValues].join("=");
+              foundMember.value[entryType][attribName][aux3] = [v, ...restValues].join("=");
             } else {
               foundMember[entryType][entryNumber] = [v, ...restValues].join("=");
 
@@ -150,7 +149,7 @@ export const simpleBodyParser = (encodedBody: string[]) => {
 // https://stackoverflow.com/a/64706045
 const SIZE_LENGTH = 4;
 const TRANSPORT_FOR_TYPE_STRING_OR_NUMBER = 1;
-const transportType1 = ["String", "Number"];
+const transportType1 = ["String", "Number", "Binary"];
 
 export const parseAttributes = (messageAttributes: any) => {
   let parsedBody: any = {};
@@ -158,15 +157,17 @@ export const parseAttributes = (messageAttributes: any) => {
   const keys = Object.keys(messageAttributes).sort();
 
   keys.forEach((key) => {
-    const { DataType, StringValue } = messageAttributes[key];
+    const { DataType, StringValue, BinaryValue } = messageAttributes[key];
 
     parsedBody[key] = {
       stringValue: StringValue,
+      binaryValue: BinaryValue,
       stringListValues: [],
       binaryListValues: [],
       dataType: DataType,
     };
 
+    const Value = StringValue ?? BinaryValue;
     const nameSize = Buffer.alloc(SIZE_LENGTH);
     nameSize.writeUInt32BE(key.length);
 
@@ -186,12 +187,12 @@ export const parseAttributes = (messageAttributes: any) => {
     if (transportType1.includes(DataType)) {
       transport.writeUInt8(TRANSPORT_FOR_TYPE_STRING_OR_NUMBER);
       valueSize = Buffer.alloc(SIZE_LENGTH);
-      valueSize.writeUInt32BE(StringValue.length);
+      valueSize.writeUInt32BE(Value.length);
 
-      value = Buffer.alloc(StringValue.length);
-      value.write(StringValue);
+      value = Buffer.alloc(Value.length);
+      value.write(Value);
     } else {
-      return console.log("Not implemented: MessageAttributes with type Binary are not supported at the moment.");
+      return console.log(`Not implemented: MessageAttributes with type ${DataType} are not supported at the moment.`);
     }
 
     const buffer = Buffer.concat([nameSize, name, typeSize, type, transport, valueSize, value]);

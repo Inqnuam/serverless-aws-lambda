@@ -246,12 +246,6 @@ export const TooManyEntriesInBatchRequest = (RequestId: string, entryLenght: num
 export const BatchEntryIdsNotDistinct = (RequestId: string, repetedId: string) =>
   ErrorResponse(RequestId, { Code: "AWS.SimpleQueueService.BatchEntryIdsNotDistinct", Message: `Id ${repetedId} repeated.` });
 
-export const InvalidBatchEntryId = (RequestId: string) =>
-  ErrorResponse(RequestId, {
-    Code: "AWS.SimpleQueueService.InvalidBatchEntryId",
-    Message: `A batch entry id can only contain alphanumeric characters, hyphens and underscores. It can be at most 80 letters long.`,
-  });
-
 export const DeleteMessageResponse = (RequestId: string) => `${xmlVersion}<DeleteMessageResponse ${xmlns}>
 ${ResponseMetadata(RequestId)}
 </DeleteMessageResponse>`;

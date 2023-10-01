@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { SqsError } from "./errors";
 import { parseAttributes } from "./parser";
 import { md5, invalidAttribValue, getBatchItemFailures, createBatch } from "./utils";
+import { verifyMessageAttributes, verifyMessageBody } from "./verifyRequest";
 
 const sleep = (sec: number) => new Promise((resolve) => setTimeout(resolve, sec * 1000));
 
@@ -310,10 +311,7 @@ export class Queue implements IQueueConfig {
       .replace(/=/g, "");
   }
   static createRecord({ MessageBody, MessageAttribute, MessageSystemAttribute }: any, QueueName: string) {
-    if (!MessageBody) {
-      // if doesnt exists or is an empty string
-      throw new SqsError({ Code: "MissingParameter", Message: "The request must contain the parameter MessageBody." });
-    }
+    verifyMessageBody(MessageBody);
 
     const record: any = {
       messageId: randomUUID(),
@@ -335,6 +333,7 @@ export class Queue implements IQueueConfig {
     };
 
     if (MessageAttribute) {
+      verifyMessageAttributes(MessageAttribute);
       const { messageAttributes, md5OfMessageAttributes } = parseAttributes(MessageAttribute);
       record.messageAttributes = messageAttributes;
       record.md5OfMessageAttributes = md5OfMessageAttributes;

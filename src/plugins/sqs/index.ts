@@ -16,7 +16,6 @@ import {
   EmptyBatchRequest,
   TooManyEntriesInBatchRequest,
   BatchEntryIdsNotDistinct,
-  InvalidBatchEntryId,
   DeleteMessageResponse,
   DeleteMessageBatchResponse,
   ListQueuesResponse,
@@ -149,10 +148,9 @@ export const sqsPlugin = (attributes?: QueueAttributes): SlsAwsLambdaPlugin => {
                   } else if (Entries.length > 10) {
                     res.statusCode = 400;
                     res.end(TooManyEntriesInBatchRequest(RequestId, Entries.length));
-                  } else if (!validateIds(Entries)) {
-                    res.statusCode = 400;
-                    res.end(InvalidBatchEntryId(RequestId));
                   } else {
+                    validateIds(Entries);
+
                     const foundDuplicatedId = findDuplicatedIds(Entries);
                     if (foundDuplicatedId) {
                       res.statusCode = 400;
@@ -235,10 +233,8 @@ export const sqsPlugin = (attributes?: QueueAttributes): SlsAwsLambdaPlugin => {
                 } else if (body.ChangeMessageVisibilityBatchRequestEntry.length > 10) {
                   res.statusCode = 400;
                   res.end(TooManyEntriesInBatchRequest(RequestId, body.ChangeMessageVisibilityBatchRequestEntry.length));
-                } else if (!validateIds(body.ChangeMessageVisibilityBatchRequestEntry)) {
-                  res.statusCode = 400;
-                  res.end(InvalidBatchEntryId(RequestId));
                 } else {
+                  validateIds(body.ChangeMessageVisibilityBatchRequestEntry);
                   const foundDuplicatedId = findDuplicatedIds(body.ChangeMessageVisibilityBatchRequestEntry);
                   if (foundDuplicatedId) {
                     res.statusCode = 400;
@@ -277,10 +273,9 @@ export const sqsPlugin = (attributes?: QueueAttributes): SlsAwsLambdaPlugin => {
                 } else if (body.DeleteMessageBatchRequestEntry.length > 10) {
                   res.statusCode = 400;
                   res.end(TooManyEntriesInBatchRequest(RequestId, body.DeleteMessageBatchRequestEntry.length));
-                } else if (!validateIds(body.DeleteMessageBatchRequestEntry)) {
-                  res.statusCode = 400;
-                  res.end(InvalidBatchEntryId(RequestId));
                 } else {
+                  validateIds(body.DeleteMessageBatchRequestEntry);
+
                   const foundDuplicatedId = findDuplicatedIds(body.DeleteMessageBatchRequestEntry);
                   if (foundDuplicatedId) {
                     res.statusCode = 400;
