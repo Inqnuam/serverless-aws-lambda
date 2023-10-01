@@ -109,6 +109,8 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
               } catch (error) {
                 notFoundKey({ key: keyName, requestId: requestId as string }, res);
               }
+            } else if (requestCmd == "ListBuckets") {
+            } else if (requestCmd == "ListObjects") {
             } else {
               console.log(`'${requestCmd}' is not implemented yet`);
               notFoundKey({ key: keyName, requestId: requestId as string }, res);
