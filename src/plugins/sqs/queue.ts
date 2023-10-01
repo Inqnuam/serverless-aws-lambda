@@ -343,10 +343,8 @@ export class Queue implements IQueueConfig {
     }
 
     if (MessageSystemAttribute) {
-      const items = Object.keys(MessageSystemAttribute);
-      if (items.length != 1 || (items.length == 1 && items[0] != "AWSTraceHeader")) {
-        throw new SqsError({ Code: "InvalidParameterValue", Message: `Message system attribute name '${items[0]}' is invalid`, SenderFault: true });
-      }
+      verifyMessageAttributes(MessageSystemAttribute, "system");
+
       record.attributes.AWSTraceHeader = MessageSystemAttribute.AWSTraceHeader.StringValue;
     } else {
       delete record.attributes.AWSTraceHeader;
