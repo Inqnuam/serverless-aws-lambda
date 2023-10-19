@@ -11,7 +11,7 @@ export const notFoundKey = ({ key, requestId }: { key: string; requestId: string
         <Message>The specified key does not exist.</Message>
         <Key>${key}</Key>
         <RequestId>${requestId}</RequestId>
-        <HostId>8OM/GATDpAkjPYvPSw/nuMqFJ9V4beXsXG2qR+LeBtmLG5U/prYcpdGDUTISXclNjar9MjjenQGcyxYm5hHEAQ==</HostId>
+        <HostId>local</HostId>
     </Error>`;
 
   res.statusCode = 404;
@@ -26,7 +26,7 @@ export const copyObjectResponse = ({ LastModified, ETag, requestId }: { LastModi
   const resContent = `<?xml version="1.0" encoding="UTF-8"?>
   <CopyObjectResult>
     <LastModified>${LastModified}</LastModified>
-    <ETag>"${ETag}"</ETag>
+    <ETag>${ETag}</ETag>
   </CopyObjectResult>`;
 
   res.statusCode = 200;

@@ -4,16 +4,11 @@
  * Author: Richard Willis <willis.rh@gmail.com>
  */
 import fs from "node:fs";
-import crypto from "crypto";
-import type { BinaryLike } from "crypto";
+import { md5 } from "../sqs/utils";
 
 const defaultPartSizeInBytes = 5 * 1024 * 1024; // 5MB
 
-function md5(contents: string | BinaryLike): string {
-  return crypto.createHash("md5").update(contents).digest("hex");
-}
-
-export function calulcateETag({ fileSizeInBytes, filePath, partSizeInBytes }: { fileSizeInBytes: number; filePath: string; partSizeInBytes?: number }): string {
+export function calulcateMulipartETag({ fileSizeInBytes, filePath, partSizeInBytes }: { fileSizeInBytes: number; filePath: string; partSizeInBytes?: number }): string {
   const partSize = partSizeInBytes ?? defaultPartSizeInBytes;
 
   let parts = Math.floor(fileSizeInBytes / partSize);
@@ -33,6 +28,9 @@ export function calulcateETag({ fileSizeInBytes, filePath, partSizeInBytes }: { 
   }
 
   const combinedHash = md5(Buffer.from(totalMd5, "hex"));
-  const etag = `${combinedHash}-${parts}`;
+  const etag = `"${combinedHash}-${parts}"`;
   return etag;
 }
+export const calulcateETag = (content: string | Buffer) => {
+  return `"${md5(content)}"`;
+};

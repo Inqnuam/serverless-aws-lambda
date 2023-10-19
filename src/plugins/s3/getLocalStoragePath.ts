@@ -14,7 +14,6 @@ export const getLocalStoragePath = (storagePath?: string) => {
   try {
     const f = statSync(localStoragePath);
 
-    // TODO: check also for isSymbolicLink
     if (f.isDirectory()) {
       return localStoragePath;
     } else {
