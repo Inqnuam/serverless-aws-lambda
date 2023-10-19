@@ -4,7 +4,7 @@ export interface IS3Event {
   type: [string, string];
   rules?: any[];
 }
-export const parseS3 = (event: any): IS3Event | undefined => {
+export const parseS3 = (event: any, provider: Record<string, any>): IS3Event | undefined => {
   if (!event || !event.s3) {
     return;
   }
@@ -12,7 +12,7 @@ export const parseS3 = (event: any): IS3Event | undefined => {
   const declarationType = typeof event.s3;
   if (declarationType == "string") {
     return {
-      bucket: event.s3,
+      bucket: provider.s3?.[event.s3]?.name ?? event.s3,
       type: ["ObjectCreated", "*"],
     };
   } else if (!Array.isArray(event.s3) && declarationType == "object") {

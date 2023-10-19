@@ -328,9 +328,10 @@ class ServerlessAwsLambda extends Daemon {
     if (this.invokeName) {
       functionsNames = functionsNames.filter((x) => x == this.invokeName);
     }
-    const defaultRuntime = this.serverless.service.provider.runtime;
+    const provider = this.serverless.service.provider;
+    const defaultRuntime = provider.runtime;
     // @ts-ignore
-    const defaultHttpApiPayload: 1 | 2 = this.serverless.service.provider.httpApi?.payload == "1.0" ? 1 : 2;
+    const defaultHttpApiPayload: 1 | 2 = provider.httpApi?.payload == "1.0" ? 1 : 2;
 
     // @ts-ignore
     const Outputs = this.serverless.service.resources?.Outputs;
@@ -433,7 +434,7 @@ class ServerlessAwsLambda extends Daemon {
           const { payload } = slsDeclaration.httpApi;
           httpApiPayload = payload == "1.0" ? 1 : payload == "2.0" ? 2 : defaultHttpApiPayload;
         }
-        const { endpoints, sns, sqs, ddb, s3, kinesis, documentDb } = parseEvents(lambda.events, Outputs, this.resources, httpApiPayload);
+        const { endpoints, sns, sqs, ddb, s3, kinesis, documentDb } = parseEvents(lambda.events, Outputs, this.resources, httpApiPayload, provider);
         lambdaDef.endpoints = endpoints;
         lambdaDef.sns = sns;
         lambdaDef.sqs = sqs;
@@ -453,7 +454,7 @@ class ServerlessAwsLambda extends Daemon {
     const outputNames = Object.keys(outputs)
       .filter((x) => !x.endsWith(".map") && outputs[x].entryPoint)
       .map((x) => {
-        const element = outputs[x] as Metafile["outputs"]["happy typescript"] & { entryPoint: string };
+        const element = outputs[x] as Metafile["outputs"][string] & { entryPoint: string };
 
         let actuelEntryPoint = element.entryPoint;
         let ext = "";
@@ -495,7 +496,7 @@ class ServerlessAwsLambda extends Daemon {
 
     this.runtimeConfig.memorySize = memorySize;
     this.runtimeConfig.timeout = timeout;
-    this.runtimeConfig.environment = environment ? {...environment} : {};
+    this.runtimeConfig.environment = environment ? { ...environment } : {};
     const awsEnvKeys = Object.keys(process.env).filter((x) => x.startsWith("AWS_"));
 
     awsEnvKeys.forEach((x: string) => {
