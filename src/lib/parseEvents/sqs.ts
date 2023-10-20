@@ -1,4 +1,3 @@
-import { log } from "../utils/colorize";
 export interface ISqs {
   name: string;
   arn?: string;
@@ -19,17 +18,17 @@ const parseQueueNameFromObject = (resources: any, Outputs: any, obj: any) => {
     if (!values.length) {
       return;
     }
-    const topicName = values[1][values[1].length - 1];
+    const queueName = values[1][values[1].length - 1];
 
-    if (typeof topicName == "string") {
-      return topicName.split("/")[1];
+    if (typeof queueName == "string") {
+      return queueName.split("/")[1];
     }
   } else if (key == "Fn::GetAtt" || key == "Ref") {
     const [resourceName] = value as unknown as any[];
 
     const resource = resources?.[resourceName];
     if (resource) {
-      return resource.TopicName;
+      return resource.QueueName;
     }
   } else if (key == "Fn::ImportValue" && typeof value == "string") {
     return Outputs?.[value]?.Export?.Name;

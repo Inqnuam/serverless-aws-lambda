@@ -53,12 +53,7 @@ class ServerlessAwsLambda extends Daemon {
   nodeVersion: number | boolean | string | undefined = false;
   invokeName?: string;
   afterDeployCallbacks: (() => void | Promise<void>)[] = [];
-  resources: {
-    ddb: {};
-    kinesis: {};
-    sns: {};
-    sqs: {};
-  };
+  resources: ReturnType<typeof getResources> = { ddb: {}, kinesis: {}, sns: {}, sqs: {} };
   constructor(serverless: any, options: any, pluginUtils: PluginUtils) {
     super({ debug: process.env.SLS_DEBUG == "*" });
 
@@ -123,8 +118,6 @@ class ServerlessAwsLambda extends Daemon {
       "after:aws:deploy:finalize:cleanup": this.afterDeploy.bind(this),
       "after:invoke:local:invoke": process.exit,
     };
-
-    this.resources = getResources(this.serverless);
   }
 
   async invokeLocal() {
@@ -143,6 +136,7 @@ class ServerlessAwsLambda extends Daemon {
     }
   }
   async init(isPackaging: boolean) {
+    this.resources = getResources(this.serverless);
     this.#setRuntimeEnvs();
     this.#lambdas = this.#getLambdas();
     await this.#setCustomEsBuildConfig();
