@@ -118,6 +118,7 @@ const exitCallback = (e: any) => {
       cb(e);
     } catch (error) {
       console.log(error);
+      process.exitCode = 1;
     }
   }
   process.exit();
@@ -197,6 +198,9 @@ function defineConfig(options: Options) {
             } catch (error) {
               log.RED(plugin.name);
               console.error(error);
+              if (!isRebuild) {
+                process.exit(1);
+              }
             }
           }
         }

@@ -132,6 +132,7 @@ class ServerlessAwsLambda extends Daemon {
         await cb();
       } catch (error) {
         console.log(error);
+        process.exit(1);
       }
     }
   }
