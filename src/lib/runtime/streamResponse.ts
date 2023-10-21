@@ -1,19 +1,6 @@
 import { Writable } from "stream";
 import type { WritableOptions } from "stream";
 
-const invalidArg = (type: string, messages?: string[], cause?: any) => {
-  let msg = [`The "chunk" argument must be of type string or an instance of Buffer or Uint8Array. Received ${type}`];
-
-  if (messages) {
-    msg = msg.concat(messages);
-  }
-  const err = new TypeError(msg.join("\n"));
-  if (cause) {
-    err.cause = cause;
-  }
-  return err;
-};
-
 type writeCb = (error: Error | null | undefined) => void;
 // custom Writable interace to exclude AWS's undefined properties
 // currently TS's Omit dont handle this special case
@@ -26,7 +13,7 @@ interface IResponseStream {
    * @deprecated
    */
   destroy: Writable["destroy"];
-  end: (chunk?: string | Buffer | Uint8Array) => void;
+  end: Writable["end"];
   uncork: Writable["uncork"];
   write: Writable["write"];
   addListener: Writable["addListener"];
@@ -92,10 +79,8 @@ interface IMetadata {
 
 export class ResponseStream extends Writable {
   #isSent = false;
-  #isEnd = false;
   #__write;
   #invalidContentType = new TypeError('Invalid value "undefined" for header "Content-Type"');
-  #multipleEnd = new Error("write after end");
   _onBeforeFirstWrite?: (write: Writable["write"]) => any;
   constructor(opts: Partial<WritableOptions>) {
     super({ highWaterMark: opts.highWaterMark, write: opts.write });
@@ -117,28 +102,24 @@ export class ResponseStream extends Writable {
       return writeResponse;
     };
 
+    const orgEnd = this.end.bind(this);
+
     // @ts-ignore
-    this.end = (chunk: any) => {
-      if (this.#isEnd) {
-        throw this.#multipleEnd;
-      }
-      // simple if(chunk) will not work as 0 must throw an error
-      const typeofChunk = typeof chunk;
-      if (chunk !== null && typeofChunk != "undefined" && typeofChunk !== "string" && !Buffer.isBuffer(chunk) && chunk?.constructor !== Uint8Array) {
-        throw invalidArg("an instance of Object", ["Try responseStream.write(yourObject);", "Then responseStream.end();"], chunk);
-      }
+    this.end = (...params) => {
+      if (params.length) {
+        const [chunk] = params;
+        if (chunk && typeof chunk != "function") {
+          this.write(chunk);
 
-      if (typeofChunk != "undefined" && !this.#isSent && typeof this._onBeforeFirstWrite == "function") {
-        this._onBeforeFirstWrite((_chunk: any) => this.#__write(_chunk));
+          orgEnd();
+        } else {
+          // @ts-ignore
+          orgEnd(...params);
+        }
+      } else {
+        // @ts-ignore
+        orgEnd(...params);
       }
-
-      this.#isEnd = true;
-
-      if (typeofChunk != "undefined") {
-        this.#__write(chunk);
-      }
-
-      this.destroy();
     };
   }
   #wrapeChunk = (chunk: any) => {

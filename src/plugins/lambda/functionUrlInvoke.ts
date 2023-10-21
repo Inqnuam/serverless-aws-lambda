@@ -57,8 +57,29 @@ const createStreamResponseHandler = (res: ServerResponse, foundHandler: any) => 
       if (serverRes.headersSent) {
         return originalWrite(chunk, encoding, cb);
       } else if (sendHeadersBefore) {
-        sendHeaders();
-        return originalWrite(chunk, encoding, cb);
+        try {
+          const chunkString = BufferedStreamResponse.codec.decode(chunk);
+
+          const out = JSON.parse(chunkString);
+          if (Array.isArray(out)) {
+            throw new Error("Invalid stream response");
+          }
+
+          if (out && typeof out == "object") {
+            sendHeaders();
+            return originalWrite(chunk, encoding, cb);
+          }
+
+          res.writeHead(200, { "Content-Type": CommonEventGenerator.contentType.octet });
+          return res.end();
+        } catch (error: any) {
+          const err = new Error(
+            `When using HttpResponseStream first chunk of .write() must be valid JSON and not be Array. Number and null will respones with 200.\n'${foundHandler.name}'`
+          );
+          err.cause = error.message;
+          console.error(err);
+          return internalServerError(res);
+        }
       } else {
         // first bytes to be written to body
         if (isHttpIntegrationResponse) {
@@ -77,9 +98,7 @@ const createStreamResponseHandler = (res: ServerResponse, foundHandler: any) => 
                 throw new Error(chunkString);
               }
             } catch (error: any) {
-              const err = new Error(
-                `When 'Content-Type' is 'application/json' first chunk of .write() must be parsable JSON and not be null or number.\n${foundHandler.name} => .write(${error.message})`
-              );
+              const err = new Error(`When 'Content-Type' is 'application/json' first chunk of .write() must be parsable JSON and not be null or number.\n'${foundHandler.name}'`);
               err.cause = error.message;
               console.error(err);
               return internalServerError(res);
