@@ -4,6 +4,8 @@ import { knownCjs } from "./knownCjs";
 const awsSdkV2 = "aws-sdk";
 const awsSdkV3 = "@aws-sdk/*";
 const awslambda = `${__dirname.slice(0, -5)}/src/lib/runtime/awslambda.ts`;
+const requirePoly = (nodePrefix: "node:" | "") =>
+  `import { createRequire as __crE_ } from "${nodePrefix}module";import { fileURLToPath as __futP_ } from "${nodePrefix}url";import { dirname as __dN_ } from "${nodePrefix}path";global.__filename = __futP_(import.meta.url);global.__dirname = __dN_(__filename);global.require = __crE_(__filename);\n`;
 
 export const buildOptimizer = ({
   isLocal,
@@ -49,6 +51,23 @@ export const buildOptimizer = ({
         build.initialOptions.external!.push(...knownCjs);
       } else {
         build.initialOptions.external!.push(nodeVersion < 18 ? awsSdkV2 : awsSdkV3);
+      }
+
+      if (build.initialOptions.format != "esm") {
+        return;
+      }
+
+      const r = requirePoly(nodeVersion < 18 ? "" : "node:");
+      if (build.initialOptions.banner) {
+        if (build.initialOptions.banner.js) {
+          build.initialOptions.banner.js = `${r}${build.initialOptions.banner.js}`;
+        } else {
+          build.initialOptions.banner.js = r;
+        }
+      } else {
+        build.initialOptions.banner = {
+          js: r,
+        };
       }
     },
   };
