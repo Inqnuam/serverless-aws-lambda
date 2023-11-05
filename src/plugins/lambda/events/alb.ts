@@ -235,8 +235,8 @@ export class AlbRequestHandler extends CommonEventGenerator {
     const queryComponents = queryString.split("&");
 
     queryComponents.forEach((c) => {
-      const [key, value] = c.split("=");
-      queryStringComponents[key] = value;
+      const [key, ...value] = c.split("=");
+      queryStringComponents[key] = value.join("=");
     });
 
     delete queryStringComponents.x_mock_type;

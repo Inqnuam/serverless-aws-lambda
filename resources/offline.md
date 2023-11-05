@@ -2,33 +2,30 @@ Set offline static path, custom port and add request listeners:
 
 ```js
 // config.js
-module.exports = ({ lambdas, isDeploying, isPackaging, setEnv, stage, port }) => {
-  /**
-   * @type {import("serverless-aws-lambda").Config}
-   */
-  return {
-    esbuild: {
-      //...
+import { defineConfig } from "serverless-aws-lambda/defineConfig";
+
+export default defineConfig({
+  esbuild: {
+    //...
+  },
+  offline: {
+    staticPath: "./public",
+    port: 9999,
+    onReady: (port) => {
+      console.log("We are ready to listen on", port);
     },
-    offline: {
-      staticPath: "./public",
-      port: 9999,
-      onReady: (port) => {
-        console.log("We are ready to listen on", port);
-      },
-      request: [
-        {
-          filter: /^\/__routes(\/)?$/, // filters request when request URL match /__routes
-          callback: (req, res) => {
-            // node http request Incoming Message and Response object
-            res.statusCode = 404;
-            res.end(`${req.url} not found`);
-          },
+    request: [
+      {
+        filter: /^\/__routes(\/)?$/, // filters request when request URL match /__routes
+        callback: (req, res) => {
+          // node http request Incoming Message and Response object
+          res.statusCode = 404;
+          res.end(`${req.url} not found`);
         },
-      ],
-    },
-  };
-};
+      },
+    ],
+  },
+});
 ```
 
 ### virtualEnvs
@@ -70,24 +67,23 @@ functions:
 ```
 
 ```js
-// config.js
-module.exports = ({ lambdas, isDeploying, isPackaging, setEnv, stage, port }) => {
-  return {
-    esbuild: {
-      // ...
-    },
-    offline: {
-      // ...
-    },
-    buildCallback: async (result) => {
-      const foundLambda = lambdas.find((x) => x.name == "players");
+import { defineConfig } from "serverless-aws-lambda/defineConfig";
 
-      if (foundLambda) {
-        console.log(foundLambda.virtualEnvs);
-      }
-    },
-  };
-};
+export default defineConfig({
+  esbuild: {
+    // ...
+  },
+  offline: {
+    // ...
+  },
+  buildCallback: async (result) => {
+    const foundLambda = lambdas.find((x) => x.name == "players");
+
+    if (foundLambda) {
+      console.log(foundLambda.virtualEnvs);
+    }
+  },
+});
 ```
 
 ## Run serverless-aws-lambda programmatically

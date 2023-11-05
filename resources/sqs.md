@@ -13,10 +13,10 @@ Import the plugin inside your defineConfig.
 
 ```js
 // config.js
-const { defineConfig } = require("serverless-aws-lambda/defineConfig");
-const { sqsPlugin } = require("serverless-aws-lambda/sqs");
+import { defineConfig } from "serverless-aws-lambda/defineConfig";
+import { sqsPlugin } = from "serverless-aws-lambda/sqs";
 
-module.exports = defineConfig({
+export default defineConfig({
   plugins: [sqsPlugin(config)],
 });
 ```

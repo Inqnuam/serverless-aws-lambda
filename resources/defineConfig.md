@@ -35,13 +35,13 @@ export default defineConfig({
 });
 ```
 
-### Create a custom plugin which may be used inside defineConfig's `plugins`
+#### Create a custom plugin which may be used inside defineConfig's `plugins`
 
 ```js
-/**
- * @type {import("serverless-aws-lambda/defineConfig").SlsAwsLambdaPlugin}
- */
- const myCustomPlugin = {
+import { defineConfig } from "serverless-aws-lambda/defineConfig";
+import type { SlsAwsLambdaPlugin } from "serverless-aws-lambda/defineConfig";
+
+ const myCustomPlugin:SlsAwsLambdaPlugin = {
       name: "my-custom-plugin",
       onInit: async function () {
         // do something
@@ -81,7 +81,7 @@ export default defineConfig({
 
 
 
-module.exports = defineConfig({
+export default defineConfig({
   esbuild: {
     target: "es2020",
   },
@@ -90,20 +90,5 @@ module.exports = defineConfig({
     port: 9999,
   },
   plugins: [myCustomPlugin],
-});
-```
-
-`defineConfig` can be imported as ESM as well.
-
-```js
-import { defineConfig } from "serverless-aws-lambda/defineConfig";
-import { sqsPlugin } from "serverless-aws-lambda/sqs";
-
-export default defineConfig({
-  offline: {
-    staticPath: "./.aws_lambda",
-    port: 9999,
-  },
-  plugins: [sqsPlugin()],
 });
 ```
