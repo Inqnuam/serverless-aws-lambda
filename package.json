@@ -12,9 +12,6 @@
   "bugs": {
     "url": "https://github.com/inqnuam/serverless-aws-lambda/issues"
   },
-  "engines": {
-    "node": ">=14.17.0"
-  },
   "main": "./dist/index.js",
   "typings": "./dist/config.d.ts",
   "exports": {
