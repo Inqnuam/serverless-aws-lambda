@@ -7,7 +7,7 @@ import { triggerEvent } from "../triggerEvent";
 import type { ServerResponse, IncomingHttpHeaders } from "http";
 import type { ILambda } from "../../../defineConfig";
 import { calulcateETag } from "../calulcateETag";
-import { md5 } from "../../sqs/utils";
+import { md5 } from "../commons/utils";
 
 export interface BucketConfig {
   deletionPolicy: "Delete" | "Retain" | "RetainExceptOnCreate";

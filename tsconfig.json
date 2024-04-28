@@ -14,5 +14,5 @@
     "declarationDir": "./dist/",
     "rootDir": "./src/"
   },
-  "exclude": ["./dist/**/*", "./templates/**/*"]
+  "exclude": ["./dist/**/*", "./templates/**/*", "vitest.config.ts"]
 }

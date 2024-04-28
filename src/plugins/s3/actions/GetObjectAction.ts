@@ -86,10 +86,10 @@ export class GetObjectAction extends S3LocalService {
     this.ifNoneMatch = headers["if-none-match"] as string;
 
     if (headers["if-modified-since"]) {
-      this.ifModifiedSince = new Date(headers["if-modified-since"] as string).getTime();
+      this.ifModifiedSince = new Date(headers["if-modified-since"]).getTime();
     }
     if (headers["if-unmodified-since"]) {
-      this.ifUnmodifiedSince = new Date(headers["if-unmodified-since"] as string).getTime();
+      this.ifUnmodifiedSince = new Date(headers["if-unmodified-since"]).getTime();
     }
   }
 

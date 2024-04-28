@@ -6,6 +6,7 @@ import type { IncomingMessage, ServerResponse } from "http";
 import type Serverless from "serverless";
 import { log } from "./lib/utils/colorize";
 import { exitEvents } from "./server";
+import type { SQSClientConfig, SQSClient } from "@aws-sdk/client-sqs";
 
 export type ILambda = {
   /**
@@ -31,6 +32,10 @@ export type ILambda = {
   onInvokeSuccess: (callback: (input: any, output: any, info?: any) => void) => void;
 } & Omit<ILambdaMock, "invokeSub" | "invokeSuccessSub" | "invokeErrorSub" | "runner">;
 
+interface IServicesConfig {
+  sqs?: SQSClientConfig;
+}
+
 export interface ClientConfigParams {
   stop: (err?: any) => Promise<void>;
   lambdas: ILambda[];
@@ -52,6 +57,8 @@ export interface ClientConfigParams {
     sns: {};
     sqs: {};
   };
+  getServices(): { sqs?: SQSClient };
+  setServices({ sqs }: IServicesConfig): Promise<void>;
 }
 
 export interface OfflineRequest {
@@ -102,6 +109,10 @@ export interface Options {
    * This allows conditionnally ( true ?? customPlugin) plugin import.
    */
   plugins?: (SlsAwsLambdaPlugin | null | undefined | boolean)[];
+  /**
+   * AWS clients configs used by EventSourceMapping, Lambda error/success destination.
+   */
+  services?: IServicesConfig;
 }
 
 let exiting = false;
@@ -151,7 +162,7 @@ function defineConfig(options: Options) {
   }
   return async function config(
     this: ClientConfigParams,
-    { stop, lambdas, isDeploying, isPackaging, setEnv, stage, region, esbuild, serverless, resources }: ClientConfigParams
+    { stop, lambdas, isDeploying, isPackaging, setEnv, stage, region, esbuild, serverless, resources, getServices, setServices }: ClientConfigParams
   ): Promise<Omit<Config, "config" | "options">> {
     let config: Config = {
       esbuild: options.esbuild ?? {},
@@ -161,6 +172,10 @@ function defineConfig(options: Options) {
       },
       afterDeployCallbacks: [],
     };
+
+    if (options.services) {
+      await setServices(options.services);
+    }
 
     const self = {
       stop,
@@ -175,6 +190,8 @@ function defineConfig(options: Options) {
       options,
       config,
       resources,
+      getServices,
+      setServices,
     };
     if (options.plugins) {
       config.offline!.onReady = async (port, ip) => {

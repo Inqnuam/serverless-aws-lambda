@@ -4,7 +4,7 @@
  * Author: Richard Willis <willis.rh@gmail.com>
  */
 import fs from "node:fs";
-import { md5 } from "../sqs/utils";
+import { md5 } from "./commons/utils";
 
 const defaultPartSizeInBytes = 5 * 1024 * 1024; // 5MB
 

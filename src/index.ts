@@ -16,6 +16,8 @@ import { parseFuncUrl } from "./lib/parseEvents/funcUrl";
 import { LambdaRequests } from "./plugins/lambda/index";
 import { readDefineConfig } from "./lib/utils/readDefineConfig";
 import { patchSchema } from "./lib/utils/schema";
+import { AwsServices } from "./lib/services";
+import type { SQSClientConfig } from "@aws-sdk/client-sqs";
 
 const cwd = process.cwd();
 const DEFAULT_LAMBDA_TIMEOUT = 6;
@@ -54,6 +56,7 @@ class ServerlessAwsLambda extends Daemon {
   invokeName?: string;
   afterDeployCallbacks: (() => void | Promise<void>)[] = [];
   resources: ReturnType<typeof getResources> = { ddb: {}, kinesis: {}, sns: {}, sqs: {} };
+  static tags: string[] = ["build"];
   constructor(serverless: any, options: any, pluginUtils: PluginUtils) {
     super({ debug: process.env.SLS_DEBUG == "*" });
 
@@ -534,6 +537,16 @@ class ServerlessAwsLambda extends Daemon {
       esbuild: esbuild,
       serverless: this.serverless,
       resources: this.resources,
+      getServices() {
+        return {
+          sqs: AwsServices.sqs,
+        };
+      },
+      setServices: async ({ sqs }: { sqs?: SQSClientConfig }) => {
+        if (sqs) {
+          await AwsServices.setSqsClient(sqs);
+        }
+      },
     };
 
     const customOfflineRequests = LambdaRequests.map((x) => {

@@ -3,11 +3,11 @@
   "license": "UNLICENSED",
   "type": "module",
   "devDependencies": {
-    "prettier": "3.0.1",
-    "serverless": "^3.35.2",
-    "serverless-aws-lambda": "^4.6.5",
+    "prettier": "3.2.5",
+    "serverless": "^3.38.0",
+    "serverless-aws-lambda": "^4.7.0",
     "serverless-aws-lambda-vitest": "^1.2.5",
-    "typescript": "^5.2.2"
+    "typescript": "^5.4.5"
   },
   "scripts": {
     "sls": "sls",

@@ -14,6 +14,7 @@ src
 build.mjs
 TODO.md
 tsconfig.json
+vitest.config.ts
 resources/invokeError.png
 resources/invokeSuccess.png
 templates

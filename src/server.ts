@@ -28,7 +28,7 @@ export class Server {
     this.#config = config ?? {};
   }
 
-  async start() {
+  async start(): Promise<{ port: string; ip: string }> {
     this.#exitEvents.forEach((e) => {
       process.on(e, () => {
         this.stop();
@@ -70,5 +70,5 @@ export class Server {
   }
 }
 
-export type { ServerConfig,  };
-export {exitEvents}
+export type { ServerConfig };
+export { exitEvents };

@@ -4,6 +4,8 @@ export interface ISqs {
   batchSize?: number;
   maximumBatchingWindow?: number;
   filterPatterns?: any;
+  enabled?: boolean;
+  functionResponseType?: ["ReportBatchItemFailures"];
 }
 const parseQueueNameFromObject = (resources: any, Outputs: any, obj: any) => {
   const [key, value] = Object.entries(obj)?.[0];
@@ -49,7 +51,7 @@ export const parseSqs = (Outputs: any, resources: any, event: any): ISqs | undef
       sqs.name = event.sqs;
     }
   } else {
-    const { arn, filterPatterns, batchSize, maximumBatchingWindow, functionResponseType } = event.sqs;
+    const { arn, filterPatterns, batchSize, maximumBatchingWindow, functionResponseType, enabled } = event.sqs;
 
     if (typeof arn == "string") {
       const arnComponents = arn.split(":");
@@ -72,8 +74,14 @@ export const parseSqs = (Outputs: any, resources: any, event: any): ISqs | undef
     if (maximumBatchingWindow) {
       sqs.maximumBatchingWindow = maximumBatchingWindow;
     }
-    if (functionResponseType) {
-      sqs.functionResponseType = functionResponseType;
+    if (functionResponseType == "ReportBatchItemFailures" || (Array.isArray(functionResponseType) && functionResponseType[0] == "ReportBatchItemFailures")) {
+      sqs.functionResponseType = ["ReportBatchItemFailures"];
+    }
+
+    if (typeof enabled == "boolean") {
+      sqs.enabled = enabled;
+    } else {
+      sqs.enabled = true;
     }
   }
   if (sqs.name) {

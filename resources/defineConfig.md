@@ -32,6 +32,12 @@ export default defineConfig({
     port: 9999,
   },
   plugins: [],
+  services: {
+    sqs: {
+      region: "us-east-1",
+      endpoint: "http://localhost:5433",
+    },
+  },
 });
 ```
 

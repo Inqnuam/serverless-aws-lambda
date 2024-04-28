@@ -2,8 +2,7 @@ import http, { Server, IncomingMessage, ServerResponse } from "http";
 import type { AddressInfo } from "net";
 import { networkInterfaces } from "os";
 import { Handlers } from "./handlers";
-import type { ILambdaMock,  } from "../runtime/rapidApi";
-import {  LambdaMock } from "../runtime/rapidApi";
+import { type ILambdaMock, LambdaMock } from "../runtime/rapidApi";
 import { log } from "../utils/colorize";
 import inspector from "inspector";
 import { html404 } from "../../plugins/lambda/htmlStatusMsg";
@@ -15,6 +14,7 @@ import { UnsupportedRuntime } from "../runtime/runners/index";
 import { NodeRunner } from "../runtime/runners/node/runner";
 import { PythonRunner } from "../runtime/runners/python/runner";
 import { RubyRunner } from "../runtime/runners/ruby/runner";
+import { initEventSourceMapping } from "../runtime/eventSourceMapping/utils";
 
 enum runners {
   node = "n",
@@ -126,6 +126,7 @@ export class Daemon extends Handlers {
       }
       try {
         await this.onReady?.(listeningPort, Handlers.ip);
+        await initEventSourceMapping(Daemon.handlers);
       } catch (error) {
         console.error(error);
       }
