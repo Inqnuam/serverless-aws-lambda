@@ -293,7 +293,7 @@ class ServerlessAwsLambda extends Daemon {
             // @ts-ignore
             x.setEnv("AWS_LAMBDA_RUNTIME_API", `127.0.0.1:${port}`);
           });
-          log.GREEN(output);
+          console.log(`\x1b[32m${output}\x1b[0m`);
         });
       }
     }

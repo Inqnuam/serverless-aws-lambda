@@ -10,6 +10,7 @@ interface LambdaErrorResponse {
 }
 
 const cwd = process.cwd();
+const cwdSlash = `${cwd}/`;
 const router = `/dist/lambda/router.`;
 const root = cwd.split(path.sep).filter(Boolean)[0];
 const stackRegex = new RegExp(`\\((\/${root}|${root}).*(\\d+):(\\d+)`);
@@ -97,7 +98,7 @@ export const patchConsole = () => {
           const e = {};
           Error.captureStackTrace(e);
           const stack = getStackLine(e);
-          process.stdout.write(`\x1b[90m${new Date().toISOString()}\t${prop.toUpperCase()}\t${AWS_LAMBDA_FUNCTION_NAME}\t${stack}\x1b[0m\n`);
+          process.stdout.write(`\x1b[90m${new Date().toISOString()}\t${prop.toUpperCase()}\t${AWS_LAMBDA_FUNCTION_NAME}\t${stack?.replace(cwdSlash, "")}\x1b[0m\n`);
           if (prop == "log") {
             org.log(...params.map((x: any) => inspect(x, { colors: true })));
           } else {

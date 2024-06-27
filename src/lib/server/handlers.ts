@@ -215,20 +215,19 @@ export class Handlers {
 
     if (foundIndex == -1) {
       Handlers.handlers.push(lambdaController);
-      if (this.debug) {
-        if (lambdaController.endpoints.length) {
-          lambdaController.endpoints.forEach((x) => {
-            const color = x.kind == "alb" ? "36" : "35";
-            x.paths.forEach((p) => {
-              this.#printPath(x.methods.join(" "), p, color);
-            });
+
+      if (lambdaController.endpoints.length) {
+        lambdaController.endpoints.forEach((x) => {
+          const color = x.kind == "alb" ? "36" : "35";
+          x.paths.forEach((p) => {
+            this.#printPath(x.methods.join(" "), p, color);
           });
-        } else {
-          this.#printPath("ANY", `/@invoke/${lambdaController.name}`);
-        }
-        if (lambdaController.url) {
-          this.#printPath("ANY", `/@url/${lambdaController.name}`, "34");
-        }
+        });
+      } else {
+        this.#printPath("ANY", `/@invoke/${lambdaController.name}`);
+      }
+      if (lambdaController.url) {
+        this.#printPath("ANY", `/@url/${lambdaController.name}`, "34");
       }
     } else {
       // esbuild rebuild

@@ -122,7 +122,7 @@ export class Daemon extends Handlers {
         callback(listeningPort, localIp);
       } else {
         let output = `✅ AWS Lambda offline server is listening on http://localhost:${listeningPort} | http://${Handlers.ip}:${listeningPort}`;
-        log.GREEN(output);
+        console.log(`\x1b[32m${output}\x1b[0m`);
       }
       try {
         await this.onReady?.(listeningPort, Handlers.ip);
