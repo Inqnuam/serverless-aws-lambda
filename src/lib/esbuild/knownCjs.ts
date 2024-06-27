@@ -4,7 +4,6 @@ export const knownCjs: string[] = [
   "@angular/platform-browser",
   "@aws-sdk/*",
   "@elastic/elasticsearch",
-  "@middy/*",
   "@hapi/joi",
   "@opensearch-project/opensearch",
   "@smithy/*",
