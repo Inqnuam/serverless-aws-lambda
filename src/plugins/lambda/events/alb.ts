@@ -98,7 +98,7 @@ export class AlbRequestHandler extends CommonEventGenerator {
         const headersKeys = Object.keys(output.multiValueHeaders).filter((key) => key !== "Server" && key !== "Date");
         headersKeys.forEach((key) => {
           if (Array.isArray(output.multiValueHeaders[key])) {
-            customHeaders.push([key, output.multiValueHeaders[key]]);
+            customHeaders.push([key, output.multiValueHeaders[key] as unknown as string]);
           } else {
             log.RED(`multiValueHeaders (${key}) values must be an array`);
             log.YELLOW("example:");
@@ -116,7 +116,7 @@ export class AlbRequestHandler extends CommonEventGenerator {
         headersKeys.forEach((key) => {
           const valueType = typeof output.headers[key];
           if (valueType == "string") {
-            customHeaders.push([key, output.headers[key]]);
+            customHeaders.push([key, output.headers[key] as string]);
           } else {
             log.RED(`response headers (${key}) value must be typeof string.\nReceived: '${valueType}'`);
             throw new Error();

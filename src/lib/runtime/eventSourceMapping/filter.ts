@@ -90,7 +90,7 @@ const filter = (record: any, key: string, operator: any) => {
 
     for (const [opName, opValue] of Object.entries(operator)) {
       if (opName in expressionOperators) {
-        andConditions.push(expressionOperators[opName as keyof typeof expressionOperators](record, key, opValue));
+        andConditions.push(expressionOperators[opName as keyof typeof expressionOperators](record, key, opValue) as boolean);
       }
     }
     return andConditions.every((x) => x === true);
