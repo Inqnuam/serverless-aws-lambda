@@ -26,6 +26,7 @@ export interface LambdaEndpoint {
   querystrings?: string[];
   requestPaths?: string[];
   stream?: boolean;
+  private?: boolean;
 }
 const supportedEvents = ["http", "httpApi", "alb"];
 export const parseEndpoints = (event: any, httpApiPayload: LambdaEndpoint["version"]): LambdaEndpoint | null => {
@@ -107,6 +108,7 @@ export const parseEndpoints = (event: any, httpApiPayload: LambdaEndpoint["versi
         parsendEvent.methods = [httpEvent.method == "*" ? "ANY" : httpEvent.method.toUpperCase()];
       }
 
+      // RESI API
       if (event.http) {
         if (event.http.async) {
           parsendEvent.async = event.http.async;
@@ -123,6 +125,9 @@ export const parseEndpoints = (event: any, httpApiPayload: LambdaEndpoint["versi
           if (paths) {
             parsendEvent.requestPaths = Object.keys(paths).filter((x) => paths[x]);
           }
+        }
+        if (event.http.private) {
+          parsendEvent.private = true;
         }
       }
     } else {

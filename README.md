@@ -21,7 +21,7 @@
 ### Minimum requirements
 
 - Node v14.17.0+
-- Serverless 2.0.0+
+- Serverless 2.0.0+ < 4.0
 
 ---
 
