@@ -65,6 +65,44 @@ export class Daemon extends Handlers {
   stop(cb?: (err?: any) => void) {
     this.#server.close(cb);
   }
+
+  #keys: string[] = [];
+  #getKeys(keys: any[], genereatedKeys: Record<string, string>) {
+    for (const k of keys) {
+      if (typeof k == "string") {
+        const value = Buffer.from(randomUUID(), "utf-8").toString("base64");
+        this.#keys.push(value);
+        genereatedKeys[k] = value;
+      } else if (k && typeof k == "object" && !Array.isArray(k)) {
+        if (typeof k.value == "string") {
+          this.#keys.push(k.value);
+        } else {
+          for (const keysWithUsagePlan of Object.values(k)) {
+            if (Array.isArray(keysWithUsagePlan)) {
+              this.#getKeys(keysWithUsagePlan, genereatedKeys);
+            }
+          }
+        }
+      }
+    }
+  }
+  setApiKeys(keys?: any[]) {
+    if (!keys) {
+      return;
+    }
+
+    const genereatedKeys: Record<string, string> = {};
+    this.#getKeys(keys, genereatedKeys);
+
+    if (Object.keys(genereatedKeys).length) {
+      console.log("\n\x1b[90mREST API Gateway generated API Keys:\x1b[0m");
+
+      for (const [key, value] of Object.entries(genereatedKeys)) {
+        console.log(`\x1b[35m${key}: \x1b[0m\x1b[36m${value}\x1b[0m`);
+      }
+    }
+  }
+
   constructor(config: IDaemonConfig = { debug: false }) {
     super(config);
     log.setDebug(config.debug);
@@ -119,10 +157,7 @@ export class Daemon extends Handlers {
         Handlers.ip = localIp;
       }
       if (typeof callback == "function") {
-        callback(listeningPort, localIp);
-      } else {
-        let output = `✅ AWS Lambda offline server is listening on http://localhost:${listeningPort} | http://${Handlers.ip}:${listeningPort}`;
-        console.log(`\x1b[32m${output}\x1b[0m`);
+        await callback(listeningPort, localIp);
       }
       try {
         await this.onReady?.(listeningPort, Handlers.ip);
@@ -184,7 +219,7 @@ export class Daemon extends Handlers {
         console.error(err.stack);
       });
 
-      const foundLambda = await defaultServer(req, res, parsedURL);
+      const foundLambda = await defaultServer(req, res, parsedURL, this.#keys);
 
       const notFound = () => {
         res.setHeader("Content-Type", "text/html");
@@ -210,7 +245,7 @@ export class Daemon extends Handlers {
         console.log(error);
       }
     }
-    log.GREEN(`${new Date().toLocaleString()} 🔄✅ Rebuild`);
+    console.log(`\x1b[32m${new Date().toLocaleString()} 🔄✅ Rebuild\x1b[0m`);
     process.send?.({ rebuild: true });
   };
   async load(lambdaDefinitions: ILambdaMock[]) {

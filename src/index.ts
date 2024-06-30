@@ -293,6 +293,10 @@ class ServerlessAwsLambda extends Daemon {
             // @ts-ignore
             x.setEnv("AWS_LAMBDA_RUNTIME_API", `127.0.0.1:${port}`);
           });
+
+          // @ts-ignore
+          this.setApiKeys(this.serverless.service.provider.apiGateway?.apiKeys);
+
           console.log(`\x1b[32m${output}\x1b[0m`);
         });
       }
@@ -314,8 +318,7 @@ class ServerlessAwsLambda extends Daemon {
       } catch (error) {
         console.error(error);
       }
-
-      log.GREEN(`${new Date().toLocaleString()} 🔄✅ Rebuild `);
+      console.log(`\x1b[32m${new Date().toLocaleString()} 🔄✅ Rebuild\x1b[0m`);
       process.send?.({ rebuild: true });
     }
   }
@@ -432,7 +435,7 @@ class ServerlessAwsLambda extends Daemon {
           const { payload } = slsDeclaration.httpApi;
           httpApiPayload = payload == "1.0" ? 1 : payload == "2.0" ? 2 : defaultHttpApiPayload;
         }
-        const { endpoints, sns, sqs, ddb, s3, kinesis, documentDb } = parseEvents(lambda.events, Outputs, this.resources, httpApiPayload, provider);
+        const { endpoints, sns, sqs, ddb, s3, kinesis, documentDb } = parseEvents({ events: lambda.events, Outputs, resources: this.resources, httpApiPayload, provider });
         lambdaDef.endpoints = endpoints;
         lambdaDef.sns = sns;
         lambdaDef.sqs = sqs;

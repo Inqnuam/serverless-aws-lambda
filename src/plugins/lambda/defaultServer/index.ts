@@ -36,7 +36,28 @@ const createRequestHandler = (params: ICreateEventHandler) => {
   return params.mockEvent.kind == "alb" ? new AlbRequestHandler(params) : new ApgRequestHandler(params);
 };
 
-export const defaultServer = async (req: IncomingMessage, res: ServerResponse, parsedURL: URL) => {
+const hasValidApiKey = (req: IncomingMessage, mockEvent: LambdaEndpoint, apiKeys: string[]) => {
+  if (!mockEvent.private) {
+    return true;
+  } else if (!apiKeys.length) {
+    console.log(`\x1b[31mPrivate http endpoints require API Key to be defined in serverless.yml\x1b[0m`);
+    return false;
+  }
+
+  for (let i = 0; i < req.rawHeaders.length; i++) {
+    const header = req.rawHeaders[i].toLowerCase();
+    if (header == "x-api-key") {
+      const apiKey = req.rawHeaders[i + 1];
+      if (apiKeys.includes(apiKey)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+};
+
+export const defaultServer = async (req: IncomingMessage, res: ServerResponse, parsedURL: URL, apiKeys: string[]) => {
   const { url, method, headers, rawHeaders } = req;
   const { searchParams } = parsedURL;
 
@@ -65,6 +86,13 @@ export const defaultServer = async (req: IncomingMessage, res: ServerResponse, p
     res.setHeader("Content-Type", CommonEventGenerator.contentType.text);
     return res.end(error.message);
   }
+
+  if (!hasValidApiKey(req, mockEvent, apiKeys)) {
+    res.statusCode = 403;
+    res.setHeader("Content-Type", CommonEventGenerator.contentType.json);
+    return res.end(CommonEventGenerator.apigForbiddenErrMsg);
+  }
+
   if (mockEvent.async) {
     res.statusCode = 200;
     res.end();
@@ -73,6 +101,27 @@ export const defaultServer = async (req: IncomingMessage, res: ServerResponse, p
   const isBase64Encoded = CommonEventGenerator.getIsBase64Encoded(headers);
   const body = await collectBody(req, isBase64Encoded);
 
+  // validate REST API Gateway Schema
+  if (mockEvent.kind == "apg" && mockEvent.schema && mockEvent.proxy == "http") {
+    let jsonBody;
+    try {
+      jsonBody = JSON.parse(body!);
+    } catch (error) {
+      res.statusCode = 400;
+      res.setHeader("Content-Type", CommonEventGenerator.contentType.json);
+      return res.end(CommonEventGenerator.apigJsonParseErrMsg);
+    }
+    const isValid = mockEvent.schema(jsonBody);
+
+    if (!isValid) {
+      res.statusCode = 400;
+      res.setHeader("Content-Type", CommonEventGenerator.contentType.json);
+
+      const errorMsg = mockEvent.schema.errors.map((x: any) => `instancePath '${x.instancePath}' ${x.message}`).join(", ");
+
+      return res.end(JSON.stringify({ message: `[${errorMsg}]` }));
+    }
+  }
   const requestHandler = createRequestHandler({ req, res, body, isBase64Encoded, multiValueHeaders, mockEvent, lambdaName: handler.outName, parsedURL, requestId });
 
   try {

@@ -13,7 +13,19 @@ export interface IDestination {
   kind: "lambda" | "sns" | "sqs";
   name: string;
 }
-export const parseEvents = (events: any[], Outputs: any, resources: any, httpApiPayload: LambdaEndpoint["version"], provider: Record<string, any>) => {
+export const parseEvents = ({
+  events,
+  Outputs,
+  resources,
+  httpApiPayload,
+  provider,
+}: {
+  events: any[];
+  Outputs: any;
+  resources: any;
+  httpApiPayload: LambdaEndpoint["version"];
+  provider: Record<string, any>;
+}) => {
   const endpoints: LambdaEndpoint[] = [];
   const sns: any[] = [];
   const sqs: any[] = [];
@@ -22,7 +34,7 @@ export const parseEvents = (events: any[], Outputs: any, resources: any, httpApi
   const kinesis: any[] = [];
   const documentDb: any[] = [];
   for (const event of events) {
-    const slsEvent = parseEndpoints(event, httpApiPayload);
+    const slsEvent = parseEndpoints(event, httpApiPayload, provider);
     const snsEvent = parseSns(Outputs, resources, event);
     const sqsEvent = parseSqs(Outputs, resources, event);
     const ddbStream = parseDdbStreamDefinitions(Outputs, resources, event);

@@ -1,5 +1,6 @@
 import type { HttpMethod } from "../server/handlers";
 import { log } from "../utils/colorize";
+import { compileAjvSchema } from "../utils/compileAjvSchema";
 
 const pathPartsRegex = /^(\{[\w.:-]+\+?\}|[a-zA-Z0-9.:_-]+)$/;
 
@@ -27,9 +28,10 @@ export interface LambdaEndpoint {
   requestPaths?: string[];
   stream?: boolean;
   private?: boolean;
+  schema?: any;
 }
 const supportedEvents = ["http", "httpApi", "alb"];
-export const parseEndpoints = (event: any, httpApiPayload: LambdaEndpoint["version"]): LambdaEndpoint | null => {
+export const parseEndpoints = (event: any, httpApiPayload: LambdaEndpoint["version"], provider: Record<string, any>): LambdaEndpoint | null => {
   const keys = Object.keys(event);
 
   if (!keys.length || !supportedEvents.includes(keys[0])) {
@@ -113,19 +115,43 @@ export const parseEndpoints = (event: any, httpApiPayload: LambdaEndpoint["versi
         if (event.http.async) {
           parsendEvent.async = event.http.async;
         }
-        if (event.http.request?.parameters) {
-          const { headers, querystrings, paths } = event.http.request.parameters;
-          if (headers) {
-            parsendEvent.headers = Object.keys(headers).filter((x) => headers[x]);
-          }
-          if (querystrings) {
-            parsendEvent.querystrings = Object.keys(querystrings).filter((x) => querystrings[x]);
+
+        if (event.http.request) {
+          const request = event.http.request;
+          if (request.parameters) {
+            const { headers, querystrings, paths } = request.parameters;
+            if (headers) {
+              parsendEvent.headers = Object.keys(headers).filter((x) => headers[x]);
+            }
+            if (querystrings) {
+              parsendEvent.querystrings = Object.keys(querystrings).filter((x) => querystrings[x]);
+            }
+
+            if (paths) {
+              parsendEvent.requestPaths = Object.keys(paths).filter((x) => paths[x]);
+            }
           }
 
-          if (paths) {
-            parsendEvent.requestPaths = Object.keys(paths).filter((x) => paths[x]);
+          if (request.schemas) {
+            let jsonReqTypeSchema = request.schemas["application/json"] ?? request.schemas["application/json; charset=utf-8"];
+            if (jsonReqTypeSchema) {
+              if (typeof jsonReqTypeSchema == "string") {
+                const schema = provider.apiGateway?.request?.schemas?.[jsonReqTypeSchema]?.schema;
+                if (!schema) {
+                  throw new Error(`Can not find JSON Schema "${jsonReqTypeSchema}"`);
+                }
+                jsonReqTypeSchema = schema;
+              } else if (typeof jsonReqTypeSchema == "object" && typeof jsonReqTypeSchema.schema == "object") {
+                jsonReqTypeSchema = jsonReqTypeSchema.schema;
+              }
+
+              parsendEvent.schema = compileAjvSchema(jsonReqTypeSchema);
+            } else {
+              console.warn("Unsupported schema validator definition:", request.schemas);
+            }
           }
         }
+
         if (event.http.private) {
           parsendEvent.private = true;
         }

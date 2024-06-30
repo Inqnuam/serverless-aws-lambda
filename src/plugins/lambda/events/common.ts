@@ -16,6 +16,8 @@ export class CommonEventGenerator {
   static keepAlive = ["Connection", "keep-alive"];
   static dummyHost = "http://localhost:3003";
   static httpErrMsg = '{"message":"Internal Server Error"}';
+  static apigJsonParseErrMsg = '{"message":"[Unknown error parsing request body]"}';
+  static apigForbiddenErrMsg = '{"message":"Forbidden"}';
   static amzMsgNull = '{"message":null}';
   static apgTimeoutMsg = '{"message": "Endpoint request timed out"}';
   static unavailable = '{"message":"Service Unavailable"}';
