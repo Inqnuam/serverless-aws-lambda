@@ -11,7 +11,7 @@ const print = (color: string, s: string) => {
   }
 };
 
-const RED = (s: string) => print("31", s);
+const RED = (s: string) => console.log(`\x1b[31m${s}\x1b[0m`);
 const GREEN = (s: string) => print("32", s);
 const YELLOW = (s: string) => print("33", s);
 const CYAN = (s: string) => print("36", s);

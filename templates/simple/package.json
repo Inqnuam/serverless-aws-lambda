@@ -5,9 +5,9 @@
   "devDependencies": {
     "prettier": "3.2.5",
     "serverless": "^3.38.0",
-    "serverless-aws-lambda": "^4.8.0",
-    "serverless-aws-lambda-vitest": "^1.2.5",
-    "typescript": "^5.4.5"
+    "serverless-aws-lambda": "^4.8.1",
+    "serverless-aws-lambda-vitest": "^2.0.0",
+    "typescript": "^5.5.3"
   },
   "scripts": {
     "sls": "sls",
