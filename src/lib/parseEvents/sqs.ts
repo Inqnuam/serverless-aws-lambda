@@ -44,6 +44,8 @@ export const parseSqs = (Outputs: any, resources: any, event: any): ISqs | undef
   let sqs: any = {};
 
   if (typeof event.sqs == "string") {
+    sqs.enabled = true;
+
     if (event.sqs.startsWith("arn:")) {
       const arnComponents = event.sqs.split(":");
       sqs.name = arnComponents[arnComponents.length - 1];
