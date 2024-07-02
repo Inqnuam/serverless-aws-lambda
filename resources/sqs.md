@@ -13,7 +13,7 @@ To define default and/or override Queue attributes see [Plugin configs](../src/p
 ```js
 // config.ts
 import { defineConfig } from "serverless-aws-lambda/defineConfig";
-import { sqsPlugin } = from "serverless-aws-lambda/sqs";
+import { sqsPlugin } from "serverless-aws-lambda/sqs";
 
 export default defineConfig({
   plugins: [sqsPlugin(config)],

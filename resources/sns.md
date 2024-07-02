@@ -10,7 +10,7 @@ Import the plugin inside your defineConfig.
 ```js
 // config.js
 import { defineConfig } from "serverless-aws-lambda/defineConfig";
-import { snsPlugin } = from "serverless-aws-lambda/sns";
+import { snsPlugin } from "serverless-aws-lambda/sns";
 
 export default defineConfig({
   plugins: [snsPlugin()],
