@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { readFile, stat, mkdir, rm } from "fs/promises";
-import { writeFileSync } from "fs";
+import { writeFileSync, rmSync } from "fs";
 import path from "path";
 import { noSuchBucket } from "../errors/notFound";
 import { triggerEvent } from "../triggerEvent";
@@ -60,6 +60,7 @@ const bucketPattern = /^[a-z0-9]+[a-z0-9.-]+[a-z0-9]$/;
 export abstract class S3LocalService {
   abstract exec(res: ServerResponse, ...rest: any): Promise<void> | void;
   static localStoragePath: string;
+  static persist: boolean = true;
   static persistence: LocalS3PersistenceV2 = { version: 2, buckets: {} };
   static genLocalKey(bucket: string, key: string, version?: string) {
     return md5(path.posix.join(bucket, key, version ?? ""));
@@ -130,7 +131,11 @@ export abstract class S3LocalService {
     }
   }
   static saveState() {
-    writeFileSync(path.join(this.localStoragePath, "__items.json"), JSON.stringify(this.persistence));
+    if (S3LocalService.persist) {
+      writeFileSync(path.join(this.localStoragePath, "__items.json"), JSON.stringify(this.persistence));
+    } else {
+      rmSync(this.localStoragePath, { force: true, recursive: true });
+    }
   }
   // https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
   static isValidBucketName(bucket: string) {

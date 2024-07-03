@@ -10,13 +10,28 @@ import type { BucketConfig } from "./actions/localAction";
 
 const filter = /^\/@s3\/.*/;
 interface IOptions {
+  /**
+   * Directory where S3 related files will be stored.
+   * This directory will be created on app start.
+   *
+   * Use `persist` option to remove it on app exit.
+   * @default "./localS3"
+   */
   localStorageDir?: string;
+  /**
+   * Indicates if localStorageDir shoud be persistent.
+   * @default true
+   */
+  persist?: boolean;
 }
 
 let callableLambdas: ILambda[] = [];
 const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
   const storagePath = getLocalStoragePath(options?.localStorageDir);
   S3LocalService.localStoragePath = storagePath;
+  if (typeof options?.persist == "boolean") {
+    S3LocalService.persist = options.persist;
+  }
 
   return {
     name: "s3-local",
