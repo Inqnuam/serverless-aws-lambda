@@ -9,8 +9,30 @@ export const sqsPlugin = (attributes?: QueueAttributes): SlsAwsLambdaPlugin => {
   let region: string | undefined = undefined;
   let accountId: string | undefined = undefined;
 
-  return {
+  const onReadyListener: Function[] = [];
+
+  const notifyReadyState = async () => {
+    self.pluginData.isReady = true;
+
+    for (const fn of onReadyListener) {
+      try {
+        await fn();
+      } catch (error) {}
+    }
+  };
+
+  const self: SlsAwsLambdaPlugin = {
     name: "sqs-plugin",
+    pluginData: {
+      isReady: false,
+      onReady: (cb: Function) => {
+        if (typeof cb == "function") {
+          onReadyListener.push(cb);
+        } else {
+          console.warn("onReady callback must be a function");
+        }
+      },
+    },
     onInit: function () {
       if (!this.isDeploying && !this.isPackaging) {
         const slsRegion = this.serverless.service.provider.region;
@@ -41,6 +63,7 @@ export const sqsPlugin = (attributes?: QueueAttributes): SlsAwsLambdaPlugin => {
           baseUrl: "/@sqs/",
           queues: getQueues(this.resources.sqs, this.lambdas, attributes),
         });
+        notifyReadyState();
       },
       request: [
         {
@@ -53,6 +76,8 @@ export const sqsPlugin = (attributes?: QueueAttributes): SlsAwsLambdaPlugin => {
       ],
     },
   };
+
+  return self;
 };
 
 export default sqsPlugin;
