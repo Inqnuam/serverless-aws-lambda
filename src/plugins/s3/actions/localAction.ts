@@ -4,14 +4,20 @@ import { writeFileSync, rmSync } from "fs";
 import path from "path";
 import { noSuchBucket } from "../errors/notFound";
 import { triggerEvent } from "../triggerEvent";
-import type { ServerResponse, IncomingHttpHeaders } from "http";
+import type { ServerResponse, IncomingHttpHeaders, IncomingMessage } from "http";
 import type { ILambda } from "../../../defineConfig";
 import { calulcateETag } from "../calulcateETag";
 import { md5 } from "../commons/utils";
+import { TAG_KEY_MIN_LEN, MAX_BUCKET_TAGS, MAX_OBJECT_TAGS, TAG_KEY_MAX_LEN, TAG_VALUE_MAX_LEN, TAG_VALUE_MIN_LEN } from "../commons/constants";
+import { InvalidTag, MalformedXML, BadRequest, S3Error } from "../errors/s3Error";
+import { XMLParser, XMLBuilder } from "fast-xml-parser";
+
+const parser = new XMLParser();
 
 export interface BucketConfig {
   deletionPolicy: "Delete" | "Retain" | "RetainExceptOnCreate";
   versioning?: "Enabled" | "Suspended";
+  tags?: Record<string, string>;
 }
 
 const StorageClass = ["STANDARD", "REDUCED_REDUNDANCY", "STANDARD_IA", "ONEZONE_IA", "INTELLIGENT_TIERING", "GLACIER", "DEEP_ARCHIVE", "OUTPOSTS", "GLACIER_IR", "SNOW"] as const;
@@ -31,6 +37,7 @@ export type LocalS3Object = {
   size: number;
   metadata: Record<string, any>;
   versions: Record<string, any>;
+  tags?: Record<string, any>;
 };
 
 interface LocalS3PersistenceV1 {
@@ -62,6 +69,7 @@ export abstract class S3LocalService {
   static localStoragePath: string;
   static persist: boolean = true;
   static persistence: LocalS3PersistenceV2 = { version: 2, buckets: {} };
+  static XMLBuilder = new XMLBuilder();
   static genLocalKey(bucket: string, key: string, version?: string) {
     return md5(path.posix.join(bucket, key, version ?? ""));
   }
@@ -229,5 +237,76 @@ export abstract class S3LocalService {
       });
       delete this.persistence.buckets[bucket].objects[key];
     } catch (error) {}
+  }
+
+  static async getTagsFromRequest(req: IncomingMessage, RequestId: string, type: "Bucket" | "Object") {
+    let buf: Buffer | undefined = undefined;
+    req.on("data", (chunk) => {
+      buf = typeof buf === "undefined" ? chunk : Buffer.concat([buf, chunk]);
+    });
+
+    const rawBody: Buffer | undefined = await new Promise((resolve) => {
+      req.on("end", async () => {
+        resolve(buf);
+      });
+    });
+
+    const badInput = new MalformedXML(RequestId);
+
+    if (!rawBody) {
+      throw new S3Error({ Code: "MissingRequestBodyError", Message: "Request Body is empty", RequestId });
+    }
+
+    let body: any;
+    try {
+      body = parser.parse(rawBody);
+    } catch (error) {
+      throw badInput;
+    }
+
+    if (body.Tagging == "") {
+      return undefined;
+    }
+
+    let tags = body.Tagging.TagSet.Tag;
+
+    if (tags && !Array.isArray(tags)) {
+      tags = [tags];
+    }
+
+    const Tags: Record<string, string> = {};
+
+    for (const tag of tags) {
+      if (tag === null || typeof tag != "object" || Array.isArray(tag)) {
+        throw badInput;
+      }
+      const { Key, Value } = tag;
+      if (typeof Key != "string" || typeof Value != "string") {
+        throw badInput;
+      }
+
+      // ensure unique Keys
+      if (Key in Tags) {
+        throw new InvalidTag({ TagKey: Key, RequestId, Message: "Cannot provide multiple Tags with the same key" });
+      }
+
+      if (Key.length > TAG_KEY_MAX_LEN || Key.length < TAG_KEY_MIN_LEN) {
+        throw new InvalidTag({ TagKey: Key, RequestId, Message: "The TagKey you have provided is invalid" });
+      }
+
+      if (Value.length > TAG_VALUE_MAX_LEN) {
+        throw new InvalidTag({ TagKey: Key, RequestId, Message: "The TagValue you have provided is invalid" });
+      }
+
+      Tags[Key] = Value;
+    }
+
+    const MAX_TAGS = type == "Bucket" ? MAX_BUCKET_TAGS : MAX_OBJECT_TAGS;
+
+    if (Object.keys(Tags).length > MAX_TAGS) {
+      throw new BadRequest({ Message: `${type} tag count cannot be greater than ${MAX_TAGS}`, RequestId });
+    }
+
+    return Tags;
   }
 }

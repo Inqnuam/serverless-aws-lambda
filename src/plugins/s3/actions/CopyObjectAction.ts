@@ -29,7 +29,7 @@ export class CopyObjectAction extends S3LocalService {
 
   constructor(url: URL, headers: IncomingHttpHeaders) {
     super(headers);
-    const [bucket, ...rest] = decodeURIComponent(url.pathname.replace("/@s3/", "")).split("/").filter(Boolean);
+    const [bucket, ...rest] = decodeURIComponent(url.pathname.replace("/%40s3/", "").replace("/@s3/", "")).split("/").filter(Boolean);
 
     this.bucket = bucket;
     this.key = rest.join("/");

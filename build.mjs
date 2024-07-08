@@ -10,7 +10,7 @@ const compileDeclarations = () => {
     console.log(error.output?.[1]?.toString());
   }
 };
-const external = ["esbuild", "archiver", "serve-static", "@smithy/eventstream-codec", "local-aws-sqs", "@aws-sdk/client-sqs", "ajv", "ajv-formats"];
+const external = ["esbuild", "archiver", "serve-static", "@smithy/eventstream-codec", "local-aws-sqs", "@aws-sdk/client-sqs", "ajv", "ajv-formats", "fast-xml-parser"];
 const watchPlugin = {
   name: "watch-plugin",
   setup: (build) => {

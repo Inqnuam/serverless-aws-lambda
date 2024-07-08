@@ -62,6 +62,7 @@
     "ajv-formats": "^3.0.1",
     "archiver": "^5.3.1",
     "esbuild": "0.21.5",
+    "fast-xml-parser": "^4.4.0",
     "local-aws-sqs": "^1.0.1",
     "serve-static": "^1.15.0"
   },

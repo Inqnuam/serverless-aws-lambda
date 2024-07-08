@@ -3,6 +3,8 @@ import { ListObjectsV2Action, ListObjectsV1Action } from "../actions/ListObjects
 import { ListBucketsAction } from "../actions/ListBucketsAction";
 import { GetObjectAction } from "../actions/GetObjectAction";
 import { UnknownAction } from "../actions/UnknownAction";
+import { GetObjectTaggingAction } from "../actions/GetObjectTaggingAction";
+import { GetBucketTaggingAction } from "../actions/GetBucketTaggingAction";
 
 export const parseGetRequest = (req: IncomingMessage) => {
   const { url, headers } = req;
@@ -10,6 +12,7 @@ export const parseGetRequest = (req: IncomingMessage) => {
 
   const requestCmd = parsedURL.searchParams.get("x-id");
   const ua = headers["user-agent"];
+  const requestIsForBucket = parsedURL.pathname.replace("/%40s3/", "").replace("/@s3/", "").split("/").filter(Boolean).length == 1;
 
   if (ua && ua.startsWith("aws-cli")) {
     const [, rawCmd] = ua.split("command/");
@@ -45,7 +48,7 @@ export const parseGetRequest = (req: IncomingMessage) => {
       case "cp":
       case "mv":
       case "sync":
-        if (decodeURIComponent(parsedURL.pathname.replace("/@s3/", "")).split("/").filter(Boolean).length > 1) {
+        if (!requestIsForBucket) {
           return new GetObjectAction(parsedURL, headers);
         }
         if (parsedURL.searchParams.get("list-type") == "2") {
@@ -53,11 +56,22 @@ export const parseGetRequest = (req: IncomingMessage) => {
         }
         return new ListObjectsV1Action(parsedURL, headers);
 
+      case "get-bucket-tagging":
+        return new GetBucketTaggingAction(parsedURL, headers);
+      case "get-object-tagging":
+        return new GetObjectTaggingAction(parsedURL, headers);
       default:
         break;
     }
   } else {
     if (!requestCmd) {
+      if (parsedURL.searchParams.has("tagging")) {
+        if (requestIsForBucket) {
+          return new GetBucketTaggingAction(parsedURL, headers);
+        }
+        return new GetObjectTaggingAction(parsedURL, headers);
+      }
+
       if (url!.endsWith("@s3/")) {
         return new ListBucketsAction(parsedURL, headers);
       }

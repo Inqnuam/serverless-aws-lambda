@@ -8,7 +8,7 @@ import { parsePostRequest } from "./parsers/parsePostRequest";
 import { S3LocalService } from "./actions/localAction";
 import type { BucketConfig } from "./actions/localAction";
 
-const filter = /^\/@s3\/.*/;
+const filter = /^\/(@|%40)s3\/.*/;
 interface IOptions {
   /**
    * Directory where S3 related files will be stored.

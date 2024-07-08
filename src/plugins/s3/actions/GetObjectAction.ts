@@ -61,7 +61,7 @@ export class GetObjectAction extends S3LocalService {
   constructor(url: URL, headers: IncomingHttpHeaders) {
     super(headers);
 
-    const filePath = decodeURIComponent(url.pathname.replace("/@s3/", ""));
+    const filePath = decodeURIComponent(url.pathname.replace("/%40s3/", "").replace("/@s3/", ""));
     const [bucket, ...key] = filePath.split("/").filter(Boolean);
 
     this.bucket = bucket;

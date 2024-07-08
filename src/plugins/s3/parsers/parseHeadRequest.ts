@@ -6,7 +6,7 @@ export const parseHeadRequest = (req: IncomingMessage) => {
   const { url, headers } = req;
   const parsedURL = new URL(url as string, "http://localhost:3000");
 
-  if (parsedURL.pathname.replace("/@s3/", "").split("/").filter(Boolean).length > 1) {
+  if (parsedURL.pathname.replace("/%40s3/", "").replace("/@s3/", "").split("/").filter(Boolean).length > 1) {
     return new HeadObjectAction(parsedURL, headers);
   }
 

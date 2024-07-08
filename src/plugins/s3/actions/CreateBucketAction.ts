@@ -5,7 +5,7 @@ export class CreateBucketAction extends S3LocalService {
   bucket: string;
   constructor(url: URL, headers: IncomingHttpHeaders) {
     super(headers);
-    const [bucket] = decodeURIComponent(url.pathname.replace("/@s3/", "")).split("/").filter(Boolean);
+    const [bucket] = decodeURIComponent(url.pathname.replace("/%40s3/", "").replace("/@s3/", "")).split("/").filter(Boolean);
     this.bucket = bucket;
   }
   async exec(res: ServerResponse) {
