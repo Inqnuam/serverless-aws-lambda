@@ -3,7 +3,6 @@ import type { LambdaEndpoint } from "../../../lib/parseEvents/endpoints";
 import { CommonEventGenerator } from "./common";
 import { log } from "../../../lib/utils/colorize";
 import { randomUUID } from "crypto";
-import { capitalize } from "../utils";
 
 interface CommonApgEvent {
   body?: string;
@@ -97,7 +96,6 @@ export class ApgRequestHandler extends CommonEventGenerator {
         : ApgRequestHandler.createApgV2Event({ req, mockEvent, parsedURL, requestId, isBase64Encoded, body });
   }
 
-  static knownHeaders: string[] = ["content-length", "host", "user-agent"];
   static skipHeaders: string[] = ["connection", "content"];
   static createApgV2Event = ({
     req,
@@ -193,7 +191,6 @@ export class ApgRequestHandler extends CommonEventGenerator {
     mockEvent,
     parsedURL,
     lambdaName,
-    multiValueHeaders,
     isBase64Encoded,
     requestId,
     body,
@@ -218,21 +215,11 @@ export class ApgRequestHandler extends CommonEventGenerator {
     event.path = parsedURL.pathname;
     event.httpMethod = method!;
 
-    const headers = ApgRequestHandler.getCustomHeaders(req, mockEvent);
+    const { headers, multiValueHeaders, apiKey } = ApgRequestHandler.getApiGV1Headers(req, mockEvent);
 
     event.headers = headers;
-
+    event.multiValueHeaders = multiValueHeaders;
     const sourceIp = String(req.socket.remoteAddress);
-    const mergedMultiValueHeaders: any = {
-      "X-Forwarded-For": [sourceIp],
-      "X-Forwarded-Proto": ["http"],
-      "X-Forwarded-Port": [String(ApgRequestHandler.port)],
-    };
-    Object.entries(multiValueHeaders).forEach(([key, value]) => {
-      mergedMultiValueHeaders[this.#normalizeHeaderKey(key)] = value;
-    });
-
-    event.multiValueHeaders = mergedMultiValueHeaders;
 
     const queryStringParameters: any = Object.fromEntries(parsedURL.searchParams);
     event.queryStringParameters = Object.keys(queryStringParameters).length ? queryStringParameters : null;
@@ -274,6 +261,10 @@ export class ApgRequestHandler extends CommonEventGenerator {
       requestContext.stage = "$default";
     } else {
       requestContext.stage = "dev";
+      if (mockEvent.private) {
+        requestContext.identity.apiKey = apiKey;
+        requestContext.identity.apiKeyId = "abcdefghjk";
+      }
     }
     event.requestContext = requestContext;
 
@@ -316,9 +307,6 @@ export class ApgRequestHandler extends CommonEventGenerator {
     return this.res.end(body);
   };
 
-  static #normalizeHeaderKey = (key: string) => {
-    return key.toLowerCase().split("-").map(capitalize).join("-");
-  };
   #normalizeV1Value = (v: any) => {
     let value: string | null = "";
     const vType = typeof v;
@@ -347,7 +335,7 @@ export class ApgRequestHandler extends CommonEventGenerator {
 
     if (output.headers && typeof output.headers == "object" && !Array.isArray(output.headers)) {
       Object.entries(output.headers).forEach(([k, v]) => {
-        const key = ApgRequestHandler.#normalizeHeaderKey(k);
+        const key = ApgRequestHandler.normalizeHeaderKey(k);
         const value = this.#normalizeV1Value(v);
 
         headers.push([key, value]);
@@ -356,7 +344,7 @@ export class ApgRequestHandler extends CommonEventGenerator {
 
     if (output.multiValueHeaders && typeof output.multiValueHeaders == "object" && !Array.isArray(output.multiValueHeaders)) {
       Object.entries(output.multiValueHeaders).forEach(([k, v]) => {
-        const key = ApgRequestHandler.#normalizeHeaderKey(k);
+        const key = ApgRequestHandler.normalizeHeaderKey(k);
 
         if (!Array.isArray(v)) {
           throw new Error();

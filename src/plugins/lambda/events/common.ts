@@ -1,5 +1,6 @@
 import type { IncomingMessage, IncomingHttpHeaders } from "http";
 import type { LambdaEndpoint } from "../../../lib/parseEvents/endpoints";
+import { capitalize } from "../utils";
 
 export type normalizedSearchParams = { toString: () => string } & { [key: string]: string[] | undefined };
 
@@ -23,6 +24,10 @@ export class CommonEventGenerator {
   static unavailable = '{"message":"Service Unavailable"}';
   static timeoutRegex = /after.\d+.*seconds/;
   static apgRequestTimeout = 30;
+
+  static normalizeHeaderKey = (key: string) => {
+    return key.toLowerCase().split("-").map(capitalize).join("-");
+  };
   static getMultiValueHeaders = (rawHeaders: string[]) => {
     let multiValueHeaders: any = {};
     const multiKeys = rawHeaders.filter((x, i) => i % 2 == 0).map((x) => x.toLowerCase());
@@ -60,6 +65,80 @@ export class CommonEventGenerator {
     return true;
   };
 
+  static knownHeaders: string[] = ["accept", "accept-encoding", "user-agent", "host", "via", "content-length"];
+  static getApiGV1Headers(req: IncomingMessage, mockEvent: LambdaEndpoint) {
+    const { rawHeaders } = req;
+
+    let apiKey: string | undefined = undefined;
+
+    const reqHeaders: any = { "X-Forwarded-For": req.socket.remoteAddress, "X-Forwarded-Proto": "http", "X-Forwarded-Port": String(CommonEventGenerator.port) };
+
+    for (let i = 0; i < rawHeaders.length; ) {
+      let key = rawHeaders[i];
+      const loweredKey = key.toLowerCase();
+
+      if (["connection", "x-mock-type"].includes(loweredKey)) {
+        i = i + 2;
+        continue;
+      }
+
+      if (this.knownHeaders.includes(loweredKey)) {
+        key = this.normalizeHeaderKey(loweredKey);
+      }
+
+      const value = rawHeaders[i + 1];
+      reqHeaders[key] = value;
+
+      if (loweredKey == "x-api-key") {
+        apiKey = value;
+      }
+
+      i = i + 2;
+    }
+
+    const headers: any = {};
+
+    for (const key of Object.keys(reqHeaders).sort((a, b) => a.localeCompare(b))) {
+      headers[key] = reqHeaders[key];
+    }
+
+    const reqMultiValueHeaders: Record<string, any[]> = {
+      "X-Forwarded-For": [req.socket.remoteAddress],
+      "X-Forwarded-Proto": ["http"],
+      "X-Forwarded-Port": [String(CommonEventGenerator.port)],
+    };
+
+    for (let i = 0; i < rawHeaders.length; ) {
+      let key = rawHeaders[i];
+      const loweredKey = key.toLowerCase();
+
+      if (["connection", "x-mock-type"].includes(loweredKey)) {
+        i = i + 2;
+        continue;
+      }
+
+      if (this.knownHeaders.includes(loweredKey)) {
+        key = this.normalizeHeaderKey(loweredKey);
+      }
+
+      const value = rawHeaders[i + 1];
+
+      if (reqMultiValueHeaders[key]) {
+        reqMultiValueHeaders[key].push(value);
+      } else {
+        reqMultiValueHeaders[key] = [value];
+      }
+
+      i = i + 2;
+    }
+
+    const multiValueHeaders: Record<string, any[]> = {};
+    for (const key of Object.keys(reqMultiValueHeaders).sort((a, b) => a.localeCompare(b))) {
+      multiValueHeaders[key] = reqMultiValueHeaders[key];
+    }
+
+    return { headers, multiValueHeaders, apiKey };
+  }
   static getCustomHeaders(req: IncomingMessage, mockEvent: LambdaEndpoint) {
     const { headers } = req;
     delete headers["x-mock-type"];
