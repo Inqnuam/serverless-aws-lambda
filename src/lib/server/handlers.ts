@@ -22,9 +22,17 @@ export class Handlers {
 
     let name = customInvokeUrls.includes(components[1]) ? components[2] : components[3];
     name = decodeURIComponent(name);
-    if (name.includes(":function")) {
-      const arnComponent = name.split(":");
+    if (name.includes(":function:")) {
+      const arnComponent = name.split(":function:");
       name = arnComponent[arnComponent.length - 1];
+    }
+
+    if (name.includes(":")) {
+      const versionnedFunctionNameComponents = name.split(":");
+
+      if (versionnedFunctionNameComponents.length == 2) {
+        name = versionnedFunctionNameComponents[0];
+      }
     }
 
     return name;
