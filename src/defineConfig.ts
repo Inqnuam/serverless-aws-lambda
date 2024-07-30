@@ -83,6 +83,7 @@ export interface SlsAwsLambdaPlugin {
   onInit?: (this: ClientConfigParams) => Promise<void> | void;
   onExit?: (this: ClientConfigParams, code: string | number) => void;
   afterDeploy?: (this: ClientConfigParams) => Promise<void> | void;
+  afterPackage?: (this: ClientConfigParams) => Promise<void> | void;
   offline?: {
     onReady?: (this: ClientConfigParams, port: number, ip: string) => Promise<void> | void;
     /**
@@ -171,6 +172,7 @@ function defineConfig(options: Options) {
         port: options.offline?.port,
       },
       afterDeployCallbacks: [],
+      afterPackageCallbacks: [],
     };
 
     if (options.services) {
@@ -244,6 +246,11 @@ function defineConfig(options: Options) {
         if (typeof plugin.afterDeploy == "function") {
           config.afterDeployCallbacks!.push(plugin.afterDeploy.bind(self));
         }
+
+        if (typeof plugin.afterPackage == "function") {
+          config.afterPackageCallbacks!.push(plugin.afterPackage.bind(self));
+        }
+
         if (plugin.onInit) {
           try {
             await plugin.onInit.call(self);
@@ -258,6 +265,10 @@ function defineConfig(options: Options) {
     if (!config.afterDeployCallbacks!.length) {
       delete config.afterDeployCallbacks;
     }
+    if (!config.afterPackageCallbacks!.length) {
+      delete config.afterPackageCallbacks;
+    }
+
     return config;
   };
 }

@@ -55,6 +55,7 @@ class ServerlessAwsLambda extends Daemon {
   nodeVersion: number | boolean | string | undefined = false;
   invokeName?: string;
   afterDeployCallbacks: (() => void | Promise<void>)[] = [];
+  afterPackageCallbacks: (() => void | Promise<void>)[] = [];
   resources: ReturnType<typeof getResources> = { ddb: {}, kinesis: {}, sns: {}, sqs: {} };
   static tags: string[] = ["build"];
   constructor(serverless: any, options: any, pluginUtils: PluginUtils) {
@@ -120,6 +121,7 @@ class ServerlessAwsLambda extends Daemon {
       "before:invoke:local:invoke": this.invokeLocal.bind(this),
       "after:aws:deploy:finalize:cleanup": this.afterDeploy.bind(this),
       "after:invoke:local:invoke": process.exit,
+      "after:package:finalize": this.afterPackage.bind(this),
     };
   }
 
@@ -137,6 +139,11 @@ class ServerlessAwsLambda extends Daemon {
         console.log(error);
         process.exit(1);
       }
+    }
+  }
+  async afterPackage() {
+    for (const cb of this.afterPackageCallbacks) {
+      await cb();
     }
   }
   async init(isPackaging: boolean) {
@@ -579,6 +586,10 @@ class ServerlessAwsLambda extends Daemon {
 
       if (Array.isArray(exportedObject.afterDeployCallbacks)) {
         this.afterDeployCallbacks = exportedObject.afterDeployCallbacks;
+      }
+
+      if (Array.isArray(exportedObject.afterPackageCallbacks)) {
+        this.afterPackageCallbacks = exportedObject.afterPackageCallbacks;
       }
 
       if (exportedObject.offline && typeof exportedObject.offline == "object") {

@@ -1687,10 +1687,10 @@ lazystream@^1.0.0:
   dependencies:
     readable-stream "^2.0.5"
 
-local-aws-sqs@^1.0.1:
-  version "1.0.1"
-  resolved "https://registry.yarnpkg.com/local-aws-sqs/-/local-aws-sqs-1.0.1.tgz#1e9c25fd3409598595a309684bcb1d23991ce76c"
-  integrity sha512-Dn5ueF5WUV5LOHrKhjjYUvZo7Rchla3DtkjZ1G8cy6zNxfmJYlu3PTRkponCtBSaVehrMZ0SKKdIJ2JXJsOXFQ==
+local-aws-sqs@^1.0.2:
+  version "1.0.2"
+  resolved "https://registry.yarnpkg.com/local-aws-sqs/-/local-aws-sqs-1.0.2.tgz#c921fbe50b86d79df91e3a93c8c12a80f6d414c7"
+  integrity sha512-l5MwX8zS+mLAVYwEAbRZEf9kmbeJxRbn03vJnuglCNQA1urgWmFCh1C2reQtoo9B2Maiw8iDKrDyZAZfYSTQig==
   dependencies:
     aws-md5-of-message-attributes "^1.0.0"
     aws-query-decoder "^1.0.1"
@@ -2145,10 +2145,10 @@ type-detect@^4.0.0, type-detect@^4.0.8:
   resolved "https://registry.yarnpkg.com/type-detect/-/type-detect-4.0.8.tgz#7646fb5f18871cfbb7749e69bd39a6388eb7450c"
   integrity sha512-0fr/mIH1dlO+x7TlcMy+bIDqKPsw/70tVyeHW787goQjhmqaZe10uwLujubK9q9Lg6Fiho1KUKDYz0Z7k7g5/g==
 
-typescript@^5.5.3:
-  version "5.5.3"
-  resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.5.3.tgz#e1b0a3c394190838a0b168e771b0ad56a0af0faa"
-  integrity sha512-/hreyEujaB0w76zKo6717l3L0o/qEUtRgdvUBvlkhoWeOVMjMuHNHk0BRBzikzuGDqNmPQbg5ifMEqsHLiIUcQ==
+typescript@^5.5.4:
+  version "5.5.4"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.5.4.tgz#d9852d6c82bad2d2eda4fd74a5762a8f5909e9ba"
+  integrity sha512-Mtq29sKDAEYP7aljRgtPOpTvOfbwRWlS6dPRzwjdE+C0R4brX/GUyhHSecbHMFLNBLcJIPt9nl9yG5TZ1weH+Q==
 
 ufo@^1.5.3:
   version "1.5.3"

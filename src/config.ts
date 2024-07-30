@@ -18,6 +18,7 @@ export interface Config {
   offline?: OfflineConfig;
   buildCallback?: (result: BuildResult, isRebuild: boolean) => Promise<void> | void;
   afterDeployCallbacks?: (() => Promise<void> | void)[];
+  afterPackageCallbacks?: (() => Promise<void> | void)[];
 }
 
 export interface ServerConfig {
