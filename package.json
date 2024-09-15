@@ -1,6 +1,6 @@
 {
   "name": "serverless-aws-lambda",
-  "version": "4.8.3",
+  "version": "4.8.4",
   "description": "AWS Application Load Balancer and API Gateway - Lambda dev tool for Serverless. Allows Express synthax in handlers. Supports packaging, local invoking and offline ALB, APG, S3, SNS, SQS, DynamoDB Stream server mocking.",
   "author": "Inqnuam",
   "license": "MIT",

@@ -95,6 +95,18 @@ export interface SlsAwsLambdaPlugin {
 
 export interface Options {
   esbuild?: Config["esbuild"];
+  /**
+   * shim `require`, `__dirname` and `__filename` when bundeling Lambdas with ESM format
+   * @default true
+   */
+  shimRequire?: boolean;
+  /**
+   * By default aws sdk packages are excluded from Lambda bundles as AWS Lambda Runtime already includes `aws-sdk` (v2) for Node < 18 and `@aws-sdk/*` for Node >=18 packages.
+   *
+   * Use this option to include aws-sdk if you prefer to control exact package version used by your Lambdas during runtime.
+   * @default false
+   */
+  includeAwsSdk?: boolean;
   offline?: {
     /**
      * Serve files locally from provided directory
@@ -167,6 +179,8 @@ function defineConfig(options: Options) {
   ): Promise<Omit<Config, "config" | "options">> {
     let config: Config = {
       esbuild: options.esbuild ?? {},
+      shimRequire: options.shimRequire,
+      includeAwsSdk: options.includeAwsSdk,
       offline: {
         staticPath: options.offline?.staticPath,
         port: options.offline?.port,

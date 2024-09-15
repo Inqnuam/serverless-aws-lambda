@@ -57,6 +57,8 @@ class ServerlessAwsLambda extends Daemon {
   afterDeployCallbacks: (() => void | Promise<void>)[] = [];
   afterPackageCallbacks: (() => void | Promise<void>)[] = [];
   resources: ReturnType<typeof getResources> = { ddb: {}, kinesis: {}, sns: {}, sqs: {} };
+  shimRequire: boolean = true;
+  includeAwsSdk: boolean = false;
   static tags: string[] = ["build"];
   constructor(serverless: any, options: any, pluginUtils: PluginUtils) {
     super({ debug: process.env.SLS_DEBUG == "*" });
@@ -209,7 +211,9 @@ class ServerlessAwsLambda extends Daemon {
         log.RED(`You are running on NodeJS ${process.version} which is lower than '${this.nodeVersion}' found in serverless.yml.`);
       }
       esBuildConfig.target = `node${this.nodeVersion}`;
-      esBuildConfig.plugins?.push(buildOptimizer({ isLocal, nodeVersion: this.nodeVersion, buildCallback: this.buildCallback }));
+      esBuildConfig.plugins?.push(
+        buildOptimizer({ isLocal, nodeVersion: this.nodeVersion, shimRequire: this.shimRequire, includeAwsSdk: this.includeAwsSdk, buildCallback: this.buildCallback })
+      );
     }
     if (!isLocal) {
       esBuildConfig.dropLabels!.push("LOCAL");
@@ -578,6 +582,14 @@ class ServerlessAwsLambda extends Daemon {
         exportedObject = await exportedFunc.default(customConfigArgs);
       } else {
         throw new Error(`Can not find config at: ${configPath}`);
+      }
+
+      if (typeof exportedObject.shimRequire == "boolean") {
+        this.shimRequire = exportedObject.shimRequire;
+      }
+
+      if (typeof exportedObject.includeAwsSdk == "boolean") {
+        this.includeAwsSdk = exportedObject.includeAwsSdk;
       }
 
       if (typeof exportedObject.buildCallback == "function") {

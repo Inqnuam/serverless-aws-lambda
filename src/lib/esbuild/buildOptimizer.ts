@@ -10,10 +10,14 @@ const requirePoly = (nodePrefix: "node:" | "") =>
 export const buildOptimizer = ({
   isLocal,
   nodeVersion,
+  shimRequire,
+  includeAwsSdk,
   buildCallback,
 }: {
   isLocal: boolean;
   nodeVersion: number;
+  shimRequire: boolean;
+  includeAwsSdk: boolean;
   buildCallback: (result: BuildResult, isRebuild: boolean, format: string, outdir: string) => void | Promise<void>;
 }): Plugin => {
   return {
@@ -49,7 +53,7 @@ export const buildOptimizer = ({
         }
 
         build.initialOptions.external!.push(...knownCjs);
-      } else {
+      } else if (!includeAwsSdk) {
         build.initialOptions.external!.push(nodeVersion < 18 ? awsSdkV2 : awsSdkV3);
       }
 
@@ -57,17 +61,19 @@ export const buildOptimizer = ({
         return;
       }
 
-      const r = requirePoly(nodeVersion < 18 ? "" : "node:");
-      if (build.initialOptions.banner) {
-        if (build.initialOptions.banner.js) {
-          build.initialOptions.banner.js = `${r}${build.initialOptions.banner.js}`;
+      if (shimRequire) {
+        const r = requirePoly(nodeVersion < 18 ? "" : "node:");
+        if (build.initialOptions.banner) {
+          if (build.initialOptions.banner.js) {
+            build.initialOptions.banner.js = `${r}${build.initialOptions.banner.js}`;
+          } else {
+            build.initialOptions.banner.js = r;
+          }
         } else {
-          build.initialOptions.banner.js = r;
+          build.initialOptions.banner = {
+            js: r,
+          };
         }
-      } else {
-        build.initialOptions.banner = {
-          js: r,
-        };
       }
     },
   };
