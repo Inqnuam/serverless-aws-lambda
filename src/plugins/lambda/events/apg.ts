@@ -376,7 +376,7 @@ export class ApgRequestHandler extends CommonEventGenerator {
 
     const contentTypeIndex = headers.findIndex((x) => x[0].toLowerCase() == "content-type");
 
-    if (contentTypeIndex == -1 && resContent) {
+    if (contentTypeIndex == -1) {
       headers.push(["Content-Type", ApgRequestHandler.contentType.json]);
     }
 
@@ -392,7 +392,7 @@ export class ApgRequestHandler extends CommonEventGenerator {
       log.YELLOW("API Gateway payload v1 return body must be typeof string, number or boolean ");
     }
 
-    const contentLengh = resContent ? String(Buffer.from(resContent).byteLength) : "0";
+    const contentLengh = code == 204 ? "0" : resContent ? String(Buffer.from(resContent).byteLength) : "0";
     headers.push(["Content-Length", contentLengh]);
 
     this.res.shouldKeepAlive = false;

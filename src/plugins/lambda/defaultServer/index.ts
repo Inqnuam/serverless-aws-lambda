@@ -102,7 +102,11 @@ export const defaultServer = async (req: IncomingMessage, res: ServerResponse, p
   const body = await collectBody(req, isBase64Encoded);
 
   // validate REST API Gateway Schema
-  if (mockEvent.kind == "apg" && mockEvent.schema && mockEvent.proxy == "http") {
+
+  const contentType = headers["content-type"];
+  const isJsonRequest = !contentType || contentType == "application/json" || contentType == "application/json; charset=utf-8";
+
+  if (isJsonRequest && mockEvent.kind == "apg" && mockEvent.schema && mockEvent.proxy == "http") {
     let jsonBody;
     try {
       jsonBody = JSON.parse(body!);
