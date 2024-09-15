@@ -1,8 +1,8 @@
-import type { ILambdaMock } from "../rapidApi";
 import { EventSourceMapping, type IEventSourceMappingConfig } from "./base";
 import { ReceiveMessageCommand, DeleteMessageBatchCommand, GetQueueAttributesCommand, GetQueueUrlCommand } from "@aws-sdk/client-sqs";
 import { createBatch, getBatchItemFailures } from "./utils";
 import { AwsServices } from "../../services";
+import { Handlers } from "../../server/handlers";
 
 export const SQS_DEFAULT_BATCH_SIZE = 10;
 export const SQS_DEFAULT_MaximumBatchingWindowInSeconds = 0;
@@ -96,7 +96,7 @@ class SqsBatch {
   constructor(
     private MaximumBatchingWindowInSeconds: number,
     private BatchSize: number,
-    private lambda: ILambdaMock,
+    private lambdaName: string,
     private QueueUrl: string,
     private ReportBatchItemFailures: boolean,
     private legacyDefinition: any
@@ -129,7 +129,8 @@ class SqsBatch {
 
     let messagesToDelete = this.#messages.map((x) => x.receiptHandle);
     try {
-      const res = await this.lambda.invoke({ Records: this.#messages }, { kind: "sqs", event: this.legacyDefinition });
+      const lambda = Handlers.handlers.find((x) => x.name == this.lambdaName || x.outName == this.lambdaName)!;
+      const res = await lambda.invoke({ Records: this.#messages }, { kind: "sqs", event: this.legacyDefinition });
 
       if (this.ReportBatchItemFailures) {
         // @ts-ignore
@@ -147,8 +148,8 @@ export class SqsEventSourceMapping extends EventSourceMapping {
   QueueUrl: string = "";
   #pooler?: NodeJS.Timeout;
   #ReportBatchItemFailures: boolean;
-  constructor(public config: IEventSourceMappingConfig, public lambda: ILambdaMock, public legacyDefinition: any) {
-    super(config, lambda, legacyDefinition);
+  constructor(public config: IEventSourceMappingConfig, public legacyDefinition: any) {
+    super(config, legacyDefinition);
 
     const comp = this.config.EventSourceArn.split(":");
     this.QueueName = comp[comp.length - 1];
@@ -166,7 +167,7 @@ export class SqsEventSourceMapping extends EventSourceMapping {
     const batch = new SqsBatch(
       this.config.MaximumBatchingWindowInSeconds!,
       this.config.BatchSize,
-      this.lambda,
+      this.config.FunctionName,
       this.QueueUrl,
       this.#ReportBatchItemFailures,
       this.legacyDefinition

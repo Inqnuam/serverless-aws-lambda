@@ -69,7 +69,7 @@ export abstract class EventSourceMapping {
   State: "Creating" | "Enabling" | "Enabled" | "Disabling" | "Disabled" = "Creating";
   StateTransitionReason: "USER_INITIATED" | "User action" = "User action";
 
-  constructor(public config: IEventSourceMappingConfig, public lambda: ILambdaMock, public legacyDefinition: any) {}
+  constructor(public config: IEventSourceMappingConfig, public legacyDefinition: any) {}
 
   filterRecords(records: any[]) {
     const pass: any[] = [];
