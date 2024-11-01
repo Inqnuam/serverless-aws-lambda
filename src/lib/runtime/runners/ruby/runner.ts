@@ -5,6 +5,9 @@ import { access } from "fs/promises";
 import type { Runner } from "../index";
 import type { ChildProcessWithoutNullStreams } from "child_process";
 import type { FSWatcher } from "fs";
+import { fileURLToPath } from "url";
+
+const moduleDirname = fileURLToPath(new URL(".", import.meta.url));
 
 export class RubyRunner implements Runner {
   invoke: Runner["invoke"];
@@ -26,7 +29,7 @@ export class RubyRunner implements Runner {
   emitRebuild: Function;
   watcherListener: (event: "rename" | "change", filename: string | Buffer) => void;
   watchers: FSWatcher[] = [];
-  static wrapper = __dirname.replace(`${path.sep}dist`, "/src/lib/runtime/runners/ruby/index.rb");
+  static wrapper = moduleDirname.replace(`${path.sep}dist`, "/src/lib/runtime/runners/ruby/index.rb");
   static DELIMITER = "__|response|__";
   static ERR_RESPONSE = "__|error|__";
   static WATCH = "__|watch|__";

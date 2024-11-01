@@ -20,7 +20,7 @@
 
 ### Minimum requirements
 
-- Node v14.17.0+
+- Node v18.20.4+
 - Serverless 2.0.0+ < 4.0
 
 ---
@@ -179,7 +179,7 @@ Invoking with `aws-sdk` Lambda Client requires to set client endpoint to local s
 Example:
 
 ```js
-const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
+import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 
 const client = new LambdaClient({ region: "us-east-1", endpoint: "http://localhost:3000" });
 const DryRun = "DryRun";

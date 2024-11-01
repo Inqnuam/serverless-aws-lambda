@@ -1,9 +1,12 @@
 import type { Plugin, BuildResult } from "esbuild";
 import { knownCjs } from "./knownCjs";
-
+import path from "path";
 const awsSdkV2 = "aws-sdk";
 const awsSdkV3 = "@aws-sdk/*";
-const awslambda = `${__dirname.slice(0, -5)}/src/lib/runtime/awslambda.ts`;
+const awslambda = `${path
+  .dirname(import.meta.url)
+  .replace("file://", "")
+  .slice(0, -5)}/src/lib/runtime/awslambda.ts`;
 const requirePoly = (nodePrefix: "node:" | "") =>
   `import { createRequire as __crE_ } from "${nodePrefix}module";import { fileURLToPath as __futP_ } from "${nodePrefix}url";import { dirname as __dN_ } from "${nodePrefix}path";global.__filename = __futP_(import.meta.url);global.__dirname = __dN_(__filename);global.require = __crE_(__filename);\n`;
 

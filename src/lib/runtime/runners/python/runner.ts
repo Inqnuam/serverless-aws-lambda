@@ -5,8 +5,11 @@ import { access } from "fs/promises";
 import type { Runner } from "../index";
 import type { ChildProcessWithoutNullStreams } from "child_process";
 import type { FSWatcher } from "fs";
+import { fileURLToPath } from "url";
 
+const moduleDirname = fileURLToPath(new URL(".", import.meta.url));
 const cwd = process.cwd();
+
 export class PythonRunner implements Runner {
   invoke: Runner["invoke"];
   mount: Runner["mount"];
@@ -28,7 +31,7 @@ export class PythonRunner implements Runner {
   filesTime: Map<string, number> = new Map();
   watcherListener: (event: "rename" | "change", filename: string | Buffer) => void;
   emitRebuild: Function;
-  static wrapper = __dirname.replace(`${path.sep}dist`, "/src/lib/runtime/runners/python/index.py");
+  static wrapper = moduleDirname.replace(`${path.sep}dist`, "/src/lib/runtime/runners/python/index.py");
   static DELIMITER = "__|response|__";
   static DELIMITEREND = "__|responseEnd|__";
   static ERR_RESPONSE = "__|error|__";

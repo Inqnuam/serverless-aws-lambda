@@ -17,10 +17,10 @@ const readFromPath = async (sourcefile: string) => {
     packages: "external",
     platform: "node",
     format: "esm",
-    target: "ES2018",
-    banner: {
-      js: `import { createRequire } from 'module';const require = createRequire(import.meta.url);const __filename = "${outfile}";const __dirname = "${dir}";`,
-    },
+    target: `node${process.versions.node.split(".")[0]}`,
+    minify: true,
+    sourcemap: "inline",
+    sourcesContent: true,
   });
 
   try {

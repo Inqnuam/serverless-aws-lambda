@@ -26,9 +26,8 @@ const esBuildConfig = {
   bundle: true,
   minify: !shouldWatch,
   platform: "node",
-  target: "ES6",
+  target: "node18",
   outdir: "dist",
-  format: "cjs",
   plugins: [watchPlugin],
   dropLabels: shouldWatch ? [] : ["DEV"],
   drop: shouldWatch ? [] : ["debugger"],
@@ -39,7 +38,6 @@ const bundle = shouldWatch ? esbuild.context : esbuild.build;
 const buildIndex = bundle.bind(null, {
   ...esBuildConfig,
   entryPoints: [
-    "./src/index.ts",
     "./src/server.ts",
     "./src/defineConfig.ts",
     "./src/lib/runtime/runners/node/index.ts",
@@ -49,18 +47,20 @@ const buildIndex = bundle.bind(null, {
     "./src/plugins/s3/index.ts",
     "./src/lambda/body-parser.ts",
   ],
+  format: "cjs",
 });
 
 const buildRouterESM = bundle.bind(null, {
   ...esBuildConfig,
   entryPoints: [
-    "./src/lambda/router.ts",
+    "./src/index.ts",
     "./src/server.ts",
-    "./src/lambda/body-parser.ts",
     "./src/defineConfig.ts",
+    "./src/lambda/router.ts",
     "./src/plugins/sns/index.ts",
     "./src/plugins/sqs/index.ts",
     "./src/plugins/s3/index.ts",
+    "./src/lambda/body-parser.ts",
   ],
   format: "esm",
   outExtension: { ".js": ".mjs" },

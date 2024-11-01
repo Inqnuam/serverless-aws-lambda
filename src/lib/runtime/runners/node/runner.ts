@@ -5,6 +5,8 @@ import type { WorkerOptions } from "worker_threads";
 import path from "path";
 import { log } from "../../../utils/colorize";
 import { BufferedStreamResponse } from "../../bufferedStreamResponse";
+import { fileURLToPath } from "url";
+const moduleDirname = fileURLToPath(new URL(".", import.meta.url));
 
 export class NodeRunner extends EventEmitter implements Runner {
   _worker?: Worker;
@@ -138,7 +140,7 @@ export class NodeRunner extends EventEmitter implements Runner {
         },
       };
 
-      this._worker = new Worker(path.resolve(__dirname, "./lib/runtime/runners/node/index.js"), opt);
+      this._worker = new Worker(path.resolve(moduleDirname, "./lib/runtime/runners/node/index.js"), opt);
       this._worker.setMaxListeners(0);
 
       const errorHandler = (err: any) => {
