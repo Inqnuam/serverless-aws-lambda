@@ -138,6 +138,7 @@ interface IEventQueueContext {
 }
 
 export class EventQueue extends Map {
+  private static readonly EMPTY_ARGS = [];
   static IGNORE = ["PROMISE", "RANDOMBYTESREQUEST", "PerformanceObserver", "TIMERWRAP"];
   onEmpty?: () => void;
   requestId: string;
@@ -249,9 +250,10 @@ export class EventQueue extends Map {
       const timmerTime = resource._repeat ? "setInterval" : "setTimeout";
       const fnString = resource._onTimeout.toString();
       const org = resource._onTimeout.bind(resource._onTimeout);
+      const cbArgs = resource._timerArgs ?? EventQueue.EMPTY_ARGS;
       resource._onTimeout = () => {
         try {
-          org();
+          org(...cbArgs);
         } catch (error) {
           const data = genResponsePayload(error);
           const solution = genSolution(fnString);

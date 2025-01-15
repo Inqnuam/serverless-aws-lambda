@@ -4,10 +4,10 @@
   "type": "module",
   "devDependencies": {
     "prettier": "3.2.5",
-    "serverless": "^3.38.0",
-    "serverless-aws-lambda": "^5.0.0",
+    "serverless": "^3.40.0",
+    "serverless-aws-lambda": "^5.0.1",
     "serverless-aws-lambda-vitest": "^3.0.2",
-    "typescript": "^5.6.3"
+    "typescript": "^5.7.3"
   },
   "scripts": {
     "sls": "sls",
