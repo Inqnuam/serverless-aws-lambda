@@ -2,12 +2,33 @@ import type { IncomingMessage, ServerResponse } from "http";
 import type { SlsAwsLambdaPlugin } from "../../defineConfig";
 import type { QueueAttributes } from "./types";
 import { getQueues } from "./utils";
-import { createRequestHandler } from "local-aws-sqs";
+import { createRequestHandler, type ISqsServerOptions } from "local-aws-sqs";
 
-export const sqsPlugin = (attributes?: QueueAttributes): SlsAwsLambdaPlugin => {
+export const sqsPlugin = (
+  attributes?: QueueAttributes,
+  serviceOptions?: Pick<ISqsServerOptions, "emulateLazyQueues" | "emulateQueueCreationLifecycle" | "validateDlqDestination">
+): SlsAwsLambdaPlugin => {
   let sqsRequestHandler = (req: IncomingMessage, res: ServerResponse) => {};
   let region: string | undefined = undefined;
   let accountId: string | undefined = undefined;
+
+  let validateDlqDestination = false;
+  let emulateQueueCreationLifecycle = false;
+  let emulateLazyQueues = false;
+
+  if (serviceOptions) {
+    if (typeof serviceOptions.validateDlqDestination == "boolean") {
+      validateDlqDestination = serviceOptions.validateDlqDestination;
+    }
+
+    if (typeof serviceOptions.emulateQueueCreationLifecycle == "boolean") {
+      emulateQueueCreationLifecycle = serviceOptions.emulateQueueCreationLifecycle;
+    }
+
+    if (typeof serviceOptions.emulateLazyQueues == "boolean") {
+      emulateLazyQueues = serviceOptions.emulateLazyQueues;
+    }
+  }
 
   const onReadyListener: Function[] = [];
 
@@ -58,8 +79,9 @@ export const sqsPlugin = (attributes?: QueueAttributes): SlsAwsLambdaPlugin => {
           port: port,
           region,
           accountId,
-          validateDlqDestination: false,
-          emulateQueueCreationLifecycle: false,
+          validateDlqDestination,
+          emulateQueueCreationLifecycle,
+          emulateLazyQueues,
           baseUrl: "/@sqs/",
           queues: getQueues(this.resources.sqs, this.lambdas, attributes),
         });
