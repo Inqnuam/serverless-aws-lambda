@@ -173,6 +173,9 @@ export class NodeRunner extends EventEmitter implements Runner {
             log.BR_BLUE("Solution:");
             console.log(data.solution);
           }
+        } else if (channel == "fail") {
+          this._worker!.terminate();
+          errorHandler(data);
         } else {
           this.emit(awsRequestId, channel, data, type, encoding);
         }

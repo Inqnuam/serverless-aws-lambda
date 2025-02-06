@@ -59,7 +59,13 @@ const listener = async (e: any) => {
   const { channel, data, awsRequestId } = e;
 
   if (channel == "import") {
-    const handler = await import(`file://${workerData.esOutputPath}?version=${Date.now()}`);
+    let handler;
+    try {
+      handler = await import(`file://${workerData.esOutputPath}?version=${Date.now()}`);
+    } catch (err) {
+      returnError(awsRequestId, err);
+      return;
+    }
 
     // workaround to esbuild bug #2494
     if (workerData.handlerName == "default" && typeof handler.default == "object" && typeof handler.default.default == "function") {

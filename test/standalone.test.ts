@@ -158,6 +158,21 @@ describe("Standalone", () => {
     });
   });
 
+  it("Should apply esbuild options", async () => {
+    await using server = await run({
+      functions: [{ name: "users", handler: "test/lambdas/users.handler" }],
+      esbuild: {
+        banner: {
+          js: "crash",
+        },
+      },
+    });
+
+    const res = await callLambda(server.port, "users");
+
+    expect(res.errorMessage).toBe("crash is not defined");
+  });
+
   it("Should run new server with Python", { timeout: 18_000 }, async () => {
     await using server = await run({
       functions: [{ name: "pipi", handler: "test/lambdas/pipi.handler", runtime: "python3.7", timeout: 16, environment: { HELLO: "WORLD" } }],
