@@ -128,8 +128,6 @@ export class PutObjectAction extends S3LocalService {
     const savingFile = createWriteStream(filePath);
 
     savingFile.on("close", async () => {
-      res.end();
-
       try {
         const fileStat = await stat(filePath);
         const ETag = calulcateETag(await readFile(filePath));
@@ -154,7 +152,7 @@ export class PutObjectAction extends S3LocalService {
           tags: tagsLen ? Tags : undefined,
         };
         const sourceIPAddress = req.socket.remoteAddress?.split(":")?.[3] ?? "127.0.0.1";
-
+        res.end();
         await triggerEvent(S3LocalService.callableLambdas, {
           bucket: this.bucket,
           key: this.key,

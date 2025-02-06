@@ -1,7 +1,12 @@
 import type { OfflineRequest } from "../../defineConfig";
 
-import { invokeRequests } from "./invokeRequests";
-import { functionUrlInvoke } from "./functionUrlInvoke";
-import { responseStreamingInvoke } from "./responseStreamingInvoke";
+import { creatInvokeRequestsHandler } from "./invokeRequests";
+import { createFunctionUrlInvokeHandler } from "./functionUrlInvoke";
+import { createResponseStreamingInvokeHandler } from "./responseStreamingInvoke";
+import type { ILambdaMock } from "../../lib/runtime/rapidApi";
 
-export const LambdaRequests: OfflineRequest[] = [invokeRequests, responseStreamingInvoke, functionUrlInvoke];
+export const createLambdaRequestsHandlers = (handlers: ILambdaMock[]): OfflineRequest[] => [
+  creatInvokeRequestsHandler(handlers),
+  createResponseStreamingInvokeHandler(handlers),
+  createFunctionUrlInvokeHandler(handlers),
+];

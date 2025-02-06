@@ -75,10 +75,11 @@ export class DeleteObjectsAction extends S3LocalService {
     res.setHeader("Content-Type", "application/xml");
     res.setHeader("x-amzn-requestid", this.requestId);
     res.setHeader("Server", "AmazonS3");
-    res.end(`<?xml version="1.0" encoding="UTF-8"?><DeleteResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">${DeleteResult}</DeleteResult>`);
 
     for (const obj of Objects) {
       await S3LocalService.removeObject(this.bucket, obj.Key, sourceIPAddress, this.requestId);
     }
+
+    res.end(`<?xml version="1.0" encoding="UTF-8"?><DeleteResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">${DeleteResult}</DeleteResult>`);
   }
 }

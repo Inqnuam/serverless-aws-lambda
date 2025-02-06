@@ -8,6 +8,7 @@ import { randomUUID } from "crypto";
 import type { HttpMethod } from "../../../lib/server/handlers";
 import type { LambdaEndpoint } from "../../../lib/parseEvents/endpoints";
 import type { IncomingMessage, IncomingHttpHeaders, ServerResponse } from "http";
+import type { ILambdaMock } from "../../../lib/runtime/rapidApi";
 const getRequestMockType = (searchParams: URLSearchParams, headers: IncomingHttpHeaders) => {
   if (searchParams.get("x_mock_type") !== null) {
     return searchParams.get("x_mock_type");
@@ -57,7 +58,7 @@ const hasValidApiKey = (req: IncomingMessage, mockEvent: LambdaEndpoint, apiKeys
   return false;
 };
 
-export const defaultServer = async (req: IncomingMessage, res: ServerResponse, parsedURL: URL, apiKeys: string[]) => {
+export const defaultServer = async (req: IncomingMessage, res: ServerResponse, Handlers: Handlers, parsedURL: URL, apiKeys: string[]) => {
   const { url, method, headers, rawHeaders } = req;
   const { searchParams } = parsedURL;
 

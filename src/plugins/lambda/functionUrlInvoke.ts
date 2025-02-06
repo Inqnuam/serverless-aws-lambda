@@ -1,11 +1,12 @@
 import type { OfflineRequest } from "../../defineConfig";
-import type { ServerResponse } from "http";
+import type { IncomingMessage, ServerResponse } from "http";
 import { ApgRequestHandler } from "./events/apg";
 import { amazonifyHeaders } from "../../lib/utils/amazonifyHeaders";
 import { chunkToJs, setRequestId, isDelimiter, collectBody, internalServerError, isStreamResponse, unsupportedMethod } from "./utils";
 import { BufferedStreamResponse } from "../../lib/runtime/bufferedStreamResponse";
 import { Handlers } from "../../lib/server/handlers";
 import { CommonEventGenerator } from "./events/common";
+import type { ILambdaMock } from "../../lib/runtime/rapidApi";
 
 const createStreamResponseHandler = (res: ServerResponse, foundHandler: any) => {
   const serverRes = foundHandler.url.stream ? res : undefined;
@@ -178,44 +179,47 @@ const handleInvokeResponse = (result: any, res: ServerResponse, invokeResponseSt
   }
 };
 
-export const functionUrlInvoke: OfflineRequest = {
-  filter: /^\/@url\//,
-  callback: async function (req, res) {
-    const { url, method, headers } = req;
-    if (unsupportedMethod(res, method!)) {
-      return;
-    }
-    const parsedURL = new URL(url as string, CommonEventGenerator.dummyHost);
+export const createFunctionUrlInvokeHandler = (handlers: ILambdaMock[]): OfflineRequest => {
+  return {
+    filter: /^\/@url\//,
 
-    const requestId = setRequestId(res);
-    const requestedName = Handlers.parseNameFromUrl(parsedURL.pathname);
-    const foundHandler = Handlers.handlers.find((x) => x.name == requestedName || x.outName == requestedName);
-
-    if (!foundHandler?.url) {
-      res.statusCode = 404;
-      return res.end("Not Found");
-    }
-    const isBase64Encoded = CommonEventGenerator.getIsBase64Encoded(headers);
-
-    const body = await collectBody(req, isBase64Encoded);
-    const reqEvent = ApgRequestHandler.createApgV2Event({ req, mockEvent: foundHandler.url, parsedURL, requestId, body, isBase64Encoded });
-    const fixedPath = parsedURL.pathname.replace(`/@url/${foundHandler.name}/`, "/").replace(`/@url/${foundHandler.outName}/`, "/");
-    reqEvent.requestContext.accountId = "anonymous";
-    reqEvent.rawPath = fixedPath;
-    reqEvent.requestContext.http.path = fixedPath;
-
-    try {
-      const serverRes = createStreamResponseHandler(res, foundHandler);
-      //@ts-ignore
-      const result = await foundHandler.invoke(reqEvent, foundHandler.url, undefined, serverRes);
-
-      if (!result) {
-        return res.end();
+    callback: async function (req: IncomingMessage, res: ServerResponse) {
+      const { url, method, headers } = req;
+      if (unsupportedMethod(res, method!)) {
+        return;
       }
-      handleInvokeResponse(result, res, serverRes);
-    } catch (error) {
-      console.error(error);
-      internalServerError(res);
-    }
-  },
+      const parsedURL = new URL(url as string, CommonEventGenerator.dummyHost);
+
+      const requestId = setRequestId(res);
+      const requestedName = Handlers.parseNameFromUrl(parsedURL.pathname);
+      const foundHandler = handlers.find((x) => x.name == requestedName || x.outName == requestedName);
+
+      if (!foundHandler?.url) {
+        res.statusCode = 404;
+        return res.end("Not Found");
+      }
+      const isBase64Encoded = CommonEventGenerator.getIsBase64Encoded(headers);
+
+      const body = await collectBody(req, isBase64Encoded);
+      const reqEvent = ApgRequestHandler.createApgV2Event({ req, mockEvent: foundHandler.url, parsedURL, requestId, body, isBase64Encoded });
+      const fixedPath = parsedURL.pathname.replace(`/@url/${foundHandler.name}/`, "/").replace(`/@url/${foundHandler.outName}/`, "/");
+      reqEvent.requestContext.accountId = "anonymous";
+      reqEvent.rawPath = fixedPath;
+      reqEvent.requestContext.http.path = fixedPath;
+
+      try {
+        const serverRes = createStreamResponseHandler(res, foundHandler);
+        //@ts-ignore
+        const result = await foundHandler.invoke(reqEvent, foundHandler.url, undefined, serverRes);
+
+        if (!result) {
+          return res.end();
+        }
+        handleInvokeResponse(result, res, serverRes);
+      } catch (error) {
+        console.error(error);
+        internalServerError(res);
+      }
+    },
+  };
 };

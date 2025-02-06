@@ -1,7 +1,7 @@
 {
   "name": "serverless-aws-lambda",
-  "version": "5.0.1",
-  "description": "AWS Application Load Balancer and API Gateway - Lambda dev tool for Serverless. Allows Express synthax in handlers. Supports packaging, local invoking and offline ALB, APG, S3, SNS, SQS, DynamoDB Stream server mocking.",
+  "version": "6.0.0-beta.1",
+  "description": "AWS Application Load Balancer and API Gateway - Lambda dev tool. Supports packaging, local invoking and offline ALB, APG, S3, SNS, SQS, DynamoDB Stream server mocking.",
   "author": "Inqnuam",
   "license": "MIT",
   "homepage": "https://github.com/inqnuam/serverless-aws-lambda",
@@ -37,11 +37,10 @@
       "import": "./dist/lambda/body-parser.mjs",
       "default": "./dist/lambda/body-parser.mjs"
     },
-    "./server": {
-      "types": "./dist/server.d.ts",
-      "require": "./dist/server.js",
-      "import": "./dist/server.mjs",
-      "default": "./dist/server.mjs"
+    "./standalone": {
+      "types": "./dist/standalone.d.ts",
+      "import": "./dist/standalone.mjs",
+      "default": "./dist/standalone.mjs"
     },
     "./sns": {
       "types": "./dist/plugins/sns/index.d.ts",
@@ -62,10 +61,13 @@
       "default": "./dist/plugins/s3/index.mjs"
     }
   },
+  "bin": {
+    "aws-lambda": "dist/cli.mjs"
+  },
   "dependencies": {
-    "@aws-sdk/client-sqs": "^3.726.1",
+    "@aws-sdk/client-sqs": "^3.741.0",
     "@smithy/eventstream-codec": "^4.0.1",
-    "@types/serverless": "^3.12.22",
+    "@types/serverless": "^3.12.26",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "archiver": "^5.3.1",
@@ -75,11 +77,14 @@
     "serve-static": "^1.16.2"
   },
   "devDependencies": {
+    "@aws-sdk/client-lambda": "^3.741.0",
+    "@aws-sdk/client-s3": "^3.741.0",
     "@types/archiver": "^5.3.2",
-    "@types/node": "^14.14.31",
+    "@types/node": "^22.13.1",
     "@types/serve-static": "^1.15.5",
+    "prettier": "^3.4.2",
     "typescript": "^5.7.3",
-    "vitest": "^2.1.8"
+    "vitest": "^3.0.5"
   },
   "keywords": [
     "aws",

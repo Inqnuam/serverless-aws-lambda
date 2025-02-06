@@ -230,7 +230,7 @@ export class LambdaMock implements ILambdaMock {
 
   async invoke(event: any, info?: any, clientContext?: any, response?: ServerResponse) {
     if (!this.runner.isMounted) {
-      log.BR_BLUE(`❄️ Cold start '${this.outName}'`);
+      log.BR_BLUE(`❄️ Cold start λ '${this.outName}'`);
       await this.runner.mount();
     }
 
@@ -310,14 +310,14 @@ export class LambdaMock implements ILambdaMock {
     if (typeof info?.kind == "string") {
       kind = ` (${info.kind.toUpperCase()})`;
     }
-    log.YELLOW(`input payload${kind}`);
+    log.YELLOW(`input payload${kind}:`);
     log.info(event);
     return process.hrtime();
   };
   static #printExecTime = (hrTimeStart: [number, number], lambdaName: string) => {
     const endAt = process.hrtime(hrTimeStart);
     const execTime = `${endAt[0]},${endAt[1]}s`;
-    const executedTime = `⌛️ '${lambdaName}' execution time: ${execTime}`;
+    const executedTime = `⌛️ λ '${lambdaName}' execution time: ${execTime}`;
     // as main and worker process share the same stdout we need a timeout before printing any additionnal info
     setTimeout(() => {
       log.YELLOW(executedTime);

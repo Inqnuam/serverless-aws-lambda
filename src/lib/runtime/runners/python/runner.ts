@@ -29,9 +29,9 @@ export class PythonRunner implements Runner {
   isMounted: boolean = false;
   watchers: FSWatcher[] = [];
   filesTime: Map<string, number> = new Map();
-  watcherListener: (event: "rename" | "change", filename: string | Buffer) => void;
+  watcherListener: (event: "rename" | "change", filename: string | Buffer | null) => void;
   emitRebuild: Function;
-  static wrapper = moduleDirname.replace(`${path.sep}dist`, "/src/lib/runtime/runners/python/index.py");
+  static wrapper = moduleDirname.replace(`${path.sep}dist${path.sep}`, "/src/lib/runtime/runners/python/index.py");
   static DELIMITER = "__|response|__";
   static DELIMITEREND = "__|responseEnd|__";
   static ERR_RESPONSE = "__|error|__";
@@ -132,7 +132,9 @@ export class PythonRunner implements Runner {
             } else if (data.trim()) {
               let printable;
               if (hasWatchFiles) {
-                printable = data.split(PythonRunner.WATCHEND)[1];
+                const printablesAsArray = data.split("\n");
+                const foundWatchStartIndex = printablesAsArray.findIndex((x) => x.startsWith(PythonRunner.WATCH));
+                printable = printablesAsArray.slice(0, foundWatchStartIndex).join("\n");
               } else {
                 printable = data;
               }
@@ -203,7 +205,7 @@ export class PythonRunner implements Runner {
       this.bin = process.platform === "win32" ? "python" : this.runtime.includes(".") ? this.runtime.split(".")[0] : this.runtime;
     }
 
-    this.python = spawn(this.bin, [PythonRunner.wrapper, this.pyModulePath, this.handlerName, String(this.timeout)], {
+    this.python = spawn(this.bin, ["-u", PythonRunner.wrapper, this.pyModulePath, this.handlerName, String(this.timeout)], {
       env: this.environment,
     });
 

@@ -45,7 +45,7 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
         } catch (error) {}
       }
     },
-    onExit: function () {
+    async onKill() {
       if (!this.isDeploying && !this.isPackaging) {
         try {
           S3LocalService.saveState();

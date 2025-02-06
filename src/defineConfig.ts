@@ -5,7 +5,6 @@ import type { HttpMethod } from "./lib/server/handlers";
 import type { IncomingMessage, ServerResponse } from "http";
 import type Serverless from "serverless";
 import { log } from "./lib/utils/colorize";
-import { exitEvents } from "./server";
 import type { SQSClientConfig, SQSClient } from "@aws-sdk/client-sqs";
 
 export type ILambda = {
@@ -81,7 +80,7 @@ export interface SlsAwsLambdaPlugin {
   pluginData?: any;
   buildCallback?: (this: ClientConfigParams, result: BuildResult, isRebuild: boolean) => Promise<void> | void;
   onInit?: (this: ClientConfigParams) => Promise<void> | void;
-  onExit?: (this: ClientConfigParams, code: string | number) => void;
+  onKill?: (this: ClientConfigParams) => Promise<void> | void;
   afterDeploy?: (this: ClientConfigParams) => Promise<void> | void;
   afterPackage?: (this: ClientConfigParams) => Promise<void> | void;
   offline?: {
@@ -97,7 +96,7 @@ export interface Options {
   esbuild?: Config["esbuild"];
   /**
    * shim `require`, `__dirname` and `__filename` when bundeling Lambdas with ESM format
-   * @default true
+   * @default false
    */
   shimRequire?: boolean;
   /**
@@ -127,29 +126,6 @@ export interface Options {
    */
   services?: IServicesConfig;
 }
-
-let exiting = false;
-
-const exitCallbacks: ((code: string | number) => void | Promise<void>)[] = [];
-
-const exitCallback = (e: any) => {
-  if (exiting) {
-    return;
-  }
-  exiting = true;
-  for (const cb of exitCallbacks) {
-    try {
-      cb(e);
-    } catch (error) {
-      console.log(error);
-      process.exitCode = 1;
-    }
-  }
-  process.exit();
-};
-exitEvents.forEach((e) => {
-  process.on(e, exitCallback);
-});
 
 function defineConfig(options: Options) {
   // validate plugin names
@@ -187,6 +163,7 @@ function defineConfig(options: Options) {
       },
       afterDeployCallbacks: [],
       afterPackageCallbacks: [],
+      onKill: [],
     };
 
     if (options.services) {
@@ -253,8 +230,8 @@ function defineConfig(options: Options) {
         });
       }
       for (const plugin of options.plugins! as SlsAwsLambdaPlugin[]) {
-        if (plugin.onExit) {
-          exitCallbacks.push(plugin.onExit.bind(self));
+        if (plugin.onKill) {
+          config.onKill!.push(plugin.onKill.bind(self));
         }
 
         if (typeof plugin.afterDeploy == "function") {

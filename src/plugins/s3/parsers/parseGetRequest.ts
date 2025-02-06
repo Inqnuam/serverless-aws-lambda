@@ -64,27 +64,25 @@ export const parseGetRequest = (req: IncomingMessage) => {
         break;
     }
   } else {
-    if (!requestCmd) {
-      if (parsedURL.searchParams.has("tagging")) {
-        if (requestIsForBucket) {
-          return new GetBucketTaggingAction(parsedURL, headers);
-        }
-        return new GetObjectTaggingAction(parsedURL, headers);
+    if (parsedURL.searchParams.has("tagging")) {
+      if (requestIsForBucket) {
+        return new GetBucketTaggingAction(parsedURL, headers);
       }
+      return new GetObjectTaggingAction(parsedURL, headers);
+    }
 
-      if (url!.endsWith("@s3/")) {
-        return new ListBucketsAction(parsedURL, headers);
-      }
-
-      if (parsedURL.searchParams.get("list-type") == "2") {
-        return new ListObjectsV2Action(parsedURL, headers);
-      }
-      return new ListObjectsV1Action(parsedURL, headers);
+    if (parsedURL.pathname!.endsWith("@s3/")) {
+      return new ListBucketsAction(parsedURL, headers);
     }
 
     if (requestCmd == "GetObject") {
       return new GetObjectAction(parsedURL, headers);
     }
+
+    if (parsedURL.searchParams.get("list-type") == "2") {
+      return new ListObjectsV2Action(parsedURL, headers);
+    }
+    return new ListObjectsV1Action(parsedURL, headers);
   }
 
   return new UnknownAction(parsedURL, headers);

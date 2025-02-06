@@ -225,17 +225,21 @@ export abstract class S3LocalService {
       if (fileStat.isFile()) {
         await rm(filePath);
       }
-
-      await triggerEvent(this.callableLambdas, {
-        bucket,
-        key,
-        requestId,
-        requestCmd: "DeleteObject",
-        eTag: data.ETag,
-        sourceIPAddress,
-        size: fileStat.size,
-      });
       delete this.persistence.buckets[bucket].objects[key];
+
+      setTimeout(async () => {
+        try {
+          await triggerEvent(this.callableLambdas, {
+            bucket,
+            key,
+            requestId,
+            requestCmd: "DeleteObject",
+            eTag: data.ETag,
+            sourceIPAddress,
+            size: fileStat.size,
+          });
+        } catch {}
+      }, 30);
     } catch (error) {}
   }
 

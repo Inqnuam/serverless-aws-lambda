@@ -2,7 +2,7 @@
   "compilerOptions": {
     "declaration": true,
     "target": "es2022",
-    "module": "ES2022",
+    "module": "ESNext",
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "emitDeclarationOnly": true,
@@ -15,5 +15,5 @@
     "declarationDir": "./dist/",
     "rootDir": "./src/"
   },
-  "exclude": ["./dist/**/*", "./templates/**/*", "vitest.config.mts"]
+  "exclude": ["./dist/**/*", "test/**/*", "./templates/**/*", "vitest.config.mts"]
 }

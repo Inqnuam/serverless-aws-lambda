@@ -9,10 +9,10 @@ const invalidParams = (lambdaName: string) => log.YELLOW(`Invalid Request Header
 // const canMatchWithTrailingSlash = (reqPath: string, declaredPath: string) => {};
 
 export class Handlers {
-  static handlers: ILambdaMock[] = [];
-  static PORT = 0;
+  handlers: ILambdaMock[] = [];
   static ip: string = "127.0.0.1";
   debug = false;
+  port: number = 0;
   constructor(config: any) {
     this.debug = config.debug;
   }
@@ -37,12 +37,12 @@ export class Handlers {
 
     return name;
   }
-  static getHandlerByName(lambdaName?: string | null) {
+  getHandlerByName(lambdaName?: string | null) {
     if (!lambdaName) {
       return;
     }
     const name = Handlers.parseNameFromUrl(lambdaName);
-    return Handlers.handlers.find((x) => x.name == name || x.outName == name);
+    return this.handlers.find((x) => x.name == name || x.outName == name);
   }
 
   static #matchAlbQuery = (query: LambdaEndpoint["query"], reqQuery: normalizedSearchParams) => {
@@ -74,7 +74,7 @@ export class Handlers {
     return matchesAll.every((x) => x === true);
   };
 
-  static findHandler = ({
+  findHandler = ({
     method,
     path,
     kind,
@@ -90,7 +90,7 @@ export class Handlers {
     let foundLambda: { event: LambdaEndpoint; handler: ILambdaMock } | undefined;
     const kindToLowerCase = kind?.toLowerCase();
 
-    const foundHandler = Handlers.handlers.find((x) => {
+    const foundHandler = this.handlers.find((x) => {
       return x.endpoints
         .filter((e) => (kind ? e.kind == kindToLowerCase : e))
         .find((w) => {
@@ -157,7 +157,7 @@ export class Handlers {
     } else {
       // Use Regex to find lambda controller
       const pathComponentsLength = path.split("/").filter(Boolean).length;
-      const foundHandler = Handlers.handlers.find((x) =>
+      const foundHandler = this.handlers.find((x) =>
         x.endpoints
           .filter((e) => (kind ? e.kind == kindToLowerCase : e))
           .find((w) => {
@@ -219,10 +219,10 @@ export class Handlers {
   };
 
   addHandler(lambdaController: ILambdaMock) {
-    const foundIndex = Handlers.handlers.findIndex((x) => x.name == lambdaController.name && x.esOutputPath == lambdaController.esOutputPath);
+    const foundIndex = this.handlers.findIndex((x) => x.name == lambdaController.name && x.esOutputPath == lambdaController.esOutputPath);
 
     if (foundIndex == -1) {
-      Handlers.handlers.push(lambdaController);
+      this.handlers.push(lambdaController);
 
       if (lambdaController.endpoints.length) {
         lambdaController.endpoints.forEach((x) => {
@@ -239,16 +239,16 @@ export class Handlers {
       }
     } else {
       // esbuild rebuild
-      if (Handlers.handlers[foundIndex].runtime.startsWith("n")) {
+      if (this.handlers[foundIndex].runtime.startsWith("n")) {
         // @ts-ignore
-        Handlers.handlers[foundIndex].clear();
-        Handlers.handlers[foundIndex] = lambdaController;
+        this.handlers[foundIndex].clear();
+        this.handlers[foundIndex] = lambdaController;
       }
     }
   }
 
   #printPath(method: string, path: string, color: string = "90") {
-    const printingString = `${method}\thttp://localhost:${Handlers.PORT}${path}`;
+    const printingString = `${method}\thttp://localhost:${this.port}${path}`;
     console.log(`\x1b[${color}m${printingString}\x1b[0m`);
   }
 }

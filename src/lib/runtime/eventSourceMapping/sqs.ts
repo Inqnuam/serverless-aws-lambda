@@ -2,7 +2,7 @@ import { EventSourceMapping, type IEventSourceMappingConfig } from "./base";
 import { ReceiveMessageCommand, DeleteMessageBatchCommand, GetQueueAttributesCommand, GetQueueUrlCommand } from "@aws-sdk/client-sqs";
 import { createBatch, getBatchItemFailures } from "./utils";
 import { AwsServices } from "../../services";
-import { Handlers } from "../../server/handlers";
+import type { ILambdaMock } from "../rapidApi";
 
 export const SQS_DEFAULT_BATCH_SIZE = 10;
 export const SQS_DEFAULT_MaximumBatchingWindowInSeconds = 0;
@@ -99,7 +99,8 @@ class SqsBatch {
     private lambdaName: string,
     private QueueUrl: string,
     private ReportBatchItemFailures: boolean,
-    private legacyDefinition: any
+    private legacyDefinition: any,
+    private handlers: ILambdaMock[]
   ) {}
 
   #start() {
@@ -129,7 +130,7 @@ class SqsBatch {
 
     let messagesToDelete = this.#messages.map((x) => x.receiptHandle);
     try {
-      const lambda = Handlers.handlers.find((x) => x.name == this.lambdaName || x.outName == this.lambdaName)!;
+      const lambda = this.handlers.find((x) => x.name == this.lambdaName || x.outName == this.lambdaName)!;
       const res = await lambda.invoke({ Records: this.#messages }, { kind: "sqs", event: this.legacyDefinition });
 
       if (this.ReportBatchItemFailures) {
@@ -148,7 +149,11 @@ export class SqsEventSourceMapping extends EventSourceMapping {
   QueueUrl: string = "";
   #pooler?: NodeJS.Timeout;
   #ReportBatchItemFailures: boolean;
-  constructor(public config: IEventSourceMappingConfig, public legacyDefinition: any) {
+  constructor(
+    public config: IEventSourceMappingConfig,
+    public handlers: ILambdaMock[],
+    public legacyDefinition: any
+  ) {
     super(config, legacyDefinition);
 
     const comp = this.config.EventSourceArn.split(":");
@@ -170,7 +175,8 @@ export class SqsEventSourceMapping extends EventSourceMapping {
       this.config.FunctionName,
       this.QueueUrl,
       this.#ReportBatchItemFailures,
-      this.legacyDefinition
+      this.legacyDefinition,
+      this.handlers
     );
     this.#batchs.push(batch);
 

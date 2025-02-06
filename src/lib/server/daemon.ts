@@ -15,6 +15,7 @@ import { NodeRunner } from "../runtime/runners/node/runner";
 import { PythonRunner } from "../runtime/runners/python/runner";
 import { RubyRunner } from "../runtime/runners/ruby/runner";
 import { initEventSourceMapping } from "../runtime/eventSourceMapping/utils";
+import type { Socket } from "net";
 
 enum runners {
   node = "n",
@@ -55,6 +56,7 @@ export class Daemon extends Handlers {
   #server: Server;
   runtimeConfig: any = {};
   #serve: any;
+  sco: Socket[] = [];
   customOfflineRequests: {
     method?: string | string[];
     filter: RegExp | string;
@@ -106,31 +108,26 @@ export class Daemon extends Handlers {
   constructor(config: IDaemonConfig = { debug: false }) {
     super(config);
     log.setDebug(config.debug);
-    // @ts-ignore
-    globalThis.sco = [];
+    this.sco = [];
     this.#server = http.createServer({ maxHeaderSize: 105536 }, this.#requestListener.bind(this));
     this.#server.on("connection", (socket) => {
       socket.on("close", () => {
-        // @ts-ignore
-        const connectionIndex = globalThis.sco.findIndex((x) => x == socket);
+        const connectionIndex = this.sco.findIndex((x) => x == socket);
         if (connectionIndex != -1) {
-          // @ts-ignore
-          globalThis.sco.splice(connectionIndex, 1);
+          this.sco.splice(connectionIndex, 1);
         }
       });
-      // @ts-ignore
-      globalThis.sco.push(socket);
+
+      this.sco.push(socket);
     });
     const uuid = randomUUID();
     CommonEventGenerator.accountId = Buffer.from(uuid).toString("hex").slice(0, 16);
     CommonEventGenerator.apiId = Buffer.from(uuid).toString("ascii").slice(0, 10);
     CommonEventGenerator.port = this.port;
   }
-  get port() {
-    return Handlers.PORT;
-  }
-  set port(p) {
-    Handlers.PORT = p;
+
+  setPort(p: number) {
+    this.port = p;
     CommonEventGenerator.port = p;
   }
 
@@ -152,7 +149,7 @@ export class Daemon extends Handlers {
     this.#server.listen(port, async () => {
       const { port: listeningPort, address } = this.#server.address() as AddressInfo;
 
-      this.port = listeningPort;
+      this.setPort(listeningPort);
       if (localIp) {
         Handlers.ip = localIp;
       }
@@ -161,7 +158,7 @@ export class Daemon extends Handlers {
       }
       try {
         await this.onReady?.(listeningPort, Handlers.ip);
-        await initEventSourceMapping(Daemon.handlers);
+        await initEventSourceMapping(this.handlers);
       } catch (error) {
         console.error(error);
       }
@@ -219,7 +216,7 @@ export class Daemon extends Handlers {
         console.error(err.stack);
       });
 
-      const foundLambda = await defaultServer(req, res, parsedURL, this.#keys);
+      const foundLambda = await defaultServer(req, res, this, parsedURL, this.#keys);
 
       const notFound = () => {
         res.setHeader("Content-Type", "text/html");
@@ -255,10 +252,11 @@ export class Daemon extends Handlers {
         r == runners.node
           ? new NodeRunner(lambda)
           : r == runners.python
-          ? new PythonRunner(lambda, this.fakeRebuildEmitter)
-          : r == runners.ruby
-          ? new RubyRunner(lambda, this.fakeRebuildEmitter)
-          : new UnsupportedRuntime(lambda.runtime);
+            ? new PythonRunner(lambda, this.fakeRebuildEmitter)
+            : r == runners.ruby
+              ? new RubyRunner(lambda, this.fakeRebuildEmitter)
+              : new UnsupportedRuntime(lambda.runtime);
+
       const lambdaController = new LambdaMock(lambda);
 
       this.addHandler(lambdaController);

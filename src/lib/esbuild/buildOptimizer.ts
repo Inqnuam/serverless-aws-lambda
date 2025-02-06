@@ -1,6 +1,8 @@
 import type { Plugin, BuildResult } from "esbuild";
 import { knownCjs } from "./knownCjs";
 import path from "path";
+import type { Socket } from "net";
+
 const awsSdkV2 = "aws-sdk";
 const awsSdkV3 = "@aws-sdk/*";
 const awslambda = `${path
@@ -16,12 +18,14 @@ export const buildOptimizer = ({
   shimRequire,
   includeAwsSdk,
   buildCallback,
+  getSockets,
 }: {
   isLocal: boolean;
   nodeVersion: number;
   shimRequire: boolean;
   includeAwsSdk: boolean;
   buildCallback: (result: BuildResult, isRebuild: boolean, format: string, outdir: string) => void | Promise<void>;
+  getSockets: () => Socket[];
 }): Plugin => {
   return {
     name: "build-optimizer-plugin",
@@ -33,8 +37,7 @@ export const buildOptimizer = ({
           process.exit(1);
         }
         if (isRebuild) {
-          // @ts-ignore
-          globalThis.sco.forEach((socket) => {
+          getSockets().forEach((socket) => {
             if (socket.writable) {
               socket.destroy();
             }

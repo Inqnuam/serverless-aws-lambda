@@ -11,3 +11,4 @@ yarn-error.log
 /router.d.ts
 /router.js
 TODO
+/.aws_lambda

@@ -40,6 +40,7 @@ export const initEventSourceMapping = async (lambdas: ILambdaMock[]) => {
           FilterCriteria: Filters ? { Filters } : undefined,
           MaximumBatchingWindowInSeconds: typeof sqs.maximumBatchingWindow == "number" ? sqs.maximumBatchingWindow : SQS_DEFAULT_MaximumBatchingWindowInSeconds,
         },
+        lambdas,
         sqs
       );
 

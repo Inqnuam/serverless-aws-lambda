@@ -23,9 +23,10 @@ export class DeleteObjectAction extends S3LocalService {
     res.statusCode = 204;
     res.setHeader("x-amzn-requestid", this.requestId);
     res.setHeader("Server", "AmazonS3");
-    res.end();
 
     const sourceIPAddress = req.socket.remoteAddress?.split(":")?.[3] ?? "127.0.0.1";
     await S3LocalService.removeObject(this.bucket, this.key, sourceIPAddress, this.requestId);
+
+    res.end();
   }
 }

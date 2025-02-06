@@ -6,21 +6,9 @@ export const parsePostRequest = (req: IncomingMessage) => {
   const { url, headers } = req;
   const parsedURL = new URL(url as string, "http://localhost:3000");
   const isDelete = parsedURL.searchParams.has("delete");
-  const ua = headers["user-agent"];
+  const requestIsForBucket = parsedURL.pathname.replace("/%40s3/", "").replace("/@s3/", "").split("/").filter(Boolean).length == 1;
 
-  const requestCmd = parsedURL.searchParams.get("x-id");
-
-  if (ua && ua.startsWith("aws-cli")) {
-    const [, rawCmd] = ua.split("command/");
-    const [, ..._cmd] = rawCmd.split(".");
-    const cmd = _cmd.join(".");
-
-    if (cmd == "delete-objects" && isDelete) {
-      return new DeleteObjectsAction(parsedURL, headers);
-    }
-  }
-
-  if (requestCmd == "DeleteObjects" && isDelete) {
+  if (isDelete && requestIsForBucket) {
     return new DeleteObjectsAction(parsedURL, headers);
   }
 
