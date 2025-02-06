@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { spawn, execSync } from "child_process";
 import path from "path";
 import { watch } from "fs";
 import { access } from "fs/promises";
@@ -6,9 +6,19 @@ import type { Runner } from "../index";
 import type { ChildProcessWithoutNullStreams } from "child_process";
 import type { FSWatcher } from "fs";
 import { fileURLToPath } from "url";
+import { log } from "../../../utils/colorize";
 
 const moduleDirname = fileURLToPath(new URL(".", import.meta.url));
 const cwd = process.cwd();
+
+function safeExecSync(cmd: string) {
+  let out = "";
+  try {
+    out = execSync(cmd, { encoding: "utf-8" });
+  } catch {}
+
+  return out;
+}
 
 export class PythonRunner implements Runner {
   invoke: Runner["invoke"];
@@ -23,6 +33,7 @@ export class PythonRunner implements Runner {
   pyModulePath: string;
   handlerDir: string;
   handlerName: string;
+  handlerFileAbsolutePath: string;
   runtime: string;
   bin?: string;
   python?: ChildProcessWithoutNullStreams;
@@ -72,6 +83,7 @@ export class PythonRunner implements Runner {
     this.handlerDir = path.dirname(tp);
     this.handlerPath = path.basename(tp, `.${this.handlerName}`);
     this.pyModulePath = `${this.handlerDir}/${this.handlerPath}`.replace(cwd, "").replace(/\/|\\/g, ".").slice(1);
+    this.handlerFileAbsolutePath = tp.replace(`.${this.handlerName}`, ".py");
     this.mount = async () => {
       if (this.python) {
         return;
@@ -200,12 +212,38 @@ export class PythonRunner implements Runner {
       console.log(error);
     }
   };
-  load = () => {
-    if (!this.bin) {
-      this.bin = process.platform === "win32" ? "python" : this.runtime.includes(".") ? this.runtime.split(".")[0] : this.runtime;
+
+  findPython() {
+    const [runtime] = this.runtime.split(".");
+
+    const pythonMajorVersion = runtime.split("python")[1];
+
+    if (safeExecSync(`${runtime} --version`)) {
+      return runtime;
     }
 
-    this.python = spawn(this.bin, ["-u", PythonRunner.wrapper, this.pyModulePath, this.handlerName, String(this.timeout)], {
+    const out = safeExecSync("python --version");
+
+    if (!out) {
+      throw new Error("Can not find python on your OS. Make sure it is installed.");
+    }
+
+    if (pythonMajorVersion) {
+      const foundPythonMajorVersion = out.split(" ")[1]?.split(".")[0];
+
+      if (foundPythonMajorVersion && foundPythonMajorVersion != pythonMajorVersion) {
+        log.YELLOW("found python binary but with different version");
+      }
+    }
+
+    return "python";
+  }
+  load = () => {
+    if (!this.bin) {
+      this.bin = this.findPython();
+    }
+
+    this.python = spawn(this.bin, ["-u", PythonRunner.wrapper, this.handlerFileAbsolutePath, this.pyModulePath, this.handlerName, String(this.timeout)], {
       env: this.environment,
     });
 

@@ -2,7 +2,7 @@ import decimal
 import sys
 import os
 import json
-from importlib import import_module
+import importlib.util
 from time import strftime, time
 import traceback
 
@@ -16,10 +16,10 @@ def decimal_serializer(o):
 
 
 handlerPath = sys.argv[1]
-handlerName = sys.argv[2]
-timeout = int(sys.argv[3])
-sys.path.append(".")
-
+modulePath = sys.argv[2]
+handlerName = sys.argv[3]
+timeout = int(sys.argv[4])
+sys.path.append(os.path.dirname(handlerPath))
 
 class LambdaContext(object):
     def __init__(self, reqId="1234567890"):
@@ -65,7 +65,10 @@ class LambdaContext(object):
         return sys.stdout.write
 
 
-module = import_module(handlerPath)
+spec = importlib.util.spec_from_file_location(modulePath, handlerPath)
+module = importlib.util.module_from_spec(spec)
+sys.modules[modulePath] = module
+spec.loader.exec_module(module)
 handler = getattr(module, handlerName)
 
 _mods = [m.__name__ for m in sys.modules.values() if m]

@@ -1,17 +1,8 @@
 import json
 import time
-import os
-import camelcase
-import test.lambdas.pupul
-
-c = camelcase.CamelCase()
-
-txt = "hello world"
+import pupul
 
 count = 0
-
-print(c.hump(txt))
-
 
 def handler(event, context):
 
