@@ -108,7 +108,11 @@ export async function run(options?: ServerOptions) {
     }
   }
 
-  const sls = new ServerlessAwsLambda(fakeSls, { port: port, debug: options?.debug }, { log() {}, writeText() {}, progress: { get() {}, create() {} } });
+  const sls = new ServerlessAwsLambda(
+    fakeSls,
+    { port: port, debug: options?.debug, customEsBuildConfig: options?.esbuild },
+    { log() {}, writeText() {}, progress: { get() {}, create() {} } }
+  );
 
   if (typeof options?.onKill == "function") {
     sls.onKill.push(options.onKill);

@@ -1,4 +1,5 @@
 import type { Event } from "serverless/aws";
+import type { Config } from "./config";
 
 export interface ICommonConfig {
   environment?: Record<string, string>;
@@ -117,4 +118,5 @@ export interface ServerOptions {
   functions?: ILambdaFunction[];
   configPath?: string;
   onKill?: () => Promise<void> | void;
+  esbuild?: Config["esbuild"];
 }

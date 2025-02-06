@@ -18,6 +18,7 @@ import { patchSchema } from "./lib/utils/schema";
 import { AwsServices } from "./lib/services";
 import type { SQSClientConfig } from "@aws-sdk/client-sqs";
 import type { ILambdaFunction } from "./standalone_types";
+import type { Config } from "./config";
 
 const cwd = process.cwd();
 const DEFAULT_LAMBDA_TIMEOUT = 3;
@@ -51,7 +52,7 @@ export class ServerlessAwsLambda extends Daemon {
   hooks: any;
   esBuildConfig: any;
   buildContext: any = {};
-  customEsBuildConfig: any;
+  customEsBuildConfig?: Config["esbuild"];
   defaultVirtualEnvs: any;
   nodeVersion: number | boolean | string | undefined = false;
   invokeName?: string;
@@ -70,6 +71,10 @@ export class ServerlessAwsLambda extends Daemon {
     this.#lambdas = [];
     this.serverless = serverless;
     this.options = options;
+
+    if (this.options.customEsBuildConfig) {
+      this.customEsBuildConfig = this.options.customEsBuildConfig;
+    }
     // @ts-ignore
     this.isPackaging = this.serverless.processedInput.commands.includes("package");
     // @ts-ignore
@@ -237,6 +242,7 @@ export class ServerlessAwsLambda extends Daemon {
         return;
       }
 
+      // @ts-ignore dont care
       this.esBuildConfig.sourcemap = sourcemap == "inline" ? "inline" : "both";
     }
   };
@@ -668,7 +674,11 @@ export class ServerlessAwsLambda extends Daemon {
 
     const customEsBuild = parseCustomEsbuild(customConfig);
     if (Object.keys(customEsBuild).length) {
-      this.customEsBuildConfig = customEsBuild;
+      if (!this.customEsBuildConfig) {
+        this.customEsBuildConfig = customEsBuild;
+      } else {
+        this.customEsBuildConfig = { ...this.customEsBuildConfig, ...customEsBuild };
+      }
     }
   }
 
