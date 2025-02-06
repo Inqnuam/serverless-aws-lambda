@@ -6,6 +6,7 @@ import type { IncomingMessage, ServerResponse } from "http";
 import type Serverless from "serverless";
 import { log } from "./lib/utils/colorize";
 import type { SQSClientConfig, SQSClient } from "@aws-sdk/client-sqs";
+import type { ILambdaFunction } from "./standalone_types";
 
 export type ILambda = {
   /**
@@ -58,6 +59,8 @@ export interface ClientConfigParams {
   };
   getServices(): { sqs?: SQSClient };
   setServices({ sqs }: IServicesConfig): Promise<void>;
+  /** Must be called only inside `onInit`, otherwise it has no effect */
+  addLambda(func: ILambdaFunction): void;
 }
 
 export interface OfflineRequest {
@@ -118,13 +121,14 @@ export interface Options {
    *
    * Others are ignored.
    *
-   * This allows conditionnally ( true ?? customPlugin) plugin import.
+   * This allows conditionnally ( condition == true ?? customPlugin) plugin import.
    */
   plugins?: (SlsAwsLambdaPlugin | null | undefined | boolean)[];
   /**
    * AWS clients configs used by EventSourceMapping, Lambda error/success destination.
    */
   services?: IServicesConfig;
+  functions?: ILambdaFunction[];
 }
 
 function defineConfig(options: Options) {
@@ -151,7 +155,7 @@ function defineConfig(options: Options) {
   }
   return async function config(
     this: ClientConfigParams,
-    { stop, lambdas, isDeploying, isPackaging, setEnv, stage, region, esbuild, serverless, resources, getServices, setServices }: ClientConfigParams
+    { stop, lambdas, isDeploying, isPackaging, setEnv, stage, region, esbuild, serverless, resources, getServices, setServices, addLambda }: ClientConfigParams
   ): Promise<Omit<Config, "config" | "options">> {
     let config: Config = {
       esbuild: options.esbuild ?? {},
@@ -165,6 +169,12 @@ function defineConfig(options: Options) {
       afterPackageCallbacks: [],
       onKill: [],
     };
+
+    if (Array.isArray(options.functions)) {
+      options.functions.forEach((f) => {
+        addLambda(f);
+      });
+    }
 
     if (options.services) {
       await setServices(options.services);
@@ -185,6 +195,7 @@ function defineConfig(options: Options) {
       resources,
       getServices,
       setServices,
+      addLambda,
     };
     if (options.plugins) {
       config.offline!.onReady = async (port, ip) => {

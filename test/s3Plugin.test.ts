@@ -8,7 +8,7 @@ let client: S3;
 describe("S3 Plugin", () => {
   beforeAll(async () => {
     server = await run({
-      configPath: "test/slsConfig.ts",
+      configPath: "test/configs/slsConfig.ts",
     });
 
     client = new S3({

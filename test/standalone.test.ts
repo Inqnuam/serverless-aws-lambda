@@ -3,15 +3,7 @@ import { describe, it, expect } from "vitest";
 import { S3Client, CreateBucketCommand } from "@aws-sdk/client-s3";
 import { LambdaClient, InvokeCommand, InvokeWithResponseStreamCommand } from "@aws-sdk/client-lambda";
 import { randomInt } from "node:crypto";
-
-async function callLambda(port: number, lambdaName: string, payload?: string) {
-  const res = await fetch(`http://localhost:${port}/@invoke/${lambdaName}`, {
-    method: "POST",
-    body: payload,
-  });
-
-  return res.json();
-}
+import { callLambda } from "./utils/callLambda";
 
 const codec = new TextDecoder("utf-8");
 
@@ -38,7 +30,7 @@ describe("Standalone", () => {
 
   it("Should load defineConfig from file", async () => {
     await using server = await run({
-      configPath: "test/slsConfig.ts",
+      configPath: "test/configs/slsConfig.ts",
     });
 
     const client = new S3Client({

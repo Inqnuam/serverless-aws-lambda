@@ -17,6 +17,7 @@ import { readDefineConfig } from "./lib/utils/readDefineConfig";
 import { patchSchema } from "./lib/utils/schema";
 import { AwsServices } from "./lib/services";
 import type { SQSClientConfig } from "@aws-sdk/client-sqs";
+import type { ILambdaFunction } from "./standalone_types";
 
 const cwd = process.cwd();
 const DEFAULT_LAMBDA_TIMEOUT = 3;
@@ -153,7 +154,7 @@ export class ServerlessAwsLambda extends Daemon {
     this.resources = getResources(this.serverless);
     this.#setRuntimeEnvs();
     this.#lambdas = this.#getLambdas();
-    await this.#setCustomEsBuildConfig();
+    await this.#applyDefineConfig();
     this.setEsBuildConfig(isPackaging);
     await this.buildAndWatch();
   }
@@ -346,13 +347,8 @@ export class ServerlessAwsLambda extends Daemon {
       process.send?.({ rebuild: true });
     }
   }
-  #getLambdas() {
-    const funcs = this.serverless.service.functions;
-    let functionsNames = Object.keys(funcs);
 
-    if (this.invokeName) {
-      functionsNames = functionsNames.filter((x) => x == this.invokeName);
-    }
+  #getLambdaDef(funcName: string) {
     const provider = this.serverless.service.provider;
     const defaultRuntime = provider.runtime;
     // @ts-ignore
@@ -362,113 +358,126 @@ export class ServerlessAwsLambda extends Daemon {
     const Outputs = this.serverless.service.resources?.Outputs;
     const region = this.runtimeConfig.environment.AWS_REGION ?? this.runtimeConfig.environment.REGION;
 
-    const lambdas = functionsNames.reduce((accum: any[], funcName: string) => {
-      const lambda = funcs[funcName];
+    const funcs = this.serverless.service.functions;
+    const lambda = funcs[funcName];
 
-      const handlerPath = (lambda as Serverless.FunctionDefinitionHandler).handler;
-      const ext = path.extname(handlerPath);
-      const handlerName = ext.slice(1);
-      const esEntryPoint = path.resolve(handlerPath.replace(ext, ""));
+    const handlerPath = (lambda as Serverless.FunctionDefinitionHandler).handler;
+    const ext = path.extname(handlerPath);
+    const handlerName = ext.slice(1);
+    const esEntryPoint = path.resolve(handlerPath.replace(ext, ""));
 
-      const slsDeclaration: any = this.serverless.service.getFunction(funcName);
-      const runtime = slsDeclaration.runtime ?? defaultRuntime;
+    const slsDeclaration: any = this.serverless.service.getFunction(funcName);
+    const runtime = slsDeclaration.runtime ?? defaultRuntime;
 
-      let lambdaDef: any = {
-        name: funcName,
-        outName: slsDeclaration.name,
-        runtime: slsDeclaration.runtime ?? defaultRuntime,
-        handlerPath,
-        handlerName,
-        esEntryPoint,
-        memorySize: lambda.memorySize ?? this.runtimeConfig.memorySize ?? DEFAULT_LAMBDA_MEMORY_SIZE,
-        timeout: lambda.timeout ?? this.runtimeConfig.timeout ?? DEFAULT_LAMBDA_TIMEOUT,
-        endpoints: [],
-        sns: [],
-        sqs: [],
-        ddb: [],
-        s3: [],
-        kinesis: [],
-        documentDb: [],
-        virtualEnvs: { ...this.defaultVirtualEnvs, ...(slsDeclaration.virtualEnvs ?? {}) },
-        online: typeof slsDeclaration.online == "boolean" ? slsDeclaration.online : true,
-        environment: {
-          AWS_EXECUTION_ENV: `AWS_Lambda_${runtime}`,
-          AWS_LAMBDA_FUNCTION_VERSION: "$LATEST",
-          AWS_LAMBDA_FUNCTION_NAME: funcName,
-          _HANDLER: path.basename(handlerPath),
-          ...this.runtimeConfig.environment,
-          ...lambda.environment,
-          ...isLocalEnv,
-        },
-        invoke: async (event: any, info?: any) => {
-          const foundLambda = this.getHandlerByName(`/@invoke/${funcName}`);
-          if (foundLambda) {
-            const res = await foundLambda.invoke(event, info);
-            return res;
-          } else {
-            log.RED(`'${funcName}' is not mounted yet.\nPlease invoke it after the initial build is completed.`);
-            return;
-          }
-        },
-        invokeSub: [],
-        invokeSuccessSub: [],
-        invokeErrorSub: [],
-        setEnv: (key: string, value: string) => {
-          this.setEnv(funcName, key, value);
-        },
-      };
-
-      // @ts-ignore
-      lambdaDef.onError = parseDestination(lambda.onError, Outputs, this.resources);
-
-      if (lambdaDef.onError?.kind == "lambda") {
-        log.YELLOW("Dead-Letter queue could only be a SNS or SQS service");
-        delete lambdaDef.onError;
-      }
-      //@ts-ignore
-      if (lambda.destinations && typeof lambda.destinations == "object") {
-        //@ts-ignore
-        lambdaDef.onFailure = parseDestination(lambda.destinations.onFailure, Outputs, this.resources);
-        //@ts-ignore
-        lambdaDef.onSuccess = parseDestination(lambda.destinations.onSuccess, Outputs, this.resources);
-      }
-
-      lambdaDef.onInvoke = (callback: (event: any, info?: any) => void) => {
-        lambdaDef.invokeSub.push(callback);
-      };
-      lambdaDef.onInvokeSuccess = (callback: (event: any, info?: any) => void) => {
-        lambdaDef.invokeSuccessSub.push(callback);
-      };
-      lambdaDef.onInvokeError = (callback: (event: any, info?: any) => void) => {
-        lambdaDef.invokeErrorSub.push(callback);
-      };
-
-      if (process.env.NODE_ENV) {
-        lambdaDef.environment.NODE_ENV = process.env.NODE_ENV;
-      }
-      if (region) {
-        lambdaDef.environment.AWS_REGION = region;
-        lambdaDef.environment.AWS_DEFAULT_REGION = region;
-      }
-
-      lambdaDef.environment.AWS_LAMBDA_FUNCTION_MEMORY_SIZE = lambdaDef.memorySize;
-      lambdaDef.url = parseFuncUrl(lambda);
-      if (lambda.events.length) {
-        let httpApiPayload = defaultHttpApiPayload;
-        if (typeof slsDeclaration.httpApi?.payload == "string") {
-          const { payload } = slsDeclaration.httpApi;
-          httpApiPayload = payload == "1.0" ? 1 : payload == "2.0" ? 2 : defaultHttpApiPayload;
+    let lambdaDef: any = {
+      name: funcName,
+      outName: slsDeclaration.name,
+      runtime: slsDeclaration.runtime ?? defaultRuntime,
+      handlerPath,
+      handlerName,
+      esEntryPoint,
+      memorySize: lambda.memorySize ?? this.runtimeConfig.memorySize ?? DEFAULT_LAMBDA_MEMORY_SIZE,
+      timeout: lambda.timeout ?? this.runtimeConfig.timeout ?? DEFAULT_LAMBDA_TIMEOUT,
+      endpoints: [],
+      sns: [],
+      sqs: [],
+      ddb: [],
+      s3: [],
+      kinesis: [],
+      documentDb: [],
+      virtualEnvs: { ...this.defaultVirtualEnvs, ...(slsDeclaration.virtualEnvs ?? {}) },
+      online: typeof slsDeclaration.online == "boolean" ? slsDeclaration.online : true,
+      environment: {
+        AWS_EXECUTION_ENV: `AWS_Lambda_${runtime}`,
+        AWS_LAMBDA_FUNCTION_VERSION: "$LATEST",
+        AWS_LAMBDA_FUNCTION_NAME: funcName,
+        _HANDLER: path.basename(handlerPath),
+        ...this.runtimeConfig.environment,
+        ...lambda.environment,
+        ...isLocalEnv,
+      },
+      invoke: async (event: any, info?: any) => {
+        const foundLambda = this.getHandlerByName(`/@invoke/${funcName}`);
+        if (foundLambda) {
+          const res = await foundLambda.invoke(event, info);
+          return res;
+        } else {
+          log.RED(`'${funcName}' is not mounted yet.\nPlease invoke it after the initial build is completed.`);
+          return;
         }
-        const { endpoints, sns, sqs, ddb, s3, kinesis, documentDb } = parseEvents({ events: lambda.events, Outputs, resources: this.resources, httpApiPayload, provider });
-        lambdaDef.endpoints = endpoints;
-        lambdaDef.sns = sns;
-        lambdaDef.sqs = sqs;
-        lambdaDef.ddb = ddb;
-        lambdaDef.s3 = s3;
-        lambdaDef.kinesis = kinesis;
-        lambdaDef.documentDb = documentDb;
+      },
+      invokeSub: [],
+      invokeSuccessSub: [],
+      invokeErrorSub: [],
+      setEnv: (key: string, value: string) => {
+        this.setEnv(funcName, key, value);
+      },
+    };
+
+    // @ts-ignore
+    lambdaDef.onError = parseDestination(lambda.onError, Outputs, this.resources);
+
+    if (lambdaDef.onError?.kind == "lambda") {
+      log.YELLOW("Dead-Letter queue could only be a SNS or SQS service");
+      delete lambdaDef.onError;
+    }
+    //@ts-ignore
+    if (lambda.destinations && typeof lambda.destinations == "object") {
+      //@ts-ignore
+      lambdaDef.onFailure = parseDestination(lambda.destinations.onFailure, Outputs, this.resources);
+      //@ts-ignore
+      lambdaDef.onSuccess = parseDestination(lambda.destinations.onSuccess, Outputs, this.resources);
+    }
+
+    lambdaDef.onInvoke = (callback: (event: any, info?: any) => void) => {
+      lambdaDef.invokeSub.push(callback);
+    };
+    lambdaDef.onInvokeSuccess = (callback: (event: any, info?: any) => void) => {
+      lambdaDef.invokeSuccessSub.push(callback);
+    };
+    lambdaDef.onInvokeError = (callback: (event: any, info?: any) => void) => {
+      lambdaDef.invokeErrorSub.push(callback);
+    };
+
+    if (process.env.NODE_ENV) {
+      lambdaDef.environment.NODE_ENV = process.env.NODE_ENV;
+    }
+    if (region) {
+      lambdaDef.environment.AWS_REGION = region;
+      lambdaDef.environment.AWS_DEFAULT_REGION = region;
+    }
+
+    lambdaDef.environment.AWS_LAMBDA_FUNCTION_MEMORY_SIZE = lambdaDef.memorySize;
+    lambdaDef.url = parseFuncUrl(lambda);
+    if (lambda.events.length) {
+      let httpApiPayload = defaultHttpApiPayload;
+      if (typeof slsDeclaration.httpApi?.payload == "string") {
+        const { payload } = slsDeclaration.httpApi;
+        httpApiPayload = payload == "1.0" ? 1 : payload == "2.0" ? 2 : defaultHttpApiPayload;
       }
-      // console.log(lambdaDef);
+      const { endpoints, sns, sqs, ddb, s3, kinesis, documentDb } = parseEvents({ events: lambda.events, Outputs, resources: this.resources, httpApiPayload, provider });
+      lambdaDef.endpoints = endpoints;
+      lambdaDef.sns = sns;
+      lambdaDef.sqs = sqs;
+      lambdaDef.ddb = ddb;
+      lambdaDef.s3 = s3;
+      lambdaDef.kinesis = kinesis;
+      lambdaDef.documentDb = documentDb;
+    }
+
+    return lambdaDef;
+  }
+
+  #getLambdas() {
+    const funcs = this.serverless.service.functions;
+    let functionsNames = Object.keys(funcs);
+
+    if (this.invokeName) {
+      functionsNames = functionsNames.filter((x) => x == this.invokeName);
+    }
+
+    const lambdas = functionsNames.reduce((accum: any[], funcName: string) => {
+      const lambdaDef = this.#getLambdaDef(funcName);
       accum.push(lambdaDef);
       return accum;
     }, []);
@@ -545,7 +554,8 @@ export class ServerlessAwsLambda extends Daemon {
       log.RED(`Can not set env variable '${key}' on '${lambdaName}'`);
     }
   }
-  async #setCustomEsBuildConfig() {
+
+  async #applyDefineConfig() {
     const customConfigArgs = {
       stop: async (cb?: (err?: any) => void) => {
         if (this.buildContext.stop) {
@@ -558,6 +568,18 @@ export class ServerlessAwsLambda extends Daemon {
       isPackaging: this.isPackaging,
       setEnv: (n: string, k: string, v: string) => {
         this.setEnv(n, k, v);
+      },
+      addLambda: (func: ILambdaFunction) => {
+        if (!func.events) {
+          func.events = [];
+        } else if (!Array.isArray(func.events)) {
+          throw new Error("Lambda 'events' must be an array when defined");
+        }
+
+        // @ts-ignore
+        this.serverless.service.functions[func.name] = func;
+
+        this.#lambdas.push(this.#getLambdaDef(func.name));
       },
       stage: this.stage,
       region: this.region,

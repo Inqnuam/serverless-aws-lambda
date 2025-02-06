@@ -5,7 +5,7 @@ export interface ICommonConfig {
   /**
    * Lambda timeout
    *
-   * @default 6
+   * @default 3
    */
   timeout?: number;
   /**
