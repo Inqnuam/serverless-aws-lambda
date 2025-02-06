@@ -173,9 +173,34 @@ describe("Standalone", () => {
     expect(res.errorMessage).toBe("crash is not defined");
   });
 
-  it("Should run new server with Python", { timeout: 18_000 }, async () => {
+  it("Should be able invoke Python Lambda with large body and receive large response", { timeout: 18_000 }, async () => {
     await using server = await run({
-      functions: [{ name: "pipi", handler: "test/lambdas/pipi.handler", runtime: "python3.7", timeout: 16, environment: { HELLO: "WORLD" } }],
+      functions: [{ name: "largeResponse", handler: "test/lambdas/largeResponse.handler", runtime: "python3.7", timeout: 6 }],
+    });
+
+    const _largeRequest = new Array(20_000).fill("a").join("");
+    const largeRequest = `start${_largeRequest}end`;
+
+    const res = await callLambda(server.port, "largeResponse", JSON.stringify({ largeRequest }));
+
+    expect(res).deep.eq({ statusCode: 200, body: { largeRequest } });
+  });
+
+  it("Should be able invoke Python Lambda with small body and receive small response", { timeout: 18_000 }, async () => {
+    await using server = await run({
+      functions: [{ name: "largeResponse", handler: "test/lambdas/largeResponse.handler", runtime: "python3.7", timeout: 6 }],
+    });
+
+    const smallRequest = `startaaaaaxaaaaend`;
+
+    const res = await callLambda(server.port, "largeResponse", JSON.stringify({ smallRequest }));
+
+    expect(res).deep.eq({ statusCode: 200, body: { smallRequest } });
+  });
+
+  it("Should run new server with Python", { timeout: 25_000 }, async () => {
+    await using server = await run({
+      functions: [{ name: "pipi", handler: "test/lambdas/pipi.handler", runtime: "python3.7", timeout: 22, environment: { HELLO: "WORLD" } }],
     });
 
     // first call

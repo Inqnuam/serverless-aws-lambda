@@ -109,6 +109,8 @@ export class PythonRunner implements Runner {
       return new Promise((resolve, reject) => {
         const content = JSON.stringify({ event, awsRequestId, context: clientContext ?? "" });
 
+        let responseStart = "";
+        // NOTE this is definitely improvable
         const pyListener = (chunk: Buffer) => {
           let result: any = null;
           const data = chunk.toString();
@@ -119,7 +121,7 @@ export class PythonRunner implements Runner {
               this.setWatchFiles(data);
             }
 
-            if (data.includes(PythonRunner.DELIMITER)) {
+            if (data.startsWith(PythonRunner.DELIMITER) && data.includes(PythonRunner.DELIMITEREND)) {
               const output = data.split(PythonRunner.DELIMITER);
               const res = output[output.length - 1].split(PythonRunner.DELIMITEREND)[0];
 
@@ -141,7 +143,19 @@ export class PythonRunner implements Runner {
               this.python!.stdout.removeListener("data", pyListener);
               this.python!.stderr.removeListener("data", errorHandler);
               resolve(result);
-            } else if (data.trim()) {
+            } else if (data.startsWith(PythonRunner.DELIMITER)) {
+              responseStart = data.slice(PythonRunner.DELIMITER.length);
+            } else if (data.includes(PythonRunner.DELIMITEREND)) {
+              const responseEnd = data.slice(0, data.indexOf(PythonRunner.DELIMITEREND));
+
+              const result = JSON.parse(`${responseStart}${responseEnd}`);
+
+              this.python!.stdout.removeListener("data", pyListener);
+              this.python!.stderr.removeListener("data", errorHandler);
+              resolve(result);
+            } else if (responseStart) {
+              responseStart += data;
+            } else if (!responseStart && data.trim()) {
               let printable;
               if (hasWatchFiles) {
                 const printablesAsArray = data.split("\n");
