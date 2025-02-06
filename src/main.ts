@@ -643,20 +643,20 @@ export class ServerlessAwsLambda extends Daemon {
         this.afterPackageCallbacks = exportedObject.afterPackageCallbacks;
       }
 
-      if (exportedObject.offline && typeof exportedObject.offline == "object") {
-        if (Array.isArray(exportedObject.offline.request)) {
-          customOfflineRequests.unshift(...exportedObject.offline.request);
+      if (exportedObject.server && typeof exportedObject.server == "object") {
+        if (Array.isArray(exportedObject.server.request)) {
+          customOfflineRequests.unshift(...exportedObject.server.request);
         }
 
-        if (typeof exportedObject.offline.staticPath == "string") {
-          this.serve = exportedObject.offline.staticPath;
+        if (typeof exportedObject.server.staticPath == "string") {
+          this.serve = exportedObject.server.staticPath;
         }
-        if (typeof exportedObject.offline.port == "number" && !this.port) {
-          this.port = exportedObject.offline.port;
+        if (typeof exportedObject.server.port == "number" && !this.port) {
+          this.port = exportedObject.server.port;
         }
 
-        if (typeof exportedObject.offline.onReady == "function") {
-          this.onReady = exportedObject.offline.onReady;
+        if (typeof exportedObject.server.onReady == "function") {
+          this.onReady = exportedObject.server.onReady;
         }
       }
     }

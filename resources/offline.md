@@ -1,4 +1,4 @@
-Set offline static path, custom port and add request listeners:
+Set local server static path, custom port and add request listeners:
 
 ```js
 // config.js
@@ -8,7 +8,7 @@ export default defineConfig({
   esbuild: {
     //...
   },
-  offline: {
+  server: {
     staticPath: "./public",
     port: 9999,
     onReady: (port) => {
@@ -73,7 +73,7 @@ export default defineConfig({
   esbuild: {
     // ...
   },
-  offline: {
+  server: {
     // ...
   },
   buildCallback: async (result) => {

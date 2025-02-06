@@ -52,7 +52,7 @@ const s3Plugin = (options?: IOptions): SlsAwsLambdaPlugin => {
         } catch (error) {}
       }
     },
-    offline: {
+    server: {
       async onReady() {
         const buckets: Record<string, BucketConfig> = {};
         Object.values(this.serverless.service.resources?.Resources ?? {}).forEach((x: any) => {

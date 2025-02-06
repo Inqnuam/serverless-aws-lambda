@@ -8,7 +8,7 @@ import { SnsError } from "./errors";
 export const snsPlugin = (): SlsAwsLambdaPlugin => {
   return {
     name: "sns-plugin",
-    offline: {
+    server: {
       request: [
         // @internal
         {

@@ -8,7 +8,7 @@ export default defineConfig({
   esbuild: {
     format: "esm",
   },
-  offline: {
+  server: {
     port: 7500,
   },
   plugins: [test && vitestPlugin({ configFile: "./vitest.e2e.config.mts", oneshot })],

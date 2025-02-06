@@ -4,12 +4,12 @@
 
 ### Description
 
-> AWS Lambda dev tool for Serverless. Allows Express synthax in handlers. Supports packaging, local invoking and offline Application Load Balancer and API Gateway lambda server mocking.
+> AWS Lambda dev tool for Serverless. Supports packaging, local invoking with Application Load Balancer and API Gateway, S3, SQS, SNS, DynamoStream server mocking.
 
 - Plug & Play (easy to install, configure and use)
 - Highly customizable
 - Functions are bundled by [esbuild](https://github.com/evanw/esbuild)
-- Offline server uses NodeJS `http` module
+- Local server uses NodeJS `http` module
 - Packaging is made by [node-archiver](https://github.com/archiverjs/node-archiver)
 
 ### Supported Runtimes
@@ -111,7 +111,7 @@ Failed execution:
 
 #### **Events**
 
-Offline server supports Application Load Balancer, API Gateway and Function URL endpoints out of box.
+Local server supports Application Load Balancer, API Gateway and Function URL endpoints out of box.
 See [plugins](#plugins) for more triggers (SNS, SQS, etc.).  
 Appropriate `event` object is sent to the handler based on your lambda declaration.
 
@@ -137,7 +137,7 @@ However if your declare both `alb` and `http` or `httpApi` inside a single lambd
 - header with `X-Mock-Type`.
 - or in query string with `x_mock_type`.
 
-Please note that invoking a lambda from sls CLI (`sls invoke local -f myFunction`) will not trigger the offline server. But will still make your handler ready to be invoked.
+Please note that invoking a lambda from sls CLI (`sls invoke local -f myFunction`) will not trigger the local server. But will still make your handler ready to be invoked.
 
 #### **AWS Console `Test` button**
 

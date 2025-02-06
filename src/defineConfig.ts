@@ -86,7 +86,7 @@ export interface SlsAwsLambdaPlugin {
   onKill?: (this: ClientConfigParams) => Promise<void> | void;
   afterDeploy?: (this: ClientConfigParams) => Promise<void> | void;
   afterPackage?: (this: ClientConfigParams) => Promise<void> | void;
-  offline?: {
+  server?: {
     onReady?: (this: ClientConfigParams, port: number, ip: string) => Promise<void> | void;
     /**
      * Add new requests to the local server.
@@ -109,7 +109,7 @@ export interface Options {
    * @default false
    */
   includeAwsSdk?: boolean;
-  offline?: {
+  server?: {
     /**
      * Serve files locally from provided directory
      */
@@ -161,9 +161,9 @@ function defineConfig(options: Options) {
       esbuild: options.esbuild ?? {},
       shimRequire: options.shimRequire,
       includeAwsSdk: options.includeAwsSdk,
-      offline: {
-        staticPath: options.offline?.staticPath,
-        port: options.offline?.port,
+      server: {
+        staticPath: options.server?.staticPath,
+        port: options.server?.port,
       },
       afterDeployCallbacks: [],
       afterPackageCallbacks: [],
@@ -198,11 +198,11 @@ function defineConfig(options: Options) {
       addLambda,
     };
     if (options.plugins) {
-      config.offline!.onReady = async (port, ip) => {
+      config.server!.onReady = async (port, ip) => {
         for (const plugin of options.plugins! as SlsAwsLambdaPlugin[]) {
-          if (plugin.offline?.onReady) {
+          if (plugin.server?.onReady) {
             try {
-              await plugin.offline.onReady!.call(self, port, ip);
+              await plugin.server.onReady!.call(self, port, ip);
             } catch (error) {
               log.RED(plugin.name);
               console.error(error);
@@ -228,13 +228,13 @@ function defineConfig(options: Options) {
       };
 
       const pluginsRequests: OfflineConfig["request"] = (options.plugins as SlsAwsLambdaPlugin[]).reduce((accum: OfflineConfig["request"], obj) => {
-        if (obj.offline?.request?.length) {
-          accum!.push(...obj.offline.request);
+        if (obj.server?.request?.length) {
+          accum!.push(...obj.server.request);
         }
         return accum;
       }, []);
       if (pluginsRequests?.length) {
-        config.offline!.request = pluginsRequests.map((x) => {
+        config.server!.request = pluginsRequests.map((x) => {
           x.callback = x.callback.bind(self);
 
           return x;

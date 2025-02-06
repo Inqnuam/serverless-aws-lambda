@@ -3,7 +3,7 @@
 [defineConfig](../src/defineConfig.ts) is a fully typed function which provides an interface where you can:
 
 - customize [esbuild](esbuild.md)
-- configure offline server (static path, port, custom routes)
+- configure local server (static path, port, custom routes)
 - invoke lambdas with a custom event
 - play with env variables on the fly
 - add plugins to serverless-aws-lambda.
@@ -27,7 +27,7 @@ export default defineConfig({
   esbuild: {
     target: "es2020",
   },
-  offline: {
+  server: {
     staticPath: "./public",
     port: 9999,
   },
@@ -57,9 +57,9 @@ import type { SlsAwsLambdaPlugin } from "serverless-aws-lambda/defineConfig";
       buildCallback : async function (result, isRebuild) {
         // do something
       },
-      offline: {
+      server: {
         onReady: function (port, ip) {
-          console.log("Offline port", port)
+          console.log("server port", port)
         },
         request: [
           {
@@ -91,7 +91,7 @@ export default defineConfig({
   esbuild: {
     target: "es2020",
   },
-  offline: {
+  server: {
     staticPath: "./public",
     port: 9999,
   },

@@ -69,7 +69,7 @@ export const sqsPlugin = (
         }
       }
     },
-    offline: {
+    server: {
       async onReady(port, ip) {
         if (!this.getServices().sqs) {
           await this.setServices({ sqs: { region: "us-east-1", endpoint: `http://localhost:${port}/@sqs`, credentials: { accessKeyId: "fake", secretAccessKey: "fake" } } });
