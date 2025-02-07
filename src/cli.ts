@@ -167,7 +167,12 @@ const options: Record<string, ICliOptions> = {
   },
   "esbuild-format": {
     type: "string",
-    description: "Sets esbuild format (cjs|esm)",
+    description: "Set esbuild format (cjs|esm)",
+  },
+  "esbuild-out-ext": {
+    type: "string",
+    description: "Set esbuild outExtension",
+    example: "aws-lambda --esbuild-out-ext .mjs --esbuild-format esm",
   },
   help: { type: "boolean", short: "h" },
 };
@@ -179,6 +184,7 @@ const { values } = parseArgs({
 
 const { port, config, debug, help, runtime, definitions, timeout, functions, handlerName, exclude, env } = values;
 const esbuildFormat = values["esbuild-format"];
+const esbuildOutExtension = values["esbuild-out-ext"];
 
 if (help) {
   printHelpAndExit();
@@ -191,10 +197,18 @@ if (definitions && functions) {
 // @ts-ignore
 const functionDefs = functions ? await getFromGlob(new RegExp(exclude), handlerName, functions as string[]) : await getFunctionsDefinitionFromFile(definitions as string);
 
-let esbuildOptions;
+let esbuildOptions = esbuildFormat || esbuildOutExtension ? {} : undefined;
 
 if (typeof esbuildFormat == "string") {
-  esbuildOptions = { format: esbuildFormat };
+  // @ts-ignore
+  esbuildOptions.format = esbuildFormat;
+}
+
+if (typeof esbuildOutExtension == "string") {
+  // @ts-ignore
+  esbuildOptions.outExtension = {
+    ".js": esbuildOutExtension,
+  };
 }
 
 run({

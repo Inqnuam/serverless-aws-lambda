@@ -24,6 +24,10 @@ export const mergeEsbuildConfig = (esBuildConfig: BuildOptions, customEsBuildCon
     esBuildConfig.format = customEsBuildConfig.format;
   }
 
+  if (typeof customEsBuildConfig.outExtension) {
+    esBuildConfig.outExtension = customEsBuildConfig.outExtension;
+  }
+
   if ("sourcesContent" in customEsBuildConfig) {
     esBuildConfig.sourcesContent = customEsBuildConfig.sourcesContent;
   }

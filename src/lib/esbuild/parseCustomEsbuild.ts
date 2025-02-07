@@ -22,6 +22,10 @@ export const parseCustomEsbuild = (customConfig: BuildOptions) => {
     customEsBuild.format = customConfig.format;
   }
 
+  if (typeof customConfig.outExtension) {
+    customEsBuild.outExtension = customConfig.outExtension;
+  }
+
   if ("sourcesContent" in customConfig) {
     customEsBuild.sourcesContent = customConfig.sourcesContent;
   }
