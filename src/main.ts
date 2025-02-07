@@ -564,10 +564,7 @@ export class ServerlessAwsLambda extends Daemon {
   async #applyDefineConfig() {
     const customConfigArgs = {
       stop: async (cb?: (err?: any) => void) => {
-        if (this.buildContext.stop) {
-          await this.buildContext.stop();
-        }
-        this.stop(cb);
+        await this.kill(cb);
       },
       lambdas: this.#lambdas,
       isDeploying: this.isDeploying,
@@ -699,9 +696,9 @@ export class ServerlessAwsLambda extends Daemon {
     }
   };
 
-  async kill() {
+  async kill(cb?: (err?: any) => void) {
     // stop listenting new requests
-    this.stop();
+    this.stop(cb);
 
     // stop esbuild
     if (this.buildContext.stop) {
