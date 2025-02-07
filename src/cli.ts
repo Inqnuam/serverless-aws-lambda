@@ -6,6 +6,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { run, type ILambdaFunction } from "./standalone" with { external: "true" };
 import { log } from "./lib/utils/colorize";
+import { version, name } from "../package.json";
 
 function printHelpAndExit() {
   log.setDebug(true);
@@ -18,8 +19,17 @@ function printHelpAndExit() {
   for (const [optionName, value] of Object.entries(options)) {
     let printableName = optionName;
 
+    if (value.skip) {
+      continue;
+    }
+
     if (value.short) {
       printableName += `, -${value.short}`;
+    }
+
+    if (value.skipFullPrint) {
+      log.CYAN(`\t --${printableName}\n`);
+      continue;
     }
 
     let content = `\t\ttype: ${value.type}`;
@@ -40,6 +50,13 @@ function printHelpAndExit() {
     log.GREY(content);
   }
 
+  log.CYAN(`\t --esbuild-[option]`);
+  log.GREY(`\n\t\tdescription: where 'options' is one of esbuild build options`);
+  log.GREY(
+    `\n\t\texample: aws-lambda --esbuild-external="@aws-sdk/*" --esbuild-external=react --esbuild-format=esm  --esbuild-outExtension..js=.mjs --esbuild-outExtension..css=.CSS`
+  );
+
+  console.log(name, `v${version}`);
   process.exit(0);
 }
 
@@ -145,6 +162,8 @@ interface ICliOptions {
   default?: string | boolean | string[] | boolean[] | undefined;
   description?: string;
   example?: string;
+  skipFullPrint?: boolean;
+  skip?: boolean;
 }
 
 const options: Record<string, ICliOptions> = {
@@ -155,7 +174,7 @@ const options: Record<string, ICliOptions> = {
   timeout: { type: "string", short: "t", default: "3", description: "Set default timeout." },
   definitions: { type: "string", short: "d", description: "Path to .json, .mjs, .cjs file with Lambda function definitions." },
   functions: { type: "string", short: "f", multiple: true, description: "Glob pattern to automatically find and define Lambda handlers." },
-  exclude: { type: "string", short: "x", default: "\.(test|spec)\.", description: "RegExp string to exclude found enteries from --functions." },
+  exclude: { type: "string", short: "x", default: "\.(test|spec)\.", description: "RegExp string to exclude found enteries from --functions." }, // maybe no default ? ot show it as example
   handlerName: { type: "string", default: "handler", description: "Handler function name. To be used with --functions." },
   env: {
     type: "string",
@@ -165,20 +184,17 @@ const options: Record<string, ICliOptions> = {
     description: "Environment variables to be injected into Lambdas. All existing AWS_* are automatically injected.",
     example: "-e API_KEY=supersecret -e API_URL=https://website.com",
   },
-  "esbuild-outdir": {
-    type: "string",
-    description: "Set esbuild outdir",
-  },
-  "esbuild-format": {
-    type: "string",
-    description: "Set esbuild format (cjs|esm)",
-  },
-  "esbuild-out-ext": {
-    type: "string",
-    description: "Set esbuild outExtension",
-    example: "aws-lambda --esbuild-out-ext .mjs --esbuild-format esm",
-  },
-  help: { type: "boolean", short: "h" },
+  "optimize-build": { type: "boolean", default: true, description: "externalize dependencies and other stuff during dev" },
+  "shim-require": { type: "boolean", default: false, description: "shim 'require()', '__dirname' and '__filename' when bundeling Lambdas with ESM format" },
+  help: { type: "boolean", short: "h", skipFullPrint: true },
+  version: { type: "boolean", short: "v", skipFullPrint: true },
+  "esbuild-external": { type: "string", multiple: true, skip: true },
+  "esbuild-resolveExtensions": { type: "string", multiple: true, skip: true },
+  "esbuild-mainFields": { type: "string", multiple: true, skip: true },
+  "esbuild-conditions": { type: "string", multiple: true, skip: true },
+  "esbuild-entryPoints": { type: "string", multiple: true, skip: true },
+  "esbuild-inject": { type: "string", multiple: true, skip: true },
+  "esbuild-nodePaths": { type: "string", multiple: true, skip: true },
 };
 
 const { values } = parseArgs({
@@ -187,11 +203,11 @@ const { values } = parseArgs({
 });
 
 const { port, config, debug, help, runtime, definitions, timeout, functions, handlerName, exclude, env } = values;
-const esbuildFormat = values["esbuild-format"];
-const esbuildOutExtension = values["esbuild-out-ext"];
-const esbuildOutdir = values["esbuild-outdir"];
 
-if (help) {
+if (values.version) {
+  console.log(version);
+  process.exit(0);
+} else if (help) {
   printHelpAndExit();
 }
 
@@ -202,39 +218,44 @@ if (definitions && functions) {
 // @ts-ignore
 const functionDefs = functions ? await getFromGlob(new RegExp(exclude), handlerName, functions as string[]) : await getFunctionsDefinitionFromFile(definitions as string);
 
-let esbuildOptions = {};
+let esbuildOptions: Record<string, any> = {};
 
-if (typeof esbuildFormat == "string") {
-  // @ts-ignore
-  esbuildOptions.format = esbuildFormat;
+for (const opt of Object.keys(values).filter((x) => x.startsWith("esbuild-"))) {
+  const optionRawName = opt.split("esbuild-")[1];
+
+  if (optionRawName.includes(".")) {
+    const dotIndex = optionRawName.indexOf(".");
+    const topLevelName = optionRawName.slice(0, dotIndex);
+    const childName = optionRawName.slice(dotIndex + 1);
+
+    if (!esbuildOptions[topLevelName]) {
+      esbuildOptions[topLevelName] = {};
+    }
+
+    esbuildOptions[topLevelName][childName] = values[opt];
+  } else {
+    esbuildOptions[optionRawName] = values[opt];
+  }
 }
 
-if (typeof esbuildOutdir == "string") {
-  // @ts-ignore
-  esbuildOptions.outdir = esbuildOutdir;
-}
+const optimizeBuild = values["optimize-build"];
+const shimRequire = values["shim-require"];
 
-if (typeof esbuildOutExtension == "string") {
-  // @ts-ignore
-  esbuildOptions.outExtension = {
-    ".js": esbuildOutExtension,
-  };
-}
-
-run({
-  // @ts-ignore
+const opt = {
   debug,
-  // @ts-ignore
   configPath: config,
   port: getNumberOrDefault(port, 0),
   functions: functionDefs,
-  // @ts-ignore
   esbuild: esbuildOptions,
+  optimizeBuild,
+  shimRequire,
   defaults: {
     // @ts-ignore
     environment: getDefaultEnvs(env),
-    // @ts-ignore
     runtime,
     timeout: getNumberOrDefault(timeout, 3),
   },
-});
+};
+
+// @ts-ignore
+run(opt);
