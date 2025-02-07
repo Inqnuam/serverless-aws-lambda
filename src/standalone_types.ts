@@ -119,4 +119,14 @@ export interface ServerOptions {
   configPath?: string;
   onKill?: () => Promise<void> | void;
   esbuild?: Config["esbuild"];
+  /**
+   * shim `require`, `__dirname` and `__filename` when bundeling Lambdas with ESM format
+   * @default false
+   */
+  shimRequire?: boolean;
+  /**
+   * Speed up build process during dev mode
+   * @default true
+   */
+  optimizeBuild?: boolean;
 }

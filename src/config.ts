@@ -16,7 +16,7 @@ export interface OfflineConfig {
 export interface Config {
   esbuild?: Omit<BuildOptions, "outfile" | "bundle" | "splitting" | "stdin" | "platforme" | "metafile" | "format"> & { format?: "cjs" | "esm" };
   shimRequire?: boolean;
-  includeAwsSdk?: boolean;
+  optimizeBuild?: boolean;
   server?: OfflineConfig;
   buildCallback?: (result: BuildResult, isRebuild: boolean) => Promise<void> | void;
   afterDeployCallbacks?: (() => Promise<void> | void)[];

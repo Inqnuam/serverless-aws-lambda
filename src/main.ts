@@ -53,6 +53,7 @@ export class ServerlessAwsLambda extends Daemon {
   esBuildConfig: any;
   buildContext: any = {};
   customEsBuildConfig?: Config["esbuild"];
+  optimizeBuild: boolean = true;
   defaultVirtualEnvs: any;
   nodeVersion: number | boolean | string | undefined = false;
   invokeName?: string;
@@ -61,7 +62,6 @@ export class ServerlessAwsLambda extends Daemon {
   onKill: (() => Promise<void> | void)[] = [];
   resources: ReturnType<typeof getResources> = { ddb: {}, kinesis: {}, sns: {}, sqs: {} };
   shimRequire: boolean = false;
-  includeAwsSdk: boolean = false;
   port: number = 0;
   onceServerReady: ((address: { port: number; url: string }) => void)[] = [];
   static tags: string[] = ["build"];
@@ -75,6 +75,14 @@ export class ServerlessAwsLambda extends Daemon {
     if (this.options.customEsBuildConfig) {
       this.customEsBuildConfig = this.options.customEsBuildConfig;
     }
+
+    if (typeof this.options.optimizeBuild == "boolean") {
+      this.optimizeBuild = this.options.optimizeBuild;
+    }
+    if (typeof this.options.shimRequire == "boolean") {
+      this.shimRequire = this.options.shimRequire;
+    }
+
     // @ts-ignore
     this.isPackaging = this.serverless.processedInput.commands.includes("package");
     // @ts-ignore
@@ -221,7 +229,14 @@ export class ServerlessAwsLambda extends Daemon {
 
       const getSockets = () => this.sco;
       esBuildConfig.plugins?.push(
-        buildOptimizer({ isLocal, nodeVersion: this.nodeVersion, shimRequire: this.shimRequire, includeAwsSdk: this.includeAwsSdk, buildCallback: this.buildCallback, getSockets })
+        buildOptimizer({
+          isLocal,
+          nodeVersion: this.nodeVersion,
+          shimRequire: this.shimRequire,
+          optimizeBuild: this.optimizeBuild,
+          buildCallback: this.buildCallback,
+          getSockets,
+        })
       );
     }
     if (!isLocal) {
@@ -630,8 +645,8 @@ export class ServerlessAwsLambda extends Daemon {
         this.shimRequire = exportedObject.shimRequire;
       }
 
-      if (typeof exportedObject.includeAwsSdk == "boolean") {
-        this.includeAwsSdk = exportedObject.includeAwsSdk;
+      if (typeof exportedObject.optimizeBuild == "boolean") {
+        this.optimizeBuild = exportedObject.optimizeBuild;
       }
 
       if (typeof exportedObject.buildCallback == "function") {

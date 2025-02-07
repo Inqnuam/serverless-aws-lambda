@@ -16,14 +16,14 @@ export const buildOptimizer = ({
   isLocal,
   nodeVersion,
   shimRequire,
-  includeAwsSdk,
+  optimizeBuild,
   buildCallback,
   getSockets,
 }: {
   isLocal: boolean;
   nodeVersion: number;
   shimRequire: boolean;
-  includeAwsSdk: boolean;
+  optimizeBuild: boolean;
   buildCallback: (result: BuildResult, isRebuild: boolean, format: string, outdir: string) => void | Promise<void>;
   getSockets: () => Socket[];
 }): Plugin => {
@@ -58,9 +58,21 @@ export const buildOptimizer = ({
           build.initialOptions.inject = [awslambda];
         }
 
-        build.initialOptions.external!.push(...knownCjs);
-      } else if (!includeAwsSdk) {
-        build.initialOptions.external!.push(nodeVersion < 18 ? awsSdkV2 : awsSdkV3);
+        if (optimizeBuild) {
+          build.initialOptions.external!.push(...knownCjs, awsSdkV2, awsSdkV3);
+
+          if (build.initialOptions.format == "esm") {
+            if (!build.initialOptions.mainFields) {
+              build.initialOptions.mainFields = ["module", "main"];
+            } else if (!build.initialOptions.mainFields.includes("module")) {
+              if (!build.initialOptions.mainFields.includes("main")) {
+                build.initialOptions.mainFields.unshift("module", "main");
+              } else {
+                build.initialOptions.mainFields.unshift("module");
+              }
+            }
+          }
+        }
       }
 
       if (build.initialOptions.format != "esm") {

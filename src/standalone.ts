@@ -59,11 +59,25 @@ class FakeSls {
 export async function run(options?: ServerOptions) {
   const fakeSls = new FakeSls();
 
-  let port = 0;
+  const slsOptions: Record<string, any> = {
+    customEsBuildConfig: options?.esbuild,
+  };
 
   if (options) {
     if (options.port) {
-      port = options.port;
+      slsOptions.port = options.port;
+    }
+
+    if (typeof options.debug == "boolean") {
+      slsOptions.debug = options.debug;
+    }
+
+    if (typeof options.shimRequire == "boolean") {
+      slsOptions.shimRequire = options.shimRequire;
+    }
+
+    if (typeof options.optimizeBuild == "boolean") {
+      slsOptions.optimizeBuild = options.optimizeBuild;
     }
 
     if (options.configPath) {
@@ -108,17 +122,13 @@ export async function run(options?: ServerOptions) {
     }
   }
 
-  const sls = new ServerlessAwsLambda(
-    fakeSls,
-    { port: port, debug: options?.debug, customEsBuildConfig: options?.esbuild },
-    { log() {}, writeText() {}, progress: { get() {}, create() {} } }
-  );
+  const sls = new ServerlessAwsLambda(fakeSls, slsOptions, { log() {}, writeText() {}, progress: { get() {}, create() {} } });
 
   if (typeof options?.onKill == "function") {
     sls.onKill.push(options.onKill);
   }
 
-  let listeningPort = port;
+  let listeningPort = 0;
   let listeningUrl = "";
 
   let serverWaiterResolve: Function;
