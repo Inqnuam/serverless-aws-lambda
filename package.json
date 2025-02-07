@@ -1,6 +1,6 @@
 {
   "name": "serverless-aws-lambda",
-  "version": "6.0.0-beta.1",
+  "version": "6.0.0-beta.2",
   "description": "AWS Application Load Balancer and API Gateway - Lambda dev tool. Supports packaging, local invoking with ALB, APG, S3, SNS, SQS, DynamoDB Stream server mocking.",
   "author": "Inqnuam",
   "license": "MIT",

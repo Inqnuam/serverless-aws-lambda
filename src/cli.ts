@@ -165,6 +165,10 @@ const options: Record<string, ICliOptions> = {
     description: "Environment variables to be injected into Lambdas. All existing AWS_* are automatically injected.",
     example: "-e API_KEY=supersecret -e API_URL=https://website.com",
   },
+  "esbuild-outdir": {
+    type: "string",
+    description: "Set esbuild outdir",
+  },
   "esbuild-format": {
     type: "string",
     description: "Set esbuild format (cjs|esm)",
@@ -185,6 +189,7 @@ const { values } = parseArgs({
 const { port, config, debug, help, runtime, definitions, timeout, functions, handlerName, exclude, env } = values;
 const esbuildFormat = values["esbuild-format"];
 const esbuildOutExtension = values["esbuild-out-ext"];
+const esbuildOutdir = values["esbuild-outdir"];
 
 if (help) {
   printHelpAndExit();
@@ -197,11 +202,16 @@ if (definitions && functions) {
 // @ts-ignore
 const functionDefs = functions ? await getFromGlob(new RegExp(exclude), handlerName, functions as string[]) : await getFunctionsDefinitionFromFile(definitions as string);
 
-let esbuildOptions = esbuildFormat || esbuildOutExtension ? {} : undefined;
+let esbuildOptions = {};
 
 if (typeof esbuildFormat == "string") {
   // @ts-ignore
   esbuildOptions.format = esbuildFormat;
+}
+
+if (typeof esbuildOutdir == "string") {
+  // @ts-ignore
+  esbuildOptions.outdir = esbuildOutdir;
 }
 
 if (typeof esbuildOutExtension == "string") {
