@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    branches: [main, fixes/v5]
 jobs:
   generate:
     runs-on: ubuntu-latest
