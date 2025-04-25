@@ -2,13 +2,14 @@ import path from "path";
 import { log } from "./colorize";
 import esbuild from "esbuild";
 import { rm } from "fs/promises";
+import { pathToFileURL } from "url";
 
 const jsExt = ["js", "mjs", "cjs", "ts", "cts", "mts"];
 
 const readFromPath = async (sourcefile: string) => {
-  const dir = path.dirname(sourcefile);
+  const dir = path.dirname(path.toNamespacedPath(sourcefile));
   const fname = path.basename(sourcefile, path.extname(sourcefile));
-  const outfile = `${dir}/__${fname}.mjs`;
+  const outfile = path.join(dir, `__${fname}.mjs`);
 
   await esbuild.build({
     outfile,
@@ -24,7 +25,7 @@ const readFromPath = async (sourcefile: string) => {
   });
 
   try {
-    const config = await import(outfile);
+    const config = await import(pathToFileURL(outfile).href);
     return config;
   } catch (error) {
     throw error;
