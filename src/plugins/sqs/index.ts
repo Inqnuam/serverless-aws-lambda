@@ -62,7 +62,8 @@ export const sqsPlugin = (attributes?: QueueAttributes): SlsAwsLambdaPlugin => {
           emulateQueueCreationLifecycle: false,
           baseUrl: "/@sqs/",
           queues: getQueues(this.resources.sqs, this.lambdas, attributes),
-        });
+        }).requestHandler;
+
         notifyReadyState();
       },
       request: [

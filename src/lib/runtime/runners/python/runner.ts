@@ -29,7 +29,7 @@ export class PythonRunner implements Runner {
   isMounted: boolean = false;
   watchers: FSWatcher[] = [];
   filesTime: Map<string, number> = new Map();
-  watcherListener: (event: "rename" | "change", filename: string | Buffer) => void;
+  watcherListener: (event: "rename" | "change", filename: string | Buffer | null) => void;
   emitRebuild: Function;
   static wrapper = moduleDirname.replace(`${path.sep}dist`, "/src/lib/runtime/runners/python/index.py");
   static DELIMITER = "__|response|__";

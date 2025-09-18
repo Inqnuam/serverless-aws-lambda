@@ -14,6 +14,7 @@ const fromUtf8 = (input: string, encoding?: BufferEncoding) => {
   const buf = Buffer.from(input, encoding);
   return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength / Uint8Array.BYTES_PER_ELEMENT);
 };
+// @ts-ignore
 const toUtf8 = (input: Uint8Array) => Buffer.from(input, input.byteOffset, input.byteLength).toString("utf8");
 
 const codec = new EventStreamCodec(toUtf8, fromUtf8);

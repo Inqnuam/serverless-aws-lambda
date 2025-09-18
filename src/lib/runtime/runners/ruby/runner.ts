@@ -27,7 +27,7 @@ export class RubyRunner implements Runner {
   ruby?: ChildProcessWithoutNullStreams;
   isMounted: boolean = false;
   emitRebuild: Function;
-  watcherListener: (event: "rename" | "change", filename: string | Buffer) => void;
+  watcherListener: (event: "rename" | "change", filename: string | Buffer | null) => void;
   watchers: FSWatcher[] = [];
   static wrapper = moduleDirname.replace(`${path.sep}dist`, "/src/lib/runtime/runners/ruby/index.rb");
   static DELIMITER = "__|response|__";
